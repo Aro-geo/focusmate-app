@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "node server.js",
-    "build": "echo 'Build completed'",
+    "build": "echo 'Serverless functions ready for deployment'",
     "start": "node server.js",
     "test": "jest",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
