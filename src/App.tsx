@@ -11,6 +11,7 @@ import TodoList from './pages/TodoList';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import MobileTestComponent from './components/MobileTestComponent';
+import PWAManager from './components/PWAManager';
 import { DataProvider } from './context/DataContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { UserProvider } from './context/UserContext';
@@ -22,6 +23,8 @@ function App() {
       <DataProvider>
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <UserProvider>
+            {/* PWA Manager for install prompts and offline functionality */}
+            <PWAManager />
         <Routes>
           {/* Test Route for Theme and Responsiveness */}
           <Route path="/test" element={<MobileTestComponent />} />

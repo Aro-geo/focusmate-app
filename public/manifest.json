@@ -1,6 +1,7 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "FocusMate AI",
+  "name": "FocusMate AI - Smart Productivity Assistant",
+  "description": "A clean, modern productivity dashboard with AI-powered insights, Pomodoro timer, journaling, and analytics",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,16 +11,121 @@
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any"
     },
     {
       "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/app/dashboard",
+  "scope": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#3b82f6",
+  "background_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "categories": ["productivity", "utilities", "business"],
+  "lang": "en",
+  "dir": "ltr",
+  "screenshots": [
+    {
+      "src": "/screenshots/dashboard-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "platform": "wide",
+      "label": "Dashboard view with AI insights and task management"
+    },
+    {
+      "src": "/screenshots/pomodoro-mobile.png", 
+      "sizes": "375x812",
+      "type": "image/png",
+      "platform": "narrow",
+      "label": "Pomodoro timer with session tracking"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Start Pomodoro",
+      "short_name": "Pomodoro",
+      "description": "Start a focus session with the Pomodoro timer",
+      "url": "/app/pomodoro",
+      "icons": [
+        {
+          "src": "/icons/pomodoro-96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "View Dashboard", 
+      "short_name": "Dashboard",
+      "description": "View your productivity dashboard",
+      "url": "/app/dashboard",
+      "icons": [
+        {
+          "src": "/icons/dashboard-96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Add Journal Entry",
+      "short_name": "Journal", 
+      "description": "Add a new journal entry",
+      "url": "/app/journal",
+      "icons": [
+        {
+          "src": "/icons/journal-96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "View Analytics",
+      "short_name": "Stats",
+      "description": "View productivity analytics and insights", 
+      "url": "/app/stats",
+      "icons": [
+        {
+          "src": "/icons/stats-96.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "web",
+      "url": "https://focusmate-ai.vercel.app/"
+    }
+  ],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+focusmate",
+      "url": "/app/dashboard?action=%s"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "/app/journal/import",
+      "accept": {
+        "text/plain": [".txt", ".md"],
+        "application/json": [".json"]
+      }
+    }
+  ],
+  "handle_links": "preferred"
 }
