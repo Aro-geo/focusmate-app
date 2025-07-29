@@ -16,6 +16,7 @@
         }
         .container {
             background: rgba(255, 255, 255, 0.1);
+            -webkit-backdrop-filter: blur(10px);
             backdrop-filter: blur(10px);
             border-radius: 20px;
             padding: 40px;
@@ -100,49 +101,62 @@
         }
         .success { background: rgba(76, 175, 80, 0.3); }
         .error { background: rgba(244, 67, 54, 0.3); }
+        .hidden {
+            display: none;
+        }
+        .subtitle {
+            text-align: center;
+            font-size: 1.2em;
+            margin-bottom: 40px;
+        }
+        .auth-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🎯 FocusMate AI</h1>
-        <p style="text-align: center; font-size: 1.2em; margin-bottom: 40px;">
+        <p class="subtitle">
             Your AI-powered productivity companion with Neon PostgreSQL backend
         </p>
 
         <div class="auth-section">
             <h2>🔐 Authentication System</h2>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+            <div class="auth-grid">
                 
                 <div>
                     <h3>Sign Up</h3>
                     <form id="signupForm">
                         <div class="form-group">
-                            <label>Email:</label>
-                            <input type="email" id="signupEmail" required>
+                            <label for="signupEmail">Email:</label>
+                            <input type="email" id="signupEmail" placeholder="Enter your email" required>
                         </div>
                         <div class="form-group">
-                            <label>Password:</label>
-                            <input type="password" id="signupPassword" required>
+                            <label for="signupPassword">Password:</label>
+                            <input type="password" id="signupPassword" placeholder="Enter your password" required>
                         </div>
                         <button type="submit">Sign Up</button>
                     </form>
-                    <div id="signupResponse" class="response" style="display: none;"></div>
+                    <div id="signupResponse" class="response hidden"></div>
                 </div>
 
                 <div>
                     <h3>Login</h3>
                     <form id="loginForm">
                         <div class="form-group">
-                            <label>Email:</label>
-                            <input type="email" id="loginEmail" required>
+                            <label for="loginEmail">Email:</label>
+                            <input type="email" id="loginEmail" placeholder="Enter your email" required>
                         </div>
                         <div class="form-group">
-                            <label>Password:</label>
-                            <input type="password" id="loginPassword" required>
+                            <label for="loginPassword">Password:</label>
+                            <input type="password" id="loginPassword" placeholder="Enter your password" required>
                         </div>
                         <button type="submit">Login</button>
                     </form>
-                    <div id="loginResponse" class="response" style="display: none;"></div>
+                    <div id="loginResponse" class="response hidden"></div>
                 </div>
             </div>
         </div>
@@ -151,7 +165,7 @@
             <h2>🔧 API Testing</h2>
             <p>Test your Vercel serverless functions and Neon PostgreSQL connection:</p>
             <button onclick="testAPI()">Test API Endpoints</button>
-            <div id="apiResponse" class="response" style="display: none;"></div>
+            <div id="apiResponse" class="response hidden"></div>
         </div>
 
         <div class="features">
