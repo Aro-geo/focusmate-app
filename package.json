@@ -2,9 +2,6 @@
   "name": "focusmate-ai",
   "version": "1.0.0",
   "description": "FocusMate AI productivity app",
-  "engines": {
-    "node": ">=18.0.0"
-  },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
