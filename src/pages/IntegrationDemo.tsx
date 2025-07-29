@@ -75,7 +75,7 @@ const IntegrationDemo: React.FC = () => {
                   <span className="text-2xl">✅</span>
                   <div>
                     <h3 className="font-medium text-green-900">Authentication</h3>
-                    <p className="text-sm text-green-700">JWT-based auth with Netlify Functions</p>
+                    <p className="text-sm text-green-700">JWT-based auth with API endpoints</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">

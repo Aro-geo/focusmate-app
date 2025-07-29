@@ -40,7 +40,7 @@ export function TodoList() {
         }
         
         // Get host info from server (needed because we can't expose full connection string)
-        const hostResponse = await fetch('/.netlify/functions/get-db-host', {
+        const hostResponse = await fetch('/api/get-db-host', {
           headers: {
             'Authorization': `Bearer ${token}`
           }

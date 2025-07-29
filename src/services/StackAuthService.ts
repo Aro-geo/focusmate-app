@@ -28,9 +28,9 @@ export class StackAuthService {
   
   constructor() {
     this.config = {
-      projectId: process.env.VITE_STACK_PROJECT_ID || '',
-      publishableKey: process.env.VITE_STACK_PUBLISHABLE_CLIENT_KEY || '',
-      jwksUrl: process.env.STACK_AUTH_JWKS_URL || `https://api.stack-auth.com/api/v1/projects/${process.env.VITE_STACK_PROJECT_ID}/.well-known/jwks.json`
+      projectId: import.meta.env.VITE_STACK_PROJECT_ID || '',
+      publishableKey: import.meta.env.VITE_STACK_PUBLISHABLE_CLIENT_KEY || '',
+      jwksUrl: import.meta.env.STACK_AUTH_JWKS_URL || `https://api.stack-auth.com/api/v1/projects/${import.meta.env.VITE_STACK_PROJECT_ID}/.well-known/jwks.json`
     };
   }
 

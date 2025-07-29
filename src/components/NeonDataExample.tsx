@@ -36,7 +36,7 @@ const NeonDataExample: React.FC = () => {
       }
       
       // Call our serverless function with the auth token
-      const response = await axios.get('/.netlify/functions/user-tasks', {
+      const response = await axios.get('/api/user-tasks', {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -68,7 +68,7 @@ const NeonDataExample: React.FC = () => {
         return;
       }
       
-      const response = await axios.post('/.netlify/functions/add-task', {
+      const response = await axios.post('/api/add-task', {
         task: newTask
       }, {
         headers: {

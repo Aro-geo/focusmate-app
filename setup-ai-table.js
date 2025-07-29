@@ -1,7 +1,7 @@
 const { Pool } = require('pg');
 
-// Use the DATABASE_URL directly from netlify.toml
-const DATABASE_URL = "postgresql://neondb_owner:npg_s8ahEI0jtxTM@ep-summer-term-abunoc3n.eu-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
+// Use the DATABASE_URL directly from environment variables
+const DATABASE_URL = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_s8ahEI0jtxTM@ep-summer-term-abunoc3n.eu-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
 
 const pool = new Pool({
   connectionString: DATABASE_URL,

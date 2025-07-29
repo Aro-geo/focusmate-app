@@ -37,7 +37,7 @@ export class UserDataService {
   private apiUrl: string;
   
   constructor() {
-    this.apiUrl = process.env.REACT_APP_API_URL || '/.netlify/functions';
+    this.apiUrl = import.meta.env.VITE_API_URL || '/api';
   }
 
   async fetchUserData(): Promise<UserDataResponse> {

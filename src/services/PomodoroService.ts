@@ -13,7 +13,7 @@ interface FocusSessionsApiResponse {
  * Service for Pomodoro session management (real API integration)
  */
 export const PomodoroService = {
-  apiUrl: process.env.REACT_APP_API_URL || '/.netlify/functions',
+  apiUrl: import.meta.env.VITE_API_URL || '/api',
 
   /**
    * Get authentication headers with JWT token

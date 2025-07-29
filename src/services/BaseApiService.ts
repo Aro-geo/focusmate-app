@@ -1,8 +1,8 @@
 // Base API service for handling authentication and common functionality
 class BaseApiService {
-  private static readonly BASE_URL = process.env.NODE_ENV === 'production' 
-    ? 'https://your-app-name.netlify.app/.netlify/functions'
-    : 'http://localhost:8888/.netlify/functions';
+  private static readonly BASE_URL = import.meta.env.MODE === 'production' 
+    ? 'https://your-app-name.vercel.app/api'
+    : 'http://localhost:3000/api';
 
   private static authToken: string | null = null;
 

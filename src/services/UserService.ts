@@ -11,7 +11,7 @@ interface ApiResponse<T> {
  * Service for user-related operations (real API integration)
  */
 export const UserService = {
-  apiUrl: process.env.REACT_APP_API_URL || '/.netlify/functions',
+  apiUrl: import.meta.env.VITE_API_URL || '/api',
 
   /**
    * Get authentication headers with JWT token

@@ -10,6 +10,7 @@ import SettingsPage from './pages/SettingsPage';
 import TodoList from './pages/TodoList';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
+import MobileTestComponent from './components/MobileTestComponent';
 import { DataProvider } from './context/DataContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { UserProvider } from './context/UserContext';
@@ -22,12 +23,15 @@ function App() {
         <Router>
           <UserProvider>
         <Routes>
+          {/* Test Route for Theme and Responsiveness */}
+          <Route path="/test" element={<MobileTestComponent />} />
+          
           {/* Authentication Routes (no layout) */}
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
           
           {/* Main App Routes (with layout) */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/" element={<Navigate to="/test" replace />} />
           <Route path="/app" element={<Layout><Navigate to="/app/dashboard" replace /></Layout>} />
           <Route path="/app/*" element={
             <Layout>

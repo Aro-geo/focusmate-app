@@ -47,7 +47,7 @@ export function useTodos(): UseTodosReturn {
       }
 
       // Get database host from secure endpoint
-      const hostResponse = await axios.get<DbHostResponse>('/.netlify/functions/get-db-host', {
+      const hostResponse = await axios.get<DbHostResponse>('/api/get-db-host', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
