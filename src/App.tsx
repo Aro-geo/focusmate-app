@@ -20,7 +20,7 @@ function App() {
   return (
     <ThemeProvider>
       <DataProvider>
-        <Router>
+        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <UserProvider>
         <Routes>
           {/* Test Route for Theme and Responsiveness */}

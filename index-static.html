@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 FocusMate AI - Your Productivity Companion</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            max-width: 1200px;
+            margin: 20px auto;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        h2 {
+            color: #f0f8ff;
+            margin: 30px 0 20px 0;
+            font-size: 1.8em;
+            border-bottom: 2px solid rgba(255,255,255,0.3);
+            padding-bottom: 10px;
+        }
+        h3 {
+            color: #e6f3ff;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #e6f3ff;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.15);
+        }
+        input::placeholder, textarea::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 15px 30px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .response {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .success {
+            background: rgba(46, 204, 113, 0.2);
+            border: 1px solid #2ecc71;
+            color: #27ae60;
+        }
+        .error {
+            background: rgba(231, 76, 60, 0.2);
+            border: 1px solid #e74c3c;
+            color: #c0392b;
+        }
+        .hidden {
+            display: none;
+        }
+        .subtitle {
+            text-align: center;
+            font-size: 1.2em;
+            margin-bottom: 40px;
+        }
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        .auth-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        .feature-section {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+        .timer-display {
+            font-size: 3em;
+            text-align: center;
+            margin: 20px 0;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .task-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+            border-left: 4px solid #4CAF50;
+        }
+        .task-completed {
+            opacity: 0.6;
+            border-left-color: #999;
+            text-decoration: line-through;
+        }
+        .ai-chat {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .chat-message {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        .user-message {
+            background: rgba(100, 149, 237, 0.3);
+            text-align: right;
+        }
+        .ai-message {
+            background: rgba(50, 205, 50, 0.3);
+        }
+        .floating-assistant {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: rgba(100, 149, 237, 0.9);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+        .floating-assistant:hover {
+            transform: scale(1.1);
+        }
+        @media (max-width: 768px) {
+            .main-grid, .auth-grid {
+                grid-template-columns: 1fr;
+            }
+            .container {
+                margin: 10px;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 FocusMate AI</h1>
+        <p class="subtitle">
+            Your AI-powered productivity companion with Pomodoro Timer, Task Management & Smart Analytics
+        </p>
+
+        <!-- Main Application Grid -->
+        <div class="main-grid">
+            <!-- Pomodoro Timer Section -->
+            <div class="feature-section">
+                <h3>🍅 Pomodoro Timer</h3>
+                <div class="timer-display" id="timerDisplay">25:00</div>
+                <div style="text-align: center;">
+                    <button onclick="startTimer()">Start</button>
+                    <button onclick="pauseTimer()">Pause</button>
+                    <button onclick="resetTimer()">Reset</button>
+                </div>
+                <div>
+                    <label for="workDuration">Work Duration (minutes):</label>
+                    <input type="number" id="workDuration" value="25" min="1" max="60">
+                </div>
+                <div>
+                    <label for="breakDuration">Break Duration (minutes):</label>
+                    <input type="number" id="breakDuration" value="5" min="1" max="30">
+                </div>
+                <div id="sessionStatus" class="response hidden"></div>
+            </div>
+
+            <!-- Task Manager Section -->
+            <div class="feature-section">
+                <h3>📋 Task Manager</h3>
+                <div class="form-group">
+                    <input type="text" id="newTaskTitle" placeholder="Enter task title...">
+                </div>
+                <div class="form-group">
+                    <textarea id="newTaskDescription" placeholder="Enter task description..." rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <select id="taskPriority">
+                        <option value="low">Low Priority</option>
+                        <option value="medium" selected>Medium Priority</option>
+                        <option value="high">High Priority</option>
+                    </select>
+                </div>
+                <button onclick="addTask()">Add Task</button>
+                <div id="tasksList"></div>
+            </div>
+        </div>
+
+        <!-- AI Assistant Section -->
+        <div class="feature-section">
+            <h3>🤖 AI Productivity Assistant</h3>
+            <div class="form-group">
+                <input type="text" id="aiInput" placeholder="Ask for productivity tips or task help...">
+            </div>
+            <button onclick="askAI()">Get AI Advice</button>
+            <button onclick="getProductivityTip()">Get Productivity Tip</button>
+            
+            <div class="ai-chat" id="aiChat">
+                <div class="chat-message ai-message">
+                    👋 Hello! I'm your AI productivity assistant. Ask me for tips, help with task prioritization, or general productivity advice!
+                </div>
+            </div>
+        </div>
+
+        <!-- Authentication Section -->
+        <div class="auth-section">
+            <h2>🔐 Authentication System</h2>
+            <div class="auth-grid">
+                <div>
+                    <h3>Sign Up</h3>
+                    <form id="signupForm">
+                        <div class="form-group">
+                            <label for="signupEmail">Email:</label>
+                            <input type="email" id="signupEmail" placeholder="Enter your email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="signupPassword">Password:</label>
+                            <input type="password" id="signupPassword" placeholder="Enter your password" required>
+                        </div>
+                        <button type="submit">Sign Up</button>
+                    </form>
+                    <div id="signupResponse" class="response hidden"></div>
+                </div>
+
+                <div>
+                    <h3>Login</h3>
+                    <form id="loginForm">
+                        <div class="form-group">
+                            <label for="loginEmail">Email:</label>
+                            <input type="email" id="loginEmail" placeholder="Enter your email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="loginPassword">Password:</label>
+                            <input type="password" id="loginPassword" placeholder="Enter your password" required>
+                        </div>
+                        <button type="submit">Login</button>
+                    </form>
+                    <div id="loginResponse" class="response hidden"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Testing Section -->
+        <div class="feature-section">
+            <h2>🔧 API Testing</h2>
+            <p>Test your Vercel serverless functions and Neon PostgreSQL connection:</p>
+            <button onclick="testAPI()">Test API Endpoints</button>
+            <div id="apiResponse" class="response hidden"></div>
+        </div>
+    </div>
+
+    <!-- Floating Assistant -->
+    <div class="floating-assistant" onclick="toggleAssistant()">
+        🤖
+    </div>
+
+    <script>
+        // Pomodoro Timer
+        let timer = {
+            minutes: 25,
+            seconds: 0,
+            isRunning: false,
+            isBreak: false,
+            interval: null
+        };
+
+        function updateTimerDisplay() {
+            const display = document.getElementById('timerDisplay');
+            const mins = String(timer.minutes).padStart(2, '0');
+            const secs = String(timer.seconds).padStart(2, '0');
+            display.textContent = `${mins}:${secs}`;
+        }
+
+        function startTimer() {
+            if (!timer.isRunning) {
+                timer.isRunning = true;
+                timer.interval = setInterval(() => {
+                    if (timer.seconds === 0) {
+                        if (timer.minutes === 0) {
+                            // Timer finished
+                            completeSession();
+                            return;
+                        }
+                        timer.minutes--;
+                        timer.seconds = 59;
+                    } else {
+                        timer.seconds--;
+                    }
+                    updateTimerDisplay();
+                }, 1000);
+            }
+        }
+
+        function pauseTimer() {
+            timer.isRunning = false;
+            if (timer.interval) {
+                clearInterval(timer.interval);
+                timer.interval = null;
+            }
+        }
+
+        function resetTimer() {
+            pauseTimer();
+            const workDuration = parseInt(document.getElementById('workDuration').value);
+            timer.minutes = workDuration;
+            timer.seconds = 0;
+            timer.isBreak = false;
+            updateTimerDisplay();
+        }
+
+        function completeSession() {
+            pauseTimer();
+            const statusDiv = document.getElementById('sessionStatus');
+            
+            if (!timer.isBreak) {
+                // Work session completed, start break
+                const breakDuration = parseInt(document.getElementById('breakDuration').value);
+                timer.minutes = breakDuration;
+                timer.seconds = 0;
+                timer.isBreak = true;
+                statusDiv.innerHTML = '🎉 Work session completed! Starting break...';
+                statusDiv.className = 'response success';
+                statusDiv.classList.remove('hidden');
+                startTimer();
+            } else {
+                // Break completed, reset to work
+                const workDuration = parseInt(document.getElementById('workDuration').value);
+                timer.minutes = workDuration;
+                timer.seconds = 0;
+                timer.isBreak = false;
+                statusDiv.innerHTML = '✅ Break completed! Ready for next work session.';
+                statusDiv.className = 'response success';
+                updateTimerDisplay();
+            }
+        }
+
+        // Task Management
+        let tasks = [];
+        let taskIdCounter = 1;
+
+        function addTask() {
+            const title = document.getElementById('newTaskTitle').value.trim();
+            const description = document.getElementById('newTaskDescription').value.trim();
+            const priority = document.getElementById('taskPriority').value;
+
+            if (!title) {
+                alert('Please enter a task title');
+                return;
+            }
+
+            const task = {
+                id: taskIdCounter++,
+                title,
+                description,
+                priority,
+                completed: false,
+                createdAt: new Date()
+            };
+
+            tasks.push(task);
+            renderTasks();
+            
+            // Clear form
+            document.getElementById('newTaskTitle').value = '';
+            document.getElementById('newTaskDescription').value = '';
+        }
+
+        function toggleTask(taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (task) {
+                task.completed = !task.completed;
+                renderTasks();
+            }
+        }
+
+        function deleteTask(taskId) {
+            tasks = tasks.filter(t => t.id !== taskId);
+            renderTasks();
+        }
+
+        function renderTasks() {
+            const tasksList = document.getElementById('tasksList');
+            tasksList.innerHTML = '';
+
+            tasks.forEach(task => {
+                const taskDiv = document.createElement('div');
+                taskDiv.className = `task-item ${task.completed ? 'task-completed' : ''}`;
+                
+                const priorityColors = {
+                    high: '#FF6B6B',
+                    medium: '#4ECDC4', 
+                    low: '#95E1D3'
+                };
+
+                taskDiv.style.borderLeftColor = priorityColors[task.priority];
+                
+                taskDiv.innerHTML = `
+                    <div style="display: flex; justify-content: between; align-items: flex-start;">
+                        <div style="flex: 1;">
+                            <h4>${task.title} <span style="font-size: 0.8em; opacity: 0.7;">[${task.priority}]</span></h4>
+                            ${task.description ? `<p style="margin-top: 5px; opacity: 0.8;">${task.description}</p>` : ''}
+                        </div>
+                        <div style="margin-left: 10px;">
+                            <button onclick="toggleTask(${task.id})" style="padding: 5px 10px; margin: 2px;">
+                                ${task.completed ? '↶ Undo' : '✓ Done'}
+                            </button>
+                            <button onclick="deleteTask(${task.id})" style="padding: 5px 10px; margin: 2px; background: rgba(231, 76, 60, 0.3);">
+                                🗑️ Delete
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                tasksList.appendChild(taskDiv);
+            });
+        }
+
+        // AI Assistant
+        let chatHistory = [];
+
+        function askAI() {
+            const input = document.getElementById('aiInput').value.trim();
+            if (!input) return;
+
+            addChatMessage('user', input);
+            document.getElementById('aiInput').value = '';
+
+            // Simulate AI response (in real app, this would call OpenAI API)
+            setTimeout(() => {
+                const response = generateAIResponse(input);
+                addChatMessage('ai', response);
+            }, 1000);
+        }
+
+        function getProductivityTip() {
+            const tips = [
+                "🎯 Try the 2-minute rule: If a task takes less than 2 minutes, do it immediately!",
+                "🧠 Use the Pomodoro Technique: 25 minutes of focused work, then 5-minute break.",
+                "📝 Write down your top 3 priorities each morning to stay focused.",
+                "🚫 Turn off notifications during deep work sessions to maintain flow state.",
+                "🌅 Tackle your most challenging task first thing in the morning when your energy is highest.",
+                "🎵 Use background music or white noise to improve concentration.",
+                "💧 Stay hydrated and take regular breaks to maintain mental clarity.",
+                "📱 Use the digital minimalism approach: only keep essential apps on your phone."
+            ];
+            
+            const randomTip = tips[Math.floor(Math.random() * tips.length)];
+            addChatMessage('ai', randomTip);
+        }
+
+        function generateAIResponse(input) {
+            const lowerInput = input.toLowerCase();
+            
+            if (lowerInput.includes('focus') || lowerInput.includes('concentrate')) {
+                return "🎯 To improve focus, try: 1) Remove distractions from your workspace 2) Use the Pomodoro Technique 3) Set clear goals for each session 4) Take regular breaks to recharge.";
+            } else if (lowerInput.includes('task') || lowerInput.includes('priority')) {
+                return "📋 For better task management: 1) Use the Eisenhower Matrix (urgent/important) 2) Break large tasks into smaller chunks 3) Set deadlines for accountability 4) Review and adjust your task list daily.";
+            } else if (lowerInput.includes('motivation') || lowerInput.includes('energy')) {
+                return "⚡ To boost motivation: 1) Connect tasks to your bigger goals 2) Celebrate small wins 3) Find an accountability partner 4) Visualize the benefits of completing your work.";
+            } else if (lowerInput.includes('time') || lowerInput.includes('schedule')) {
+                return "⏰ Time management tips: 1) Time-block your calendar 2) Batch similar tasks together 3) Use the 80/20 rule (focus on high-impact activities) 4) Plan your day the night before.";
+            } else {
+                return "🤖 I'm here to help with productivity, focus, task management, and time optimization. Try asking about specific challenges you're facing!";
+            }
+        }
+
+        function addChatMessage(sender, message) {
+            const chatDiv = document.getElementById('aiChat');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${sender}-message`;
+            messageDiv.textContent = message;
+            chatDiv.appendChild(messageDiv);
+            chatDiv.scrollTop = chatDiv.scrollHeight;
+        }
+
+        function toggleAssistant() {
+            const aiSection = document.querySelector('.feature-section:has(#aiChat)');
+            aiSection.scrollIntoView({ behavior: 'smooth' });
+            document.getElementById('aiInput').focus();
+        }
+
+        // Authentication and API functions (from previous version)
+        document.getElementById('signupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('signupEmail').value;
+            const password = document.getElementById('signupPassword').value;
+            const responseDiv = document.getElementById('signupResponse');
+
+            try {
+                const response = await fetch('/api/auth-signup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                responseDiv.innerHTML = response.ok ? 
+                    `✅ ${data.message}` : `❌ ${data.message}`;
+                responseDiv.className = `response ${response.ok ? 'success' : 'error'}`;
+                responseDiv.classList.remove('hidden');
+
+                if (response.ok) {
+                    document.getElementById('signupForm').reset();
+                }
+            } catch (error) {
+                responseDiv.innerHTML = `❌ Network error: ${error.message}`;
+                responseDiv.className = 'response error';
+                responseDiv.classList.remove('hidden');
+            }
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const responseDiv = document.getElementById('loginResponse');
+
+            try {
+                const response = await fetch('/api/auth-login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                responseDiv.innerHTML = response.ok ? 
+                    `✅ ${data.message}` : `❌ ${data.message}`;
+                responseDiv.className = `response ${response.ok ? 'success' : 'error'}`;
+                responseDiv.classList.remove('hidden');
+
+                if (response.ok) {
+                    localStorage.setItem('token', data.token);
+                    document.getElementById('loginForm').reset();
+                }
+            } catch (error) {
+                responseDiv.innerHTML = `❌ Network error: ${error.message}`;
+                responseDiv.className = 'response error';
+                responseDiv.classList.remove('hidden');
+            }
+        });
+
+        async function testAPI() {
+            const responseDiv = document.getElementById('apiResponse');
+            responseDiv.innerHTML = '🔄 Testing API endpoints...';
+            responseDiv.className = 'response';
+            responseDiv.classList.remove('hidden');
+
+            const results = [];
+
+            try {
+                // Test signup endpoint
+                const signupTest = await fetch('/api/auth-signup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'test@example.com', password: 'test123' })
+                });
+                results.push(`📝 Signup API: ${signupTest.ok ? '✅ Working' : '❌ Failed'}`);
+
+                // Test login endpoint  
+                const loginTest = await fetch('/api/auth-login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'test@example.com', password: 'test123' })
+                });
+                results.push(`🔐 Login API: ${loginTest.ok ? '✅ Working' : '❌ Failed'}`);
+
+                responseDiv.innerHTML = results.join('<br>') + '<br><br>🎉 API testing completed!';
+                responseDiv.className = 'response success';
+
+            } catch (error) {
+                responseDiv.innerHTML = `❌ API test failed: ${error.message}`;
+                responseDiv.className = 'response error';
+            }
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            updateTimerDisplay();
+            renderTasks();
+            
+            // Add enter key support for AI input
+            document.getElementById('aiInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    askAI();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
