@@ -190,20 +190,26 @@ class PWAService {
 
     if (Notification.permission === 'granted') {
       try {
-        // Subscribe to push notifications
-        const subscription = await this.registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: this.urlBase64ToUint8Array(
-            process.env.REACT_APP_VAPID_PUBLIC_KEY || ''
-          )
-        });
+        // Wait for service worker to be active
+        if (this.registration.active) {
+          // Subscribe to push notifications
+          const subscription = await this.registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: this.urlBase64ToUint8Array(
+              process.env.REACT_APP_VAPID_PUBLIC_KEY || 'BMxZWXr5G_UjqY8CKQBB4P7RhHpw_8YJnJ_5g9z2Qz_xPzJQXr5GKQBB4P7RhHpw'
+            )
+          });
 
         console.log('🔔 Push subscription created');
         
         // Send subscription to server
         await this.sendSubscriptionToServer(subscription);
+        } else {
+          console.log('⏳ Service worker not active yet, skipping push subscription');
+        }
       } catch (error) {
         console.error('Failed to subscribe to push notifications:', error);
+        // Don't throw error, just log it as push notifications are optional
       }
     }
   }
