@@ -1,4 +1,5 @@
 import BaseApiService from './BaseApiService';
+import axios from 'axios';
 
 interface ChatResponse {
   response: string;
@@ -49,7 +50,9 @@ interface OpenAIProxyResponse {
   };
 }
 
-class OpenAIService {
+class OpenAIService extends BaseApiService {
+  private apiUrl = process.env.REACT_APP_API_URL || '/api';
+
   /**
    * Call OpenAI via the centralized proxy function
    */

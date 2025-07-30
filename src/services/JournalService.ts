@@ -38,7 +38,7 @@ export const JournalService = {
       id: Date.now(),
       user_id: entry.user_id,
       content: entry.content,
-      mood: entry.mood || null,
+      mood: entry.mood || undefined,
       tags: entry.tags || [],
       created_at: new Date()
     };

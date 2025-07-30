@@ -43,8 +43,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ className = '' }) => {
       const newTask: NewTask = {
         title: newTaskTitle.trim(),
         description: newTaskDescription.trim() || undefined,
-        priority: 'medium',
-        status: 'pending'
+        priority: 'medium'
       };
 
       const createdTask = await TaskService.create(newTask);
@@ -66,7 +65,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ className = '' }) => {
   const handleToggleComplete = async (task: Task) => {
     try {
       const newStatus = task.status === 'completed' ? 'pending' : 'completed';
-      const updatedTask = await TaskService.update(task.id, { 
+      const updatedTask = await TaskService.update(task.id.toString(), { 
         status: newStatus,
         completed_at: newStatus === 'completed' ? new Date().toISOString() : undefined
       });
@@ -84,7 +83,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ className = '' }) => {
       const success = await TaskService.delete(taskId);
       
       if (success) {
-        setTasks(prev => prev.filter(t => t.id !== taskId));
+        setTasks(prev => prev.filter(t => t.id.toString() !== taskId));
       } else {
         setError('Failed to delete task');
       }
@@ -198,7 +197,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ className = '' }) => {
                       onClick={() => handleToggleComplete(task)}
                       className="mt-1 text-lg hover:scale-110 transition-transform"
                     >
-                      {getStatusIcon(task.status)}
+                      {getStatusIcon(task.status || 'pending')}
                     </button>
                     <div className="flex-1">
                       <h4 className={`font-medium ${
@@ -229,7 +228,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ className = '' }) => {
                     </div>
                   </div>
                   <button
-                    onClick={() => handleDeleteTask(task.id)}
+                    onClick={() => handleDeleteTask(task.id.toString())}
                     className="text-red-500 hover:text-red-700 p-1"
                     title="Delete task"
                   >

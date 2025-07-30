@@ -41,7 +41,7 @@ class EnhancedAIService {
   private apiUrl: string;
 
   constructor() {
-    this.apiUrl = import.meta.env.VITE_API_URL || '/api';
+    this.apiUrl = process.env.REACT_APP_API_URL || '/api';
   }
 
   /**
@@ -76,7 +76,7 @@ class EnhancedAIService {
       });
 
       if (response.success && response.data) {
-        return response.data;
+        return response.data as TaskAnalysis;
       }
 
       // Fallback analysis
@@ -116,7 +116,7 @@ class EnhancedAIService {
       });
 
       if (response.success && response.data) {
-        return response.data;
+        return response.data.data || response.data;
       }
 
       // Fallback prioritization
@@ -160,7 +160,7 @@ class EnhancedAIService {
       });
 
       if (response.success && response.data) {
-        return response.data;
+        return response.data.data || response.data;
       }
 
       return this.generateFallbackInsights(context);

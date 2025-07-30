@@ -54,51 +54,39 @@ export const TaskService = {
    * Create a new task
    */
   async create(task: NewTask): Promise<Task> {
-    try {
-      const response = await axios.post<TasksApiResponse>(`${this.apiUrl}/tasks`, {
-        title: task.title,
-        description: task.description,
-        priority: task.priority || 'medium',
-        due_date: task.due_date
-      }, {
-        headers: this.getAuthHeaders()
-      });
-      
-      if (response.data.success && response.data.task) {
-        return response.data.task;
-      }
-      throw new Error('Failed to create task');
-    } catch (error) {
-      console.error('Error creating task:', error);
-      throw new Error('Failed to create task');
+    const result = await BaseApiService.post<{ task: Task }>('tasks', {
+      title: task.title,
+      description: task.description,
+      priority: task.priority || 'medium',
+      due_date: task.due_date
+    });
+    
+    if (result.success && result.data?.task) {
+      return result.data.task;
     }
+    
+    throw new Error(result.message || 'Failed to create task');
   },
 
   /**
    * Update a task
    */
   async update(id: number, task: Partial<Task>): Promise<Task | null> {
-    try {
-      const response = await axios.put<TasksApiResponse>(`${this.apiUrl}/tasks`, {
-        id,
-        title: task.title,
-        description: task.description,
-        priority: task.priority,
-        status: task.status,
-        due_date: task.due_date,
-        completed_at: task.completed ? new Date().toISOString() : null
-      }, {
-        headers: this.getAuthHeaders()
-      });
-      
-      if (response.data.success && response.data.task) {
-        return response.data.task;
-      }
-      return null;
-    } catch (error) {
-      console.error('Error updating task:', error);
-      throw new Error('Failed to update task');
+    const result = await BaseApiService.put<{ task: Task }>(`tasks/${id}`, {
+      title: task.title,
+      description: task.description,
+      priority: task.priority,
+      status: task.status,
+      due_date: task.due_date,
+      completed_at: task.completed ? new Date().toISOString() : null
+    });
+    
+    if (result.success && result.data?.task) {
+      return result.data.task;
     }
+    
+    console.error('Error updating task:', result.message);
+    return null;
   },
 
   /**

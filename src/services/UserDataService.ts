@@ -25,6 +25,7 @@ export interface UserData {
     pendingTasks: number;
     completionRate: number;
   };
+  focusTime?: string;
 }
 
 export interface UserDataResponse {
@@ -37,7 +38,7 @@ export class UserDataService {
   private apiUrl: string;
   
   constructor() {
-    this.apiUrl = import.meta.env.VITE_API_URL || '/api';
+    this.apiUrl = process.env.REACT_APP_API_URL || '/api';
   }
 
   async fetchUserData(): Promise<UserDataResponse> {

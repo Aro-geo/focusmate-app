@@ -67,7 +67,7 @@ export function TodoList() {
         });
 
         // Execute query (protected by Row Level Security)
-        const todosResponse = await sql('select * from todos where user_id = auth.user_id()');
+        const todosResponse = await sql`select * from todos where user_id = auth.user_id()`;
         
         // Update state with todos
         setTodos(todosResponse as Array<Todo>);

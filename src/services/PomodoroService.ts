@@ -13,7 +13,7 @@ interface FocusSessionsApiResponse {
  * Service for Pomodoro session management (real API integration)
  */
 export const PomodoroService = {
-  apiUrl: import.meta.env.VITE_API_URL || '/api',
+  apiUrl: process.env.REACT_APP_API_URL || '/api',
 
   /**
    * Get authentication headers with JWT token
@@ -59,7 +59,7 @@ export const PomodoroService = {
    * Get session by ID
    */
   async getById(id: number): Promise<PomodoroSession | null> {
-    const sessions = await this.getAllForUser(1);
+    const sessions = await this.getAllSessions(1);
     return sessions.find(session => session.id === id) || null;
   },
 
@@ -71,12 +71,12 @@ export const PomodoroService = {
     const newSession: PomodoroSession = {
       id: Date.now(),
       user_id: session.user_id,
-      task_id: session.task_id || null,
+      task_id: session.task_id || undefined,
       duration: session.duration,
       mode: session.mode,
-      mood: session.mood || null,
+      mood: session.mood || undefined,
       start_time: session.start_time,
-      end_time: session.end_time || null,
+      end_time: session.end_time || undefined,
       created_at: new Date()
     };
     return newSession;

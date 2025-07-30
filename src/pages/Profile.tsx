@@ -13,7 +13,8 @@ const Profile: React.FC = () => {
   const [editableData, setEditableData] = useState({
     name: '',
     email: '',
-    bio: ''
+    bio: '',
+    avatarUrl: ''
   });
   const [stats, setStats] = useState({
     totalTasks: 0,
@@ -41,7 +42,8 @@ const Profile: React.FC = () => {
           setEditableData({
             name: currentUser.username,
             email: currentUser.email,
-            bio: ''
+            bio: '',
+            avatarUrl: currentUser.avatarUrl || ''
           });
         } else {
           window.location.href = '/login';
@@ -64,20 +66,20 @@ const Profile: React.FC = () => {
       
       try {
         // Get real statistics from services
-        const userTasks = await tasks.getAllForUser(userData.id);
+        const userTasks = await tasks.getAllForUser();
         const completedTasks = userTasks.filter(task => task.completed || task.status === 'completed');
-        const pomodoroStats = await pomodoro.getStatistics(userData.id);
+        const pomodoroStats = await pomodoro.getUserStats(userData.id);
         
         setStats({
           totalTasks: userTasks.length,
           completedTasks: completedTasks.length,
-          focusTime: pomodoroStats.totalMinutes / 60, // Convert to hours
+          focusTime: pomodoroStats.total_minutes / 60, // Convert to hours
           journalEntries: 0, // TODO: Implement journal service
         });
 
         // Generate AI feedback based on real data
         const completionRate = userTasks.length > 0 ? (completedTasks.length / userTasks.length) * 100 : 0;
-        const focusHours = pomodoroStats.totalMinutes / 60;
+        const focusHours = pomodoroStats.total_minutes / 60;
         
         setAiFeedback(
           `Great progress, ${userData.username}! You've completed ${completionRate.toFixed(0)}% of your tasks ` +
@@ -286,7 +288,7 @@ const Profile: React.FC = () => {
               <div key={key} className="flex items-center justify-between">
                 <ToggleSwitch
                   id={key}
-                  checked={value}
+                  checked={Boolean(value)}
                   onChange={() => handleNotificationChange(key as NotificationKey)}
                   label={key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
                 />

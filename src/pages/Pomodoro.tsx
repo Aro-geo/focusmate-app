@@ -205,8 +205,8 @@ const Pomodoro: React.FC = () => {
       const prompt = `A user just completed a ${session.duration / 60} minute focus session working on "${session.task}". 
       Provide a brief, encouraging feedback message about their productivity. Keep it under 50 words and be motivational.`;
       
-      const response = await openAIService.sendMessage(prompt);
-      setFeedback(response.content);
+      const response = await openAIService.chat(prompt);
+      setFeedback(response);
     } catch (error) {
       console.error('Failed to generate AI feedback:', error);
       setFeedback("Great job completing this focus session! You're building excellent productivity habits.");
@@ -220,8 +220,8 @@ const Pomodoro: React.FC = () => {
     
     try {
       setIsAiLoading(true);
-      const response = await openAIService.sendMessage(aiChatInput);
-      setAiMessage(response.content);
+      const response = await openAIService.chat(aiChatInput);
+      setAiMessage(response);
       setAiChatInput('');
     } catch (error) {
       console.error('Failed to send AI message:', error);
@@ -238,8 +238,8 @@ const Pomodoro: React.FC = () => {
   const handleGetTip = async () => {
     try {
       setIsAiLoading(true);
-      const response = await openAIService.sendMessage("Give me a quick productivity tip for staying focused during work sessions.");
-      setAiMessage(response.content);
+      const response = await openAIService.chat("Give me a quick productivity tip for staying focused during work sessions.");
+      setAiMessage(response);
     } catch (error) {
       console.error('Failed to get tip:', error);
       setAiMessage("💡 Tip: Try the 2-minute rule - if something takes less than 2 minutes, do it now!");

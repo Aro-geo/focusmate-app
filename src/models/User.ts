@@ -8,6 +8,7 @@ export interface User {
   email: string;
   password_hash?: string;
   created_at: Date;
+  avatarUrl?: string;
 }
 
 export interface NewUser {

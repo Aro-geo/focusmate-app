@@ -24,8 +24,8 @@ export class NeonClient {
   private apiUrl: string;
 
   private constructor() {
-    this.placeholder = import.meta.env.VITE_DATABASE_URL_PLACEHOLDER || '';
-    this.apiUrl = import.meta.env.VITE_API_URL || '/api';
+    this.placeholder = process.env.REACT_APP_DATABASE_URL_PLACEHOLDER || '';
+    this.apiUrl = process.env.REACT_APP_API_URL || '/api';
   }
 
   /**

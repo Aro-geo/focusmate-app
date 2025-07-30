@@ -42,24 +42,28 @@ const AuthDemo: React.FC<AuthDemoProps> = ({ className = '' }) => {
         // Login
         const result = await AuthService.login({ email, password });
         
-        if (result.success && result.data) {
-          setUser(result.data.user);
+        if (result.success && result.user) {
+          setUser(result.user);
           setEmail('');
           setPassword('');
         } else {
-          setError(result.message);
+          setError(result.message || 'Login failed');
         }
       } else {
         // Register
-        const result = await AuthService.register({ email, password, name: name || undefined });
+        const result = await AuthService.register({ 
+          email, 
+          password, 
+          name: name || email.split('@')[0] // Use email prefix as fallback name
+        });
         
-        if (result.success && result.data) {
-          setUser(result.data.user);
+        if (result.success && result.user) {
+          setUser(result.user);
           setEmail('');
           setPassword('');
           setName('');
         } else {
-          setError(result.message);
+          setError(result.message || 'Registration failed');
         }
       }
     } catch (err) {
