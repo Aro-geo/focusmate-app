@@ -105,6 +105,8 @@ export function TodoList() {
               checked={todo.completed}
               className="mr-2"
               readOnly
+              aria-label={`Mark "${todo.task}" as ${todo.completed ? 'incomplete' : 'complete'}`}
+              title={`Mark "${todo.task}" as ${todo.completed ? 'incomplete' : 'complete'}`}
             />
             <span className={todo.completed ? 'line-through text-gray-500' : ''}>
               {todo.task}

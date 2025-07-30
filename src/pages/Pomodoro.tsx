@@ -488,10 +488,16 @@ const Pomodoro: React.FC = () => {
 
               {/* Task Selection */}
               <div className="max-w-md mx-auto">
+                <label htmlFor="task-select" className="sr-only">
+                  Select a task for this Pomodoro session
+                </label>
                 <div className="relative">
                   <select
+                    id="task-select"
                     value={selectedTask || ""}
                     onChange={handleTaskSelect}
+                    title="Select a task for this Pomodoro session"
+                    aria-label="Select a task for this Pomodoro session"
                     className={`w-full p-3 rounded-xl border ${
                       darkMode
                         ? 'bg-gray-700 border-gray-600 text-white'
