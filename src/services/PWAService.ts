@@ -249,9 +249,9 @@ class PWAService {
    * Sync offline data when back online
    */
   private async syncOfflineData() {
-    if (this.registration && this.registration.sync) {
+    if (this.registration && 'sync' in this.registration) {
       try {
-        await this.registration.sync.register('sync-offline-data');
+        await (this.registration as any).sync.register('sync-offline-data');
         console.log('🔄 Background sync registered');
       } catch (error) {
         console.error('Failed to register background sync:', error);
@@ -264,8 +264,8 @@ class PWAService {
    */
   private trackInstallation() {
     // Send analytics event
-    if (typeof gtag !== 'undefined') {
-      gtag('event', 'pwa_install', {
+    if (typeof (window as any).gtag !== 'undefined') {
+      (window as any).gtag('event', 'pwa_install', {
         event_category: 'engagement',
         event_label: 'PWA Installation'
       });
@@ -439,7 +439,7 @@ class PWAService {
         return {
           quota: estimate.quota,
           usage: estimate.usage,
-          usageDetails: estimate.usageDetails,
+          usageDetails: (estimate as any).usageDetails,
           percentageUsed: estimate.quota ? (estimate.usage! / estimate.quota * 100) : 0
         };
       } catch (error) {

@@ -69,14 +69,14 @@ class EnhancedAIService {
         }
       ];
 
-      const response = await BaseApiService.post<{success: boolean, data: any}>('ai/analyze-task', {
+      const response = await BaseApiService.post<TaskAnalysis>('ai/analyze-task', {
         messages,
         taskDescription,
         userContext
       });
 
       if (response.success && response.data) {
-        return response.data as TaskAnalysis;
+        return response.data;
       }
 
       // Fallback analysis
@@ -109,14 +109,14 @@ class EnhancedAIService {
         }
       ];
 
-      const response = await BaseApiService.post<{success: boolean, data: any}>('ai/prioritize-tasks', {
+      const response = await BaseApiService.post<any[]>('ai/prioritize-tasks', {
         messages,
         tasks,
         userState
       });
 
       if (response.success && response.data) {
-        return response.data.data || response.data;
+        return response.data;
       }
 
       // Fallback prioritization
@@ -154,13 +154,13 @@ class EnhancedAIService {
         }
       ];
 
-      const response = await BaseApiService.post<{success: boolean, data: ContextualInsight}>('ai/contextual-insights', {
+      const response = await BaseApiService.post<ContextualInsight>('ai/contextual-insights', {
         messages,
         context
       });
 
       if (response.success && response.data) {
-        return response.data.data || response.data;
+        return response.data;
       }
 
       return this.generateFallbackInsights(context);
@@ -204,7 +204,7 @@ class EnhancedAIService {
         }
       ];
 
-      const response = await BaseApiService.post<{success: boolean, data: any}>('ai/schedule-recommendations', {
+      const response = await BaseApiService.post<any[]>('ai/schedule-recommendations', {
         messages,
         tasks,
         availableTimeSlots,
@@ -254,7 +254,7 @@ class EnhancedAIService {
         }
       ];
 
-      const response = await BaseApiService.post<{success: boolean, data: ProductivityPattern}>('ai/analyze-patterns', {
+      const response = await BaseApiService.post<ProductivityPattern>('ai/analyze-patterns', {
         messages,
         userData
       });
@@ -305,7 +305,7 @@ class EnhancedAIService {
         }
       ];
 
-      const response = await BaseApiService.post<{success: boolean, data: any}>('ai/break-suggestions', {
+      const response = await BaseApiService.post<{break_type: string; duration: number; activities: string[]; timing_reason: string}>('ai/break-suggestions', {
         messages,
         currentState
       });
