@@ -40,7 +40,10 @@ class PWAService {
    * Initialize PWA service
    */
   private async init() {
-    if ('serviceWorker' in navigator) {
+    // Temporarily disable Service Worker in development to prevent API request interference
+    const isDevelopment = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') || window.location.hostname === 'localhost';
+    
+    if ('serviceWorker' in navigator && !isDevelopment) {
       try {
         // Register service worker
         this.registration = await navigator.serviceWorker.register('/sw.js', {
@@ -70,6 +73,8 @@ class PWAService {
       } catch (error) {
         console.error('❌ Service Worker registration failed:', error);
       }
+    } else if (isDevelopment) {
+      console.log('🚧 Service Worker disabled in development mode');
     } else {
       console.warn('⚠️ Service Workers are not supported in this browser');
     }

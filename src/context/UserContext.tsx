@@ -33,8 +33,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       console.log('🔑 Token check:', token ? 'Token found' : 'No token found');
       
       if (!token) {
-        console.log('No token found, redirecting to login');
-        navigate('/login');
+        console.log('No token found, checking current route');
+        const currentPath = window.location.pathname;
+        if (!currentPath.includes('/login') && !currentPath.includes('/signup') && !currentPath.includes('/test')) {
+          console.log('Not on auth page, redirecting to login');
+          navigate('/login');
+        }
         return;
       }
 
@@ -86,7 +90,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       refreshUserData();
     } else {
       setIsLoading(false);
-      navigate('/login');
+      // Only redirect to login if we're trying to access a protected route
+      // Don't redirect if we're already on login or signup pages
+      const currentPath = window.location.pathname;
+      if (!currentPath.includes('/login') && !currentPath.includes('/signup') && !currentPath.includes('/test')) {
+        navigate('/login');
+      }
     }
   }, [navigate]);
 

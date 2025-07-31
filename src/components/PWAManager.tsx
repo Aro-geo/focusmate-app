@@ -249,7 +249,7 @@ const PWAManager: React.FC = () => {
       </AnimatePresence>
 
       {/* PWA Settings Panel (for debugging/info) */}
-      {process.env.NODE_ENV === 'development' && (
+      {(typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') && (
         <motion.div
           initial={{ opacity: 0, x: 300 }}
           animate={{ opacity: 1, x: 0 }}

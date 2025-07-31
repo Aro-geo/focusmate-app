@@ -38,7 +38,7 @@ export class RealAuthService {
   private apiUrl: string;
   
   constructor() {
-    this.apiUrl = process.env.REACT_APP_API_URL || '/api';
+    this.apiUrl = (typeof process !== 'undefined' && process.env && process.env.REACT_APP_API_URL) ? process.env.REACT_APP_API_URL : '/api';
   }
 
   async register(userData: RegisterData): Promise<RegisterResponse> {

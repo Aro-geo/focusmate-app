@@ -34,7 +34,7 @@ function App() {
           <Route path="/signup" element={<SignUp />} />
           
           {/* Main App Routes (with layout) */}
-          <Route path="/" element={<Navigate to="/test" replace />} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/app" element={<Layout><Navigate to="/app/dashboard" replace /></Layout>} />
           <Route path="/app/*" element={
             <Layout>
