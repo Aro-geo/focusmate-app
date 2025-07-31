@@ -6,10 +6,12 @@ import { openAIService } from '../services/OpenAIService';
 
 const SignUp: React.FC = () => {
   const [formData, setFormData] = React.useState({
-    name: '',
+    fullName: '',
     email: '',
     password: '',
     confirmPassword: '',
+    username: '',
+    agreeToTerms: false
   });
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
@@ -19,10 +21,10 @@ const SignUp: React.FC = () => {
   const navigate = useNavigate();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }));
     // Clear error when user starts typing
     if (errors[name]) {
@@ -36,10 +38,10 @@ const SignUp: React.FC = () => {
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
 
-    if (!formData.name) {
-      newErrors.name = 'Name is required';
-    } else if (formData.name.length < 2) {
-      newErrors.name = 'Name must be at least 2 characters';
+    if (!formData.fullName) {
+      newErrors.fullName = 'Full name is required';
+    } else if (formData.fullName.length < 2) {
+      newErrors.fullName = 'Full name must be at least 2 characters';
     }
 
     if (!formData.email) {
@@ -60,13 +62,17 @@ const SignUp: React.FC = () => {
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
+    if (!formData.agreeToTerms) {
+      newErrors.agreeToTerms = 'You must agree to the terms and conditions';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSignupSuccess = async (username: string) => {
     // Show verification alert
-    alert('Check your email to verify your account');
+    alert('Account created successfully! You can now log in.');
     
     // Navigate to login page - no automatic dashboard access
     navigate('/login');
@@ -83,16 +89,18 @@ const SignUp: React.FC = () => {
     setErrors({}); // Clear previous errors
     
     try {
-      // Use real authentication service
+      // Use real authentication service with correct field names
       const result = await realAuthService.register({
-        name: formData.name,
+        fullName: formData.fullName,
         email: formData.email,
-        password: formData.password
+        password: formData.password,
+        username: formData.username || undefined, // Make optional
+        agreeToTerms: formData.agreeToTerms
       });
       
       if (result.success) {
         // Handle successful signup with AI welcome
-        await handleSignupSuccess(result.user?.username || formData.name);
+        await handleSignupSuccess(result.data?.user?.username || formData.fullName);
       } else {
         // Signup failed, show error message
         setErrors({ 
@@ -157,7 +165,7 @@ const SignUp: React.FC = () => {
 
             {/* Name Field */}
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">
                 Full Name
               </label>
               <div className="relative">
@@ -165,21 +173,21 @@ const SignUp: React.FC = () => {
                   <User className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  id="name"
-                  name="name"
+                  id="fullName"
+                  name="fullName"
                   type="text"
                   autoComplete="name"
                   required
-                  value={formData.name}
+                  value={formData.fullName}
                   onChange={handleInputChange}
                   className={`block w-full pl-10 pr-3 py-3 border ${
-                    errors.name ? 'border-red-300' : 'border-gray-300'
+                    errors.fullName ? 'border-red-300' : 'border-gray-300'
                   } rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200`}
                   placeholder="Enter your full name"
                 />
               </div>
-              {errors.name && (
-                <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+              {errors.fullName && (
+                <p className="mt-1 text-sm text-red-600">{errors.fullName}</p>
               )}
             </div>
 
@@ -208,6 +216,33 @@ const SignUp: React.FC = () => {
               </div>
               {errors.email && (
                 <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+              )}
+            </div>
+
+            {/* Username Field (Optional) */}
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+                Username <span className="text-gray-500">(Optional)</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <User className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  autoComplete="username"
+                  value={formData.username}
+                  onChange={handleInputChange}
+                  className={`block w-full pl-10 pr-3 py-3 border ${
+                    errors.username ? 'border-red-300' : 'border-gray-300'
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200`}
+                  placeholder="Choose a username (optional)"
+                />
+              </div>
+              {errors.username && (
+                <p className="mt-1 text-sm text-red-600">{errors.username}</p>
               )}
             </div>
 
@@ -292,13 +327,15 @@ const SignUp: React.FC = () => {
             {/* Terms and Conditions */}
             <div className="flex items-center">
               <input
-                id="terms"
-                name="terms"
+                id="agreeToTerms"
+                name="agreeToTerms"
                 type="checkbox"
                 required
+                checked={formData.agreeToTerms}
+                onChange={handleInputChange}
                 className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
               />
-              <label htmlFor="terms" className="ml-2 block text-sm text-gray-700">
+              <label htmlFor="agreeToTerms" className="ml-2 block text-sm text-gray-700">
                 I agree to the{' '}
                 <a href="#" className="text-purple-600 hover:text-purple-500">
                   Terms of Service

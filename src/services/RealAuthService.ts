@@ -2,9 +2,11 @@ import axios from 'axios';
 // DO NOT import: bcrypt, jsonwebtoken, pg
 
 export interface RegisterData {
-  name: string;
+  fullName: string;
   email: string;
   password: string;
+  username?: string;
+  agreeToTerms: boolean;
 }
 
 export interface LoginData {
@@ -21,8 +23,11 @@ export interface User {
 
 export interface RegisterResponse {
   success: boolean;
-  user?: User;
-  token?: string;
+  data?: {
+    user: User;
+    token: string;
+    refreshToken: string;
+  };
   message?: string;
 }
 
@@ -44,14 +49,16 @@ export class RealAuthService {
   async register(userData: RegisterData): Promise<RegisterResponse> {
     try {
       const response = await axios.post<RegisterResponse>(`${this.apiUrl}/auth-register`, {
-        name: userData.name,
+        fullName: userData.fullName,
         email: userData.email,
-        password: userData.password
+        password: userData.password,
+        username: userData.username,
+        agreeToTerms: userData.agreeToTerms
       });
       
-      if (response.data.success && response.data.token) {
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+      if (response.data.success && response.data.data?.token) {
+        localStorage.setItem('token', response.data.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.data.user));
       }
       
       return response.data;
