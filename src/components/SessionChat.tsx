@@ -12,7 +12,7 @@ interface ChatMessage {
 
 interface SessionChatProps {
   sessionId: string;
-  currentUser: { id: string; name: string };
+  currentUser: { id: string; fullName: string };
   isMinimized?: boolean;
   onToggleMinimize?: () => void;
 }
@@ -50,7 +50,7 @@ const SessionChat: React.FC<SessionChatProps> = ({
     const message: ChatMessage = {
       id: Date.now().toString(),
       userId: currentUser.id,
-      userName: currentUser.name,
+      userName: currentUser.fullName,
       message: content,
       timestamp: new Date(),
       type

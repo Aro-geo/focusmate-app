@@ -42,8 +42,8 @@ const AuthDemo: React.FC<AuthDemoProps> = ({ className = '' }) => {
         // Login
         const result = await AuthService.login({ email, password });
         
-        if (result.success && result.user) {
-          setUser(result.user);
+        if (result.success && result.data?.user) {
+          setUser(result.data.user);
           setEmail('');
           setPassword('');
         } else {
@@ -54,11 +54,12 @@ const AuthDemo: React.FC<AuthDemoProps> = ({ className = '' }) => {
         const result = await AuthService.register({ 
           email, 
           password, 
-          name: name || email.split('@')[0] // Use email prefix as fallback name
+          fullName: name || email.split('@')[0], // Use email prefix as fallback name
+          agreeToTerms: true
         });
         
-        if (result.success && result.user) {
-          setUser(result.user);
+        if (result.success && result.data?.user) {
+          setUser(result.data.user);
           setEmail('');
           setPassword('');
           setName('');
@@ -94,7 +95,7 @@ const AuthDemo: React.FC<AuthDemoProps> = ({ className = '' }) => {
             <h4 className="font-medium text-gray-900 mb-2">User Information</h4>
             <div className="text-left space-y-1">
               <p className="text-sm"><span className="font-medium">Email:</span> {user.email}</p>
-              {user.name && <p className="text-sm"><span className="font-medium">Name:</span> {user.name}</p>}
+              {user.fullName && <p className="text-sm"><span className="font-medium">Name:</span> {user.fullName}</p>}
               <p className="text-sm"><span className="font-medium">User ID:</span> {user.id}</p>
               <p className="text-sm"><span className="font-medium">Member since:</span> {new Date(user.created_at).toLocaleDateString()}</p>
             </div>

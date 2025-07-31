@@ -33,8 +33,12 @@ export interface RegisterResponse {
 
 export interface LoginResponse {
   success: boolean;
-  user?: User;
-  token?: string;
+  data?: {
+    user: User;
+    token: string;
+    refreshToken: string;
+    expiresIn: string;
+  };
   message?: string;
   statusCode?: number; // Add status code for better error handling
 }
@@ -91,10 +95,10 @@ export class RealAuthService {
       console.log('Login API response:', response);
       
       // Check if response status is 200 and contains token
-      if (response.status === 200 && response.data.success && response.data.token) {
+      if (response.status === 200 && response.data.success && response.data.data?.token) {
         console.log('Login successful, storing token and user data');
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        localStorage.setItem('token', response.data.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.data.user));
       } else {
         console.warn('Login response missing success or token:', response.data);
       }
