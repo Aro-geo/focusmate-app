@@ -1,4 +1,4 @@
-const { query, getClient } = require('../lib/db');
+const { supabase } = require('../lib/db');
 const { verifyPassword } = require('../utils/password');
 const { generateToken, generateRefreshToken } = require('../utils/jwt');
 const { validateInput, loginSchema, sanitizeEmail, checkRateLimit } = require('../utils/validation');
@@ -22,8 +22,6 @@ async function handler(req, res) {
       error: 'METHOD_NOT_ALLOWED'
     });
   }
-
-  const client = await getClient();
 
   try {
     // Rate limiting
@@ -53,19 +51,26 @@ async function handler(req, res) {
     const { email, password, rememberMe } = validation.data;
     const sanitizedEmail = sanitizeEmail(email);
 
-    // Start transaction
-    await client.query('BEGIN');
-
     // Find user by email
-    const userResult = await client.query(
-      `SELECT id, email, password_hash, username, full_name, timezone, is_active, 
-              failed_login_attempts, locked_until, created_at, updated_at
-       FROM users WHERE email = $1`,
-      [sanitizedEmail]
-    );
+    const { data: users, error: userError } = await supabase
+      .from('users')
+      .select(`
+        id, email, password_hash, username, full_name, timezone, is_active, 
+        failed_login_attempts, locked_until, created_at, updated_at
+      `)
+      .eq('email', sanitizedEmail)
+      .limit(1);
 
-    if (userResult.rows.length === 0) {
-      await client.query('ROLLBACK');
+    if (userError) {
+      console.error('Error finding user:', userError);
+      return res.status(500).json({
+        success: false,
+        message: 'Database error occurred',
+        error: 'DATABASE_ERROR'
+      });
+    }
+
+    if (!users || users.length === 0) {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password',
@@ -73,11 +78,10 @@ async function handler(req, res) {
       });
     }
 
-    const user = userResult.rows[0];
+    const user = users[0];
 
     // Check if account is active
     if (!user.is_active) {
-      await client.query('ROLLBACK');
       return res.status(401).json({
         success: false,
         message: 'Account is deactivated. Please contact support.',
@@ -87,7 +91,6 @@ async function handler(req, res) {
 
     // Check if account is temporarily locked
     if (user.locked_until && new Date(user.locked_until) > new Date()) {
-      await client.query('ROLLBACK');
       const lockTimeRemaining = Math.ceil((new Date(user.locked_until) - new Date()) / 1000 / 60);
       return res.status(423).json({
         success: false,
@@ -107,21 +110,27 @@ async function handler(req, res) {
 
       // Lock account after 5 failed attempts for 30 minutes
       if (failedAttempts >= 5) {
-        lockUntil = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+        lockUntil = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 minutes
       }
 
-      await client.query(
-        'UPDATE users SET failed_login_attempts = $1, locked_until = $2, updated_at = NOW() WHERE id = $3',
-        [failedAttempts, lockUntil, user.id]
-      );
+      await supabase
+        .from('users')
+        .update({
+          failed_login_attempts: failedAttempts,
+          locked_until: lockUntil,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
 
       // Log failed login attempt
-      await client.query(
-        'INSERT INTO user_activity_logs (user_id, action, ip_address, user_agent, created_at) VALUES ($1, $2, $3, $4, NOW())',
-        [user.id, 'failed_login', clientIP, req.headers['user-agent'] || 'unknown']
-      );
-
-      await client.query('COMMIT');
+      await supabase
+        .from('user_activity_logs')
+        .insert({
+          user_id: user.id,
+          action: 'failed_login',
+          ip_address: clientIP,
+          user_agent: req.headers['user-agent'] || 'unknown'
+        });
 
       let message = 'Invalid email or password';
       if (lockUntil) {
@@ -137,18 +146,28 @@ async function handler(req, res) {
     }
 
     // Reset failed login attempts on successful login
-    await client.query(
-      'UPDATE users SET failed_login_attempts = 0, locked_until = NULL, last_login = NOW(), updated_at = NOW() WHERE id = $1',
-      [user.id]
-    );
+    await supabase
+      .from('users')
+      .update({
+        failed_login_attempts: 0,
+        locked_until: null,
+        last_login: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', user.id);
 
     // Get user preferences
-    const preferencesResult = await client.query(
-      'SELECT * FROM user_preferences WHERE user_id = $1',
-      [user.id]
-    );
+    const { data: preferencesData, error: preferencesError } = await supabase
+      .from('user_preferences')
+      .select('*')
+      .eq('user_id', user.id)
+      .limit(1);
 
-    const preferences = preferencesResult.rows[0] || {};
+    if (preferencesError) {
+      console.error('Error fetching preferences:', preferencesError);
+    }
+
+    const preferences = preferencesData?.[0] || {};
 
     // Generate tokens
     const tokenExpiry = rememberMe ? '30d' : '24h';
@@ -156,36 +175,46 @@ async function handler(req, res) {
     const refreshToken = generateRefreshToken(user);
 
     // Clean up old sessions (keep only the 5 most recent)
-    await client.query(
-      `DELETE FROM user_sessions 
-       WHERE user_id = $1 
-       AND id NOT IN (
-         SELECT id FROM user_sessions 
-         WHERE user_id = $1 
-         ORDER BY created_at DESC 
-         LIMIT 5
-       )`,
-      [user.id]
-    );
+    const { data: oldSessions } = await supabase
+      .from('user_sessions')
+      .select('id')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (oldSessions && oldSessions.length > 0) {
+      const keepIds = oldSessions.map(s => s.id);
+      await supabase
+        .from('user_sessions')
+        .delete()
+        .eq('user_id', user.id)
+        .not('id', 'in', `(${keepIds.join(',')})`);
+    }
 
     // Store new refresh token
     const refreshTokenExpiry = rememberMe 
-      ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
-      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);  // 7 days
+      ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();  // 7 days
 
-    await client.query(
-      `INSERT INTO user_sessions (user_id, refresh_token, expires_at, ip_address, user_agent, created_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())`,
-      [user.id, refreshToken, refreshTokenExpiry, clientIP, req.headers['user-agent'] || 'unknown']
-    );
+    await supabase
+      .from('user_sessions')
+      .insert({
+        user_id: user.id,
+        refresh_token: refreshToken,
+        expires_at: refreshTokenExpiry,
+        ip_address: clientIP,
+        user_agent: req.headers['user-agent'] || 'unknown'
+      });
 
     // Log successful login
-    await client.query(
-      'INSERT INTO user_activity_logs (user_id, action, ip_address, user_agent, created_at) VALUES ($1, $2, $3, $4, NOW())',
-      [user.id, 'login', clientIP, req.headers['user-agent'] || 'unknown']
-    );
-
-    await client.query('COMMIT');
+    await supabase
+      .from('user_activity_logs')
+      .insert({
+        user_id: user.id,
+        action: 'login',
+        ip_address: clientIP,
+        user_agent: req.headers['user-agent'] || 'unknown'
+      });
 
     // Return success response
     res.status(200).json({
@@ -214,9 +243,6 @@ async function handler(req, res) {
     });
 
   } catch (error) {
-    // Rollback transaction on error
-    await client.query('ROLLBACK');
-    
     console.error('Login error:', {
       message: error.message,
       stack: error.stack,
@@ -229,10 +255,6 @@ async function handler(req, res) {
       message: 'An error occurred during login',
       error: 'INTERNAL_SERVER_ERROR'
     });
-
-  } finally {
-    // Release the client back to the pool
-    client.release();
   }
 }
 

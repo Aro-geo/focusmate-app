@@ -14,7 +14,7 @@ A clean, modern productivity dashboard built for young professionals featuring A
 - **Mood Tracking**: Daily mood selector for productivity insights
 - **Progress Analytics**: Weekly progress tracking and statistics with advanced Chart.js visualizations
 - **Smooth Animations**: Beautiful Framer Motion animations throughout the app
-- **Database Integration**: Full PostgreSQL database with Neon for persistent storage
+- **Database Integration**: Full PostgreSQL database with Supabase for persistent storage
 - **Authentication**: Secure JWT-based user authentication with bcrypt password hashing
 - **Dark Mode**: Complete dark theme support with system preference detection
 - **Responsive Design**: Mobile-first responsive layout with adaptive navigation
@@ -39,7 +39,7 @@ api/
 └── get-db-host.js         # Secure database host endpoint
 
 lib/
-├── db.js                  # Neon PostgreSQL connection pool
+├── db.js                  # Supabase PostgreSQL connection pool
 
 middleware/
 ├── auth.js                # JWT authentication middleware
@@ -76,7 +76,7 @@ node scripts/db-setup-rls.js
 npm run dev
 ```
 
-### 🌩️ Neon Serverless Database Integration
+### 🌩️ Supabase Database Integration
 
 #### Production Database Schema
 Includes tables for users, todos, pomodoro sessions, and journal entries with Row Level Security (RLS) policies for user data isolation.
@@ -108,7 +108,7 @@ const result = await query('SELECT * FROM users WHERE id = $1', [userId]);
 
 ### Backend & Database
 - **Vercel Serverless Functions** for scalable API endpoints
-- **Neon PostgreSQL** serverless database with connection pooling
+- **Supabase PostgreSQL** database with real-time subscriptions
 - **JWT Authentication** with bcrypt password hashing
 - **Node.js with Express** for API middleware
 
@@ -128,7 +128,7 @@ focusmate-ai/
 │   ├── auth-signup.js         # User registration endpoint
 │   └── get-db-host.js         # Secure database host provider
 ├── lib/
-│   └── db.js                  # Neon PostgreSQL connection pool
+│   └── db.js                  # Supabase PostgreSQL connection pool
 ├── middleware/
 │   ├── auth.js                # JWT middleware & validation
 │   └── cors.js                # CORS & security headers
@@ -183,7 +183,7 @@ focusmate-ai/
 ### Prerequisites
 - Node.js (v18.0.0 or higher)
 - npm (v10+ recommended)
-- Neon PostgreSQL database
+- Supabase PostgreSQL database
 - Vercel account (for deployment)
 
 ### Local Development Setup
@@ -241,7 +241,8 @@ npx vercel --prod
 ```
 
 2. **Set environment variables** in Vercel dashboard:
-   - `DATABASE_URL` - Your Neon database connection string
+   - `SUPABASE_URL` - Your Supabase project URL
+- `SUPABASE_KEY` - Your Supabase anon/public key
    - `JWT_SECRET` - Secure random string (32+ characters)
    - `NODE_ENV=production`
 
@@ -254,7 +255,8 @@ npx vercel --prod
 ### Required Variables
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `DATABASE_URL` | Neon PostgreSQL connection string | `postgresql://user:pass@host/db?sslmode=require` |
+| `SUPABASE_URL` | Supabase project URL | `https://your-project.supabase.co` |
+| `SUPABASE_KEY` | Supabase anon/public key | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
 | `JWT_SECRET` | Secret key for JWT signing (32+ chars) | `your-super-secret-jwt-key-min-32-characters` |
 | `NODE_ENV` | Environment mode | `development` or `production` |
 
@@ -377,7 +379,7 @@ node scripts/db-setup-rls.js  # Set up Row Level Security
 
 ---
 
-*Built with ❤️ for productivity enthusiasts using modern React, Vercel serverless functions, and Neon PostgreSQL*
+*Built with ❤️ for productivity enthusiasts using modern React, Vercel serverless functions, and Supabase PostgreSQL*
 
 ## 📄 License
 
@@ -457,7 +459,7 @@ If you have any questions or need help getting started:
 - ✅ **v1.0.0**: Initial release with full authentication and database integration
 - ✅ **JWT Security**: Implemented secure token-based authentication
 - ✅ **Vercel Deployment**: Production-ready serverless backend
-- ✅ **Neon Integration**: Scalable PostgreSQL database with RLS
+- ✅ **Supabase Integration**: Scalable PostgreSQL database with RLS
 - 🚀 **v1.1.0**: Advanced AI features and PWA capabilities (Current)
   - ✅ Enhanced AI task analysis with complexity scoring
   - ✅ Intelligent task prioritization with multi-factor scoring
@@ -471,7 +473,7 @@ If you have any questions or need help getting started:
 ## 🙏 Acknowledgments
 
 - **Vercel** for excellent serverless function hosting
-- **Neon** for providing scalable PostgreSQL database
+- **Supabase** for providing scalable PostgreSQL database
 - **Framer Motion** for beautiful animation library
 - **Tailwind CSS** for rapid UI development
 - **React** team for the amazing framework

@@ -1,33 +1,27 @@
 import React from 'react';
-import axios from 'axios';
-import { neon } from '@neondatabase/serverless';
+import supabaseClient from '../services/SupabaseClient';
 
-// Define Todo interface
-export interface Todo {
+interface Todo {
   id: number;
-  task: string;
+  title: string;
+  description?: string;
   completed: boolean;
-  user_id: number;
+  priority: 'low' | 'medium' | 'high';
+  due_date?: string;
   created_at: string;
+  updated_at: string;
+  user_id: number;
 }
 
 interface UseTodosReturn {
   todos: Todo[];
   loading: boolean;
   error: string | null;
-  addTodo: (task: string) => Promise<void>;
-  toggleTodo: (id: number, currentStatus: boolean) => Promise<void>;
+  addTodo: (todo: Omit<Todo, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => Promise<void>;
+  updateTodo: (id: number, updates: Partial<Todo>) => Promise<void>;
   deleteTodo: (id: number) => Promise<void>;
+  toggleTodo: (id: number) => Promise<void>;
   refreshTodos: () => Promise<void>;
-}
-
-interface DbHostResponse {
-  success: boolean;
-  data: {
-    host: string;
-    ttl: number;
-  };
-  message?: string;
 }
 
 // Custom hook for Todo operations
@@ -35,9 +29,8 @@ export function useTodos(): UseTodosReturn {
   const [todos, setTodos] = React.useState<Todo[]>([]);
   const [loading, setLoading] = React.useState<boolean>(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [sql, setSql] = React.useState<any>(null);
 
-  // Initialize connection to Neon database
+  // Initialize connection to Supabase database
   const initConnection = React.useCallback(async () => {
     try {
       // Get auth token from storage
@@ -46,136 +39,168 @@ export function useTodos(): UseTodosReturn {
         throw new Error('Not authenticated. Please login first.');
       }
 
-      // Get database host from secure endpoint
-      const hostResponse = await axios.get<DbHostResponse>('/api/get-db-host', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (!hostResponse.data.success || !hostResponse.data.data.host) {
-        throw new Error(hostResponse.data.message || 'Failed to get database host');
+      // Test connection
+      const success = await supabaseClient.testConnection();
+      if (!success) {
+        throw new Error('Failed to connect to database');
       }
 
-      // Generate connection string with host
-      const baseUrl = process.env.REACT_APP_DATABASE_URL_PLACEHOLDER;
-      if (!baseUrl) {
-        throw new Error('Database URL placeholder not configured');
-      }
-
-      const connectionString = baseUrl.replace(
-        '@/',
-        `@${hostResponse.data.data.host}/`
-      );
-
-      // Create neon client with JWT for auth
-      const neonSql = neon(connectionString, { authToken: token });
-      setSql(neonSql);
-      return neonSql;
+      return true;
     } catch (err: any) {
       console.error('Database connection initialization error:', err);
       setError(err.message || 'Failed to connect to database');
-      return null;
+      return false;
     }
   }, []);
 
   // Fetch todos from database
   const fetchTodos = React.useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
     try {
-      const connection = sql || await initConnection();
-      if (!connection) return;
+      setLoading(true);
+      setError(null);
 
-      // Query todos with RLS filtering by user_id
-      const result = await connection('SELECT * FROM todos ORDER BY created_at DESC');
-      setTodos(result as Todo[]);
+      const connectionOk = await initConnection();
+      if (!connectionOk) {
+        return;
+      }
+
+      // Get current user ID from token or user data
+      const userData = localStorage.getItem('user');
+      if (!userData) {
+        throw new Error('User data not found');
+      }
+
+      const user = JSON.parse(userData);
+      const userId = user.id;
+
+      // Fetch todos for the current user
+      const todosData = await supabaseClient.query('todos', {
+        select: '*',
+        eq: { user_id: userId },
+        order: { column: 'created_at', ascending: false }
+      });
+
+      setTodos(todosData || []);
     } catch (err: any) {
       console.error('Error fetching todos:', err);
-      setError(err.message || 'Failed to load todos');
+      setError(err.message || 'Failed to fetch todos');
     } finally {
       setLoading(false);
     }
-  }, [sql, initConnection]);
+  }, [initConnection]);
 
   // Add a new todo
-  const addTodo = React.useCallback(async (task: string) => {
-    if (!task.trim()) return;
-
+  const addTodo = React.useCallback(async (todo: Omit<Todo, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
     try {
-      const connection = sql || await initConnection();
-      if (!connection) return;
+      setError(null);
 
-      await connection(
-        'INSERT INTO todos (task, completed, user_id) VALUES ($1, false, auth.user_id())',
-        [task.trim()]
-      );
-      await fetchTodos();
+      const userData = localStorage.getItem('user');
+      if (!userData) {
+        throw new Error('User data not found');
+      }
+
+      const user = JSON.parse(userData);
+      const userId = user.id;
+
+      const newTodo = {
+        ...todo,
+        user_id: userId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const result = await supabaseClient.insert('todos', newTodo);
+      
+      if (result && result.length > 0) {
+        setTodos(prev => [result[0], ...prev]);
+      }
     } catch (err: any) {
       console.error('Error adding todo:', err);
-      setError(err.message || 'Failed to add task');
+      setError(err.message || 'Failed to add todo');
     }
-  }, [sql, initConnection, fetchTodos]);
+  }, []);
 
-  // Toggle todo completion status
-  const toggleTodo = React.useCallback(async (id: number, currentStatus: boolean) => {
+  // Update a todo
+  const updateTodo = React.useCallback(async (id: number, updates: Partial<Todo>) => {
     try {
-      const connection = sql || await initConnection();
-      if (!connection) return;
+      setError(null);
 
-      await connection(
-        'UPDATE todos SET completed = $1 WHERE id = $2 AND user_id = auth.user_id()',
-        [!currentStatus, id]
-      );
-      await fetchTodos();
+      const updateData = {
+        ...updates,
+        updated_at: new Date().toISOString()
+      };
+
+      const result = await supabaseClient.update('todos', updateData, { id });
+      
+      if (result && result.length > 0) {
+        setTodos(prev => prev.map(todo => 
+          todo.id === id ? { ...todo, ...result[0] } : todo
+        ));
+      }
     } catch (err: any) {
-      console.error('Error toggling todo:', err);
-      setError(err.message || 'Failed to update task');
+      console.error('Error updating todo:', err);
+      setError(err.message || 'Failed to update todo');
     }
-  }, [sql, initConnection, fetchTodos]);
+  }, []);
 
   // Delete a todo
   const deleteTodo = React.useCallback(async (id: number) => {
     try {
-      const connection = sql || await initConnection();
-      if (!connection) return;
+      setError(null);
 
-      await connection(
-        'DELETE FROM todos WHERE id = $1 AND user_id = auth.user_id()',
-        [id]
-      );
-      await fetchTodos();
+      await supabaseClient.delete('todos', { id });
+      
+      setTodos(prev => prev.filter(todo => todo.id !== id));
     } catch (err: any) {
       console.error('Error deleting todo:', err);
-      setError(err.message || 'Failed to delete task');
+      setError(err.message || 'Failed to delete todo');
     }
-  }, [sql, initConnection, fetchTodos]);
+  }, []);
 
-  // Initialize on component mount
-  React.useEffect(() => {
-    if (!sql) {
-      initConnection()
-        .then(connection => {
-          if (connection) {
-            fetchTodos();
-          }
-        })
-        .catch(err => {
-          console.error('Error during initialization:', err);
-          setError(err.message || 'Failed to initialize');
-          setLoading(false);
-        });
-    } else {
-      fetchTodos();
+  // Toggle todo completion status
+  const toggleTodo = React.useCallback(async (id: number) => {
+    try {
+      setError(null);
+
+      const todo = todos.find(t => t.id === id);
+      if (!todo) return;
+
+      const updateData = {
+        completed: !todo.completed,
+        updated_at: new Date().toISOString()
+      };
+
+      const result = await supabaseClient.update('todos', updateData, { id });
+      
+      if (result && result.length > 0) {
+        setTodos(prev => prev.map(t => 
+          t.id === id ? { ...t, ...result[0] } : t
+        ));
+      }
+    } catch (err: any) {
+      console.error('Error toggling todo:', err);
+      setError(err.message || 'Failed to toggle todo');
     }
-  }, [sql, initConnection, fetchTodos]);
+  }, [todos]);
+
+  // Refresh todos
+  const refreshTodos = React.useCallback(async () => {
+    await fetchTodos();
+  }, [fetchTodos]);
+
+  // Load todos on mount
+  React.useEffect(() => {
+    fetchTodos();
+  }, [fetchTodos]);
 
   return {
     todos,
     loading,
     error,
     addTodo,
-    toggleTodo,
+    updateTodo,
     deleteTodo,
-    refreshTodos: fetchTodos
+    toggleTodo,
+    refreshTodos
   };
 }

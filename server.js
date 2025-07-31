@@ -35,7 +35,7 @@ app.get('/api/db-test', async (req, res) => {
     const success = await testConnection();
     res.json({ 
       success, 
-      message: success ? 'Database connected' : 'Database connection failed' 
+      message: success ? 'Supabase database connected' : 'Supabase database connection failed' 
     });
   } catch (error) {
     res.status(500).json({ 
@@ -53,7 +53,7 @@ app.listen(PORT, () => {
   console.log(`  POST /api/auth-register - User registration`);
   console.log(`  POST /api/auth-login - User login`);
   console.log(`  GET  /api/health - Health check`);
-  console.log(`  GET  /api/db-test - Database connection test`);
+  console.log(`  GET  /api/db-test - Supabase database connection test`);
 });
 
 module.exports = app;

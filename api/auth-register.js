@@ -1,4 +1,4 @@
-const { query, getClient } = require('../lib/db');
+const { supabase } = require('../lib/db');
 const { hashPassword } = require('../utils/password');
 const { generateToken, generateRefreshToken } = require('../utils/jwt');
 const { validateInput, signupSchema, sanitizeEmail, isEmailDomainAllowed, checkRateLimit } = require('../utils/validation');
@@ -22,8 +22,6 @@ async function handler(req, res) {
       error: 'METHOD_NOT_ALLOWED'
     });
   }
-
-  const client = await getClient();
 
   try {
     // Rate limiting
@@ -62,20 +60,26 @@ async function handler(req, res) {
       });
     }
 
-    // Start transaction
-    await client.query('BEGIN');
-
     // Check if user already exists
-    const existingUserResult = await client.query(
-      'SELECT id, email, is_active FROM users WHERE email = $1',
-      [sanitizedEmail]
-    );
+    const { data: existingUsers, error: existingError } = await supabase
+      .from('users')
+      .select('id, email, is_active')
+      .eq('email', sanitizedEmail)
+      .limit(1);
 
-    if (existingUserResult.rows.length > 0) {
-      const existingUser = existingUserResult.rows[0];
+    if (existingError) {
+      console.error('Error checking existing user:', existingError);
+      return res.status(500).json({
+        success: false,
+        message: 'Database error occurred',
+        error: 'DATABASE_ERROR'
+      });
+    }
+
+    if (existingUsers && existingUsers.length > 0) {
+      const existingUser = existingUsers[0];
       
       if (existingUser.is_active) {
-        await client.query('ROLLBACK');
         return res.status(409).json({
           success: false,
           message: 'An account with this email already exists',
@@ -85,42 +89,63 @@ async function handler(req, res) {
         // Reactivate deactivated account
         const hashedPassword = await hashPassword(password);
         
-        await client.query(
-          `UPDATE users 
-           SET password_hash = $1, username = $2, full_name = $3, timezone = $4, 
-               is_active = true, updated_at = NOW() 
-           WHERE id = $5`,
-          [hashedPassword, username, fullName, timezone, existingUser.id]
-        );
+        const { data: updatedUser, error: updateError } = await supabase
+          .from('users')
+          .update({
+            password_hash: hashedPassword,
+            username: username,
+            full_name: fullName,
+            timezone: timezone,
+            is_active: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingUser.id)
+          .select('id, email, username, full_name, timezone, created_at')
+          .single();
 
-        const updatedUserResult = await client.query(
-          'SELECT id, email, username, full_name, timezone, created_at FROM users WHERE id = $1',
-          [existingUser.id]
-        );
+        if (updateError) {
+          console.error('Error updating user:', updateError);
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to reactivate account',
+            error: 'UPDATE_ERROR'
+          });
+        }
 
-        const user = updatedUserResult.rows[0];
-        const token = generateToken(user);
-        const refreshToken = generateRefreshToken(user);
+        // Generate tokens
+        const token = generateToken(updatedUser);
+        const refreshToken = generateRefreshToken(updatedUser);
 
         // Store refresh token
-        await client.query(
-          'INSERT INTO user_sessions (user_id, refresh_token, expires_at) VALUES ($1, $2, $3)',
-          [user.id, refreshToken, new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)] // 30 days
-        );
+        await supabase
+          .from('user_sessions')
+          .insert({
+            user_id: updatedUser.id,
+            refresh_token: refreshToken,
+            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          });
 
-        await client.query('COMMIT');
+        // Log signup event
+        await supabase
+          .from('user_activity_logs')
+          .insert({
+            user_id: updatedUser.id,
+            action: 'signup',
+            ip_address: clientIP,
+            user_agent: req.headers['user-agent'] || 'unknown'
+          });
 
         return res.status(200).json({
           success: true,
           message: 'Account reactivated successfully',
           data: {
             user: {
-              id: user.id,
-              email: user.email,
-              username: user.username,
-              fullName: user.full_name,
-              timezone: user.timezone,
-              createdAt: user.created_at
+              id: updatedUser.id,
+              email: updatedUser.email,
+              username: updatedUser.username,
+              fullName: updatedUser.full_name,
+              timezone: updatedUser.timezone,
+              createdAt: updatedUser.created_at
             },
             token,
             refreshToken
@@ -131,13 +156,22 @@ async function handler(req, res) {
 
     // Check if username is already taken (if provided)
     if (username) {
-      const existingUsernameResult = await client.query(
-        'SELECT id FROM users WHERE username = $1',
-        [username]
-      );
+      const { data: existingUsernames, error: usernameError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('username', username)
+        .limit(1);
 
-      if (existingUsernameResult.rows.length > 0) {
-        await client.query('ROLLBACK');
+      if (usernameError) {
+        console.error('Error checking username:', usernameError);
+        return res.status(500).json({
+          success: false,
+          message: 'Database error occurred',
+          error: 'DATABASE_ERROR'
+        });
+      }
+
+      if (existingUsernames && existingUsernames.length > 0) {
         return res.status(409).json({
           success: false,
           message: 'Username is already taken',
@@ -150,41 +184,63 @@ async function handler(req, res) {
     const hashedPassword = await hashPassword(password);
 
     // Create new user
-    const insertUserResult = await client.query(
-      `INSERT INTO users (email, password_hash, username, full_name, timezone, is_active, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW())
-       RETURNING id, email, username, full_name, timezone, created_at`,
-      [sanitizedEmail, hashedPassword, username, fullName, timezone]
-    );
+    const { data: newUser, error: insertError } = await supabase
+      .from('users')
+      .insert({
+        email: sanitizedEmail,
+        password_hash: hashedPassword,
+        username: username,
+        full_name: fullName,
+        timezone: timezone,
+        is_active: true
+      })
+      .select('id, email, username, full_name, timezone, created_at')
+      .single();
 
-    const newUser = insertUserResult.rows[0];
+    if (insertError) {
+      console.error('Error creating user:', insertError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to create account',
+        error: 'INSERT_ERROR'
+      });
+    }
 
     // Create default user preferences
-    await client.query(
-      `INSERT INTO user_preferences (user_id, theme, notifications_enabled, pomodoro_duration, break_duration)
-       VALUES ($1, 'light', true, 25, 5)`,
-      [newUser.id]
-    );
+    await supabase
+      .from('user_preferences')
+      .insert({
+        user_id: newUser.id,
+        theme: 'light',
+        notifications_enabled: true,
+        pomodoro_duration: 25,
+        break_duration: 5
+      });
 
     // Generate tokens
     const token = generateToken(newUser);
     const refreshToken = generateRefreshToken(newUser);
 
     // Store refresh token
-    await client.query(
-      'INSERT INTO user_sessions (user_id, refresh_token, expires_at, created_at) VALUES ($1, $2, $3, NOW())',
-      [newUser.id, refreshToken, new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)]
-    );
+    await supabase
+      .from('user_sessions')
+      .insert({
+        user_id: newUser.id,
+        refresh_token: refreshToken,
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      });
 
     // Log signup event
-    await client.query(
-      'INSERT INTO user_activity_logs (user_id, action, ip_address, user_agent, created_at) VALUES ($1, $2, $3, $4, NOW())',
-      [newUser.id, 'signup', clientIP, req.headers['user-agent'] || 'unknown']
-    );
+    await supabase
+      .from('user_activity_logs')
+      .insert({
+        user_id: newUser.id,
+        action: 'signup',
+        ip_address: clientIP,
+        user_agent: req.headers['user-agent'] || 'unknown'
+      });
 
-    await client.query('COMMIT');
-
-    // Return success response (don't include sensitive data)
+    // Return success response
     res.status(201).json({
       success: true,
       message: 'Account created successfully',
@@ -203,23 +259,11 @@ async function handler(req, res) {
     });
 
   } catch (error) {
-    // Rollback transaction on error
-    await client.query('ROLLBACK');
-    
     console.error('Signup error:', {
       message: error.message,
       stack: error.stack,
       body: req.body
     });
-
-    // Handle specific database errors
-    if (error.code === '23505') { // Unique constraint violation
-      return res.status(409).json({
-        success: false,
-        message: 'Email or username already exists',
-        error: 'DUPLICATE_ENTRY'
-      });
-    }
 
     // Generic error response
     res.status(500).json({
@@ -227,10 +271,6 @@ async function handler(req, res) {
       message: 'An error occurred during signup',
       error: 'INTERNAL_SERVER_ERROR'
     });
-
-  } finally {
-    // Release the client back to the pool
-    client.release();
   }
 }
 
