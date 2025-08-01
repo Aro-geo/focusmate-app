@@ -256,7 +256,7 @@ npx vercel --prod
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `SUPABASE_URL` | Supabase project URL | `https://your-project.supabase.co` |
-| `SUPABASE_KEY` | Supabase anon/public key | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `SUPABASE_KEY` | Supabase anon/public key | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV...` |
 | `JWT_SECRET` | Secret key for JWT signing (32+ chars) | `your-super-secret-jwt-key-min-32-characters` |
 | `NODE_ENV` | Environment mode | `development` or `production` |
 
