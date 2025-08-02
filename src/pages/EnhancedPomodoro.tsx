@@ -22,7 +22,7 @@ const EnhancedPomodoro: React.FC = () => {
   const [chatMinimized, setChatMinimized] = useState(true);
   
   // Mock user data
-  const currentUser = { id: 'user-1', name: 'You' };
+  const currentUser = { id: 'user-1', fullName: 'You' };
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);

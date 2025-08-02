@@ -1,7 +1,7 @@
 import React from 'react';
 import supabaseClient from '../services/SupabaseClient';
 
-interface Todo {
+export interface Todo {
   id: number;
   title: string;
   description?: string;
@@ -80,7 +80,13 @@ export function useTodos(): UseTodosReturn {
         order: { column: 'created_at', ascending: false }
       });
 
-      setTodos(todosData || []);
+      if (Array.isArray(todosData) && todosData.every(item => item && typeof item === 'object' && 'id' in item)) {
+        setTodos(todosData as unknown as Todo[]);
+      } else {
+        console.error('Invalid todos response:', todosData);
+        setError('Failed to load todos');
+        setTodos([]);
+      }
     } catch (err: any) {
       console.error('Error fetching todos:', err);
       setError(err.message || 'Failed to fetch todos');

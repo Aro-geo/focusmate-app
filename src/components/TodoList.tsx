@@ -19,10 +19,15 @@ export function TodoList() {
   const [todos, setTodos] = useState<Array<Todo>>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [newTodo, setNewTodo] = useState({
+  const [newTodo, setNewTodo] = useState<{
+    title: string;
+    description: string;
+    priority: 'low' | 'medium' | 'high';
+    due_date: string;
+  }>({
     title: '',
     description: '',
-    priority: 'medium' as const,
+    priority: 'medium',
     due_date: ''
   });
 
@@ -60,7 +65,13 @@ export function TodoList() {
         });
         
         // Update state with todos
-        setTodos(todosData as Array<Todo>);
+        if (Array.isArray(todosData) && todosData.every(item => item && typeof item === 'object' && 'id' in item)) {
+          setTodos(todosData as unknown as Todo[]);
+        } else {
+          console.error('Invalid todos response:', todosData);
+          setError('Failed to load todos');
+          setTodos([]);
+        }
       } catch (err: any) {
         console.error('Error loading todos:', err);
         setError(err.message || 'Failed to load todos');

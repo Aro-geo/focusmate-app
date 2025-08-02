@@ -9,7 +9,7 @@ export class AuthService {
       if (result.success) {
         // Dispatch authentication success event
         window.dispatchEvent(new CustomEvent('auth-success', { 
-          detail: { user: result.user, type: 'login' } 
+          detail: { user: result.data?.user, type: 'login' } 
         }));
       }
       
@@ -30,7 +30,7 @@ export class AuthService {
       if (result.success) {
         // Dispatch authentication success event
         window.dispatchEvent(new CustomEvent('auth-success', { 
-          detail: { user: result.user, type: 'register' } 
+          detail: { user: result.data?.user, type: 'register' } 
         }));
       }
       

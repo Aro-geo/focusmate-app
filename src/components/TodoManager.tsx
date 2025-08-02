@@ -1,5 +1,16 @@
 import * as React from 'react';
-import { useTodos, Todo } from '../hooks/useTodos';
+import { useTodos } from '../hooks/useTodos';
+
+interface Todo {
+  id: number;
+  title: string;
+  completed: boolean;
+  priority: 'low' | 'medium' | 'high';
+  due_date?: string;
+  created_at: string;
+  updated_at: string;
+  user_id: number;
+}
 
 // Create a TodoManager component that uses our custom hook
 export default function TodoManager() {
@@ -16,7 +27,11 @@ export default function TodoManager() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (newTask.trim()) {
-      addTodo(newTask);
+      addTodo({
+        title: newTask.trim(),
+        completed: false,
+        priority: 'medium'
+      });
       setNewTask('');
     }
   };
@@ -69,18 +84,18 @@ export default function TodoManager() {
                 <input
                   type="checkbox"
                   checked={todo.completed}
-                  onChange={() => toggleTodo(todo.id, todo.completed)}
+                  onChange={() => toggleTodo(todo.id)}
                   className="mr-3"
-                  aria-label={`Mark "${todo.task}" as ${todo.completed ? 'incomplete' : 'complete'}`}
+                  aria-label={`Mark "${todo.title}" as ${todo.completed ? 'incomplete' : 'complete'}`}
                 />
                 <span className={todo.completed ? 'line-through text-gray-500' : ''}>
-                  {todo.task}
+                  {todo.title}
                 </span>
               </div>
               <button
                 onClick={() => deleteTodo(todo.id)}
                 className="text-red-500 hover:text-red-700"
-                aria-label={`Delete task "${todo.task}"`}
+                aria-label={`Delete task "${todo.title}"`}
               >
                 Delete
               </button>
