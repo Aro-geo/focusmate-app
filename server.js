@@ -13,20 +13,20 @@ app.use(express.json());
 // Import API routes
 const authRegister = require('./api/auth-register');
 const authLogin = require('./api/auth-login');
+const getUserData = require('./api/get-user-data');
+const addTask = require('./api/add-task');
+const toggleTask = require('./api/toggle-task');
+const health = require('./api/health');
 
 // Route handlers
 app.post('/api/auth-register', authRegister);
 app.post('/api/auth-login', authLogin);
+app.get('/api/get-user-data', getUserData);
+app.post('/api/add-task', addTask);
+app.put('/api/toggle-task', toggleTask);
+app.get('/api/health', health);
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'API is running', 
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV 
-  });
-});
+
 
 // Test database connection
 app.get('/api/db-test', async (req, res) => {
