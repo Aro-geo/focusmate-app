@@ -1,0 +1,9 @@
+@echo off
+echo Starting FocusMate AI with Vercel Dev Server...
+echo.
+echo Installing Vercel CLI if not installed...
+npm install -g vercel
+echo.
+echo Starting Vercel development server...
+vercel dev --listen 3001
+pause
