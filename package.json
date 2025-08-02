@@ -7,8 +7,9 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "dev": "start-server.bat",
-    "server": "start-server.bat"
+    "dev": "vercel dev",
+    "server": "vercel dev",
+    "dev:local": "start-server.bat"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -48,7 +49,7 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^4.9.5"
   },
-  "proxy": "http://localhost:3001",
+
   "browserslist": {
     "production": [
       ">0.2%",
