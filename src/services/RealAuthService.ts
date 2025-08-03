@@ -52,7 +52,7 @@ export class RealAuthService {
 
   async register(userData: RegisterData): Promise<RegisterResponse> {
     try {
-      const response = await axios.post<RegisterResponse>(`${this.apiUrl}/auth-register`, {
+      const response = await axios.post<RegisterResponse>(`${this.apiUrl}/auth-signup`, {
         fullName: userData.fullName,
         email: userData.email,
         password: userData.password,
