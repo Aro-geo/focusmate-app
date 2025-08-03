@@ -1,8 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Supabase configuration
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://cperkkyxiirnseahxehz.supabase.co';
-const supabaseKey = process.env.REACT_APP_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwZXJra3l4aWlybnNlYWh4ZWh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM5NjI0MTEsImV4cCI6MjA2OTUzODQxMX0.B0kMyDFUqKtZL63zqaZv46g3XtkZGM--OmfVvPYcuAE';
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+const supabaseKey = process.env.REACT_APP_SUPABASE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Missing required Supabase environment variables: REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_KEY');
+}
 
 // Create Supabase client
 const supabase = createClient(supabaseUrl, supabaseKey);

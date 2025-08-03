@@ -6,7 +6,7 @@ async function handler(req, res) {
   corsMiddleware(req, res);
   securityHeaders(req, res);
 
-  if (req.method !== 'PUT') {
+  if (req.method !== 'POST') {
     return res.status(405).json({
       success: false,
       message: 'Method not allowed'
@@ -49,18 +49,14 @@ async function handler(req, res) {
       });
     }
 
-    // Toggle status
-    const newStatus = currentTask.status === 'completed' ? 'pending' : 'completed';
+    // Toggle completion status
+    const newCompleted = !currentTask.completed;
+    const newStatus = newCompleted ? 'completed' : 'pending';
     const updateData = {
+      completed: newCompleted,
       status: newStatus,
       updated_at: new Date().toISOString()
     };
-
-    if (newStatus === 'completed') {
-      updateData.completed_at = new Date().toISOString();
-    } else {
-      updateData.completed_at = null;
-    }
 
     const { data: task, error } = await supabase
       .from('todos')

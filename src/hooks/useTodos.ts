@@ -1,5 +1,5 @@
 import React from 'react';
-import supabaseClient from '../services/SupabaseClient';
+import TaskApiService from '../services/TaskApiService';
 
 export interface Todo {
   id: number;
@@ -30,101 +30,52 @@ export function useTodos(): UseTodosReturn {
   const [loading, setLoading] = React.useState<boolean>(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Initialize connection to Supabase database
-  const initConnection = React.useCallback(async () => {
-    try {
-      // Get auth token from storage
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Not authenticated. Please login first.');
-      }
-
-      // Test connection
-      const success = await supabaseClient.testConnection();
-      if (!success) {
-        throw new Error('Failed to connect to database');
-      }
-
-      return true;
-    } catch (err: any) {
-      console.error('Database connection initialization error:', err);
-      setError(err.message || 'Failed to connect to database');
+  // Check authentication
+  const checkAuth = React.useCallback(() => {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      setError('Not authenticated. Please login first.');
       return false;
     }
+    return true;
   }, []);
 
-  // Fetch todos from database
+  // Fetch todos from API
   const fetchTodos = React.useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const connectionOk = await initConnection();
-      if (!connectionOk) {
+      if (!checkAuth()) {
         return;
       }
 
-      // Get current user ID from token or user data
-      const userData = localStorage.getItem('user');
-      if (!userData) {
-        throw new Error('User data not found');
-      }
-
-      const user = JSON.parse(userData);
-      const userId = user.id;
-
-      // Fetch todos for the current user
-      const todosData = await supabaseClient.query('todos', {
-        select: '*',
-        eq: { user_id: userId },
-        order: { column: 'created_at', ascending: false }
-      });
-
-      if (Array.isArray(todosData) && todosData.every(item => item && typeof item === 'object' && 'id' in item)) {
-        setTodos(todosData as unknown as Todo[]);
-      } else {
-        console.error('Invalid todos response:', todosData);
-        setError('Failed to load todos');
-        setTodos([]);
-      }
+      const todosData = await TaskApiService.getTasks();
+      setTodos(todosData);
     } catch (err: any) {
       console.error('Error fetching todos:', err);
       setError(err.message || 'Failed to fetch todos');
     } finally {
       setLoading(false);
     }
-  }, [initConnection]);
+  }, [checkAuth]);
 
   // Add a new todo
   const addTodo = React.useCallback(async (todo: Omit<Todo, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
     try {
       setError(null);
 
-      const userData = localStorage.getItem('user');
-      if (!userData) {
-        throw new Error('User data not found');
+      if (!checkAuth()) {
+        return;
       }
 
-      const user = JSON.parse(userData);
-      const userId = user.id;
-
-      const newTodo = {
-        ...todo,
-        user_id: userId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      const result = await supabaseClient.insert('todos', newTodo);
-      
-      if (result && result.length > 0) {
-        setTodos(prev => [result[0], ...prev]);
-      }
+      const newTask = await TaskApiService.addTask(todo.title, todo.priority);
+      setTodos(prev => [newTask, ...prev]);
     } catch (err: any) {
       console.error('Error adding todo:', err);
       setError(err.message || 'Failed to add todo');
     }
-  }, []);
+  }, [checkAuth]);
 
   // Update a todo
   const updateTodo = React.useCallback(async (id: number, updates: Partial<Todo>) => {
@@ -168,26 +119,19 @@ export function useTodos(): UseTodosReturn {
     try {
       setError(null);
 
-      const todo = todos.find(t => t.id === id);
-      if (!todo) return;
-
-      const updateData = {
-        completed: !todo.completed,
-        updated_at: new Date().toISOString()
-      };
-
-      const result = await supabaseClient.update('todos', updateData, { id });
-      
-      if (result && result.length > 0) {
-        setTodos(prev => prev.map(t => 
-          t.id === id ? { ...t, ...result[0] } : t
-        ));
+      if (!checkAuth()) {
+        return;
       }
+
+      const updatedTask = await TaskApiService.toggleTask(id);
+      setTodos(prev => prev.map(t => 
+        t.id === id ? updatedTask : t
+      ));
     } catch (err: any) {
       console.error('Error toggling todo:', err);
       setError(err.message || 'Failed to toggle todo');
     }
-  }, [todos]);
+  }, [checkAuth]);
 
   // Refresh todos
   const refreshTodos = React.useCallback(async () => {

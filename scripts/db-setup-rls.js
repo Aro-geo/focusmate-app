@@ -30,15 +30,76 @@ async function setupDatabase() {
 
     console.log('Created auth schema and functions');
 
+    // Create users table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        username VARCHAR(50) UNIQUE,
+        full_name VARCHAR(100),
+        timezone VARCHAR(50) DEFAULT 'UTC',
+        is_active BOOLEAN DEFAULT true,
+        failed_login_attempts INTEGER DEFAULT 0,
+        locked_until TIMESTAMP WITH TIME ZONE,
+        last_login TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
+    // Create user_preferences table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_preferences (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        theme VARCHAR(20) DEFAULT 'light',
+        notifications_enabled BOOLEAN DEFAULT true,
+        pomodoro_duration INTEGER DEFAULT 25,
+        break_duration INTEGER DEFAULT 5,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
+    // Create user_sessions table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        refresh_token TEXT NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        ip_address INET,
+        user_agent TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
+    // Create user_activity_logs table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_activity_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        action VARCHAR(50) NOT NULL,
+        ip_address INET,
+        user_agent TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
     // Create todos table
     await client.query(`
-      -- Create todos table if it doesn't exist
       CREATE TABLE IF NOT EXISTS todos (
         id SERIAL PRIMARY KEY,
-        task TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
         completed BOOLEAN DEFAULT false,
-        user_id INTEGER NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        priority VARCHAR(10) DEFAULT 'medium',
+        status VARCHAR(20) DEFAULT 'pending',
+        due_date TIMESTAMP WITH TIME ZONE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
     `);
 
