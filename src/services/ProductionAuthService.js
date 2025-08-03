@@ -1,7 +1,7 @@
 // src/services/AuthService.js
 class AuthService {
   constructor() {
-    this.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+    this.baseURL = process.env.REACT_APP_API_URL || '';
     this.token = localStorage.getItem('authToken');
   }
 

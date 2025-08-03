@@ -15,7 +15,7 @@ class TaskApiService {
   private baseURL: string;
 
   constructor() {
-    this.baseURL = process.env.REACT_APP_API_URL || '/api';
+    this.baseURL = process.env.REACT_APP_API_URL || '';
   }
 
   private getAuthHeaders() {
