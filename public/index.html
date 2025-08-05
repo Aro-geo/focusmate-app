@@ -85,5 +85,29 @@
         }
       });
     </script>
+
+    <script type="module">
+      // Import the functions you need from the SDKs you need
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+      import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-analytics.js";
+      // TODO: Add SDKs for Firebase products that you want to use
+      // https://firebase.google.com/docs/web/setup#available-libraries
+
+      // Your web app's Firebase configuration
+      // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+      const firebaseConfig = {
+        apiKey: "AIzaSyD0A6vB81_lMuBnR7mXi6Kb6DO2TS3hGVY",
+        authDomain: "focusmate-ai-8cad6.firebaseapp.com",
+        projectId: "focusmate-ai-8cad6",
+        storageBucket: "focusmate-ai-8cad6.firebasestorage.app",
+        messagingSenderId: "704086849869",
+        appId: "1:704086849869:web:5374e89bfb21729f8c1f04",
+        measurementId: "G-JH4NYF7RNJ"
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const analytics = getAnalytics(app);
+    </script>
   </body>
 </html>
