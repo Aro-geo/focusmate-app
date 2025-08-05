@@ -1,5 +1,5 @@
 import React from 'react';
-import TaskApiService from '../services/TaskApiService';
+import { firebaseService } from '../services/FirebaseService';
 
 export interface Todo {
   id: number;
@@ -45,7 +45,7 @@ export function useTodos(): UseTodosReturn {
         return;
       }
 
-      const todosData = await TaskApiService.getTasks();
+      const todosData = await firebaseService.getTasks();
       setTodos(todosData);
     } catch (err: any) {
       console.error('Error fetching todos:', err);
@@ -64,7 +64,7 @@ export function useTodos(): UseTodosReturn {
         return;
       }
 
-      const newTask = await TaskApiService.addTask(todo.title, todo.priority);
+      const newTask = await firebaseService.addTask(todo.title, todo.priority);
       setTodos(prev => [newTask, ...prev]);
     } catch (err: any) {
       console.error('Error adding todo:', err);
@@ -107,7 +107,7 @@ export function useTodos(): UseTodosReturn {
         return;
       }
 
-      const updatedTask = await TaskApiService.toggleTask(id);
+      const updatedTask = await firebaseService.toggleTask(id.toString());
       setTodos(prev => prev.map(t => 
         t.id === id ? updatedTask : t
       ));

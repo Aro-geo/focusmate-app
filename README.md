@@ -1,8 +1,6 @@
-# FocusMate AI – - **Responsive Design**: Mobile-first responsive layout with adaptive navigation
+# FocusMate AI – Intelligent Productivity Assistant
 
-## 🔐 Authentication & Securityrt Productivity Assistant
-
-A clean, modern productivity dashboard built for young professionals featuring AI-powered insights, Pomodoro timer, journaling, and analytics with beautiful Framer Motion animations. Full-stack application with Vercel serverless backend and Neon PostgreSQL database.
+A clean, modern productivity dashboard built for young professionals featuring AI-powered insights, Pomodoro timer, journaling, and analytics with beautiful Framer Motion animations. Full-stack application with Firebase backend and Firestore database.
 
 ## 🚀 Features
 
@@ -14,87 +12,51 @@ A clean, modern productivity dashboard built for young professionals featuring A
 - **Mood Tracking**: Daily mood selector for productivity insights
 - **Progress Analytics**: Weekly progress tracking and statistics with advanced Chart.js visualizations
 - **Smooth Animations**: Beautiful Framer Motion animations throughout the app
-- **Database Integration**: Full PostgreSQL database with Supabase for persistent storage
-- **Authentication**: Secure JWT-based user authentication with bcrypt password hashing
+- **Database Integration**: Full Firebase Firestore database with real-time updates
 - **Dark Mode**: Complete dark theme support with system preference detection
 - **Responsive Design**: Mobile-first responsive layout with adaptive navigation
 
-## � Authentication & Security
+## 🏗️ Project Structure
 
-- **JWT Authentication**: Secure token-based authentication with automatic refresh
-- **Password Security**: bcrypt hashing with 12 salt rounds
-- **Rate Limiting**: Protection against brute force attacks
-- **Row Level Security**: Database-level user data isolation
-- **Input Validation**: Comprehensive validation with Joi schemas
-- **CORS Protection**: Secure cross-origin resource sharing
-- **SQL Injection Protection**: Parameterized queries throughout
-
-## ⚡ Vercel Serverless Backend
-
-### 🏗️ Backend Architecture
 ```
-api/
-├── auth-login.js          # JWT login with rate limiting
-├── auth-signup.js         # User registration with validation
-└── get-db-host.js         # Secure database host endpoint
-
-lib/
-├── db.js                  # Supabase PostgreSQL connection pool
-
-middleware/
-├── auth.js                # JWT authentication middleware
-└── cors.js                # CORS & security headers
-
-utils/
-├── jwt.js                 # JWT token management
-├── password.js            # bcrypt password hashing
-└── validation.js          # Joi input validation
+focusmate-ai/
+├── src/
+│   ├── components/            # Reusable UI components
+│   │   ├── Layout.tsx         # Main layout wrapper
+│   │   ├── Sidebar.tsx        # Navigation sidebar
+│   │   ├── TodoManager.tsx    # Firebase-connected todo manager
+│   │   ├── TaskManager.tsx    # Advanced task management
+│   │   ├── FloatingAssistant.tsx # AI assistant interface
+│   │   └── Charts.tsx         # Analytics visualizations
+│   ├── pages/                 # Main application pages
+│   │   ├── Dashboard.tsx      # Main dashboard with analytics
+│   │   ├── Pomodoro.tsx       # Advanced Pomodoro timer
+│   │   ├── Journal.tsx        # Journal with AI insights
+│   │   ├── Stats.tsx          # Comprehensive analytics
+│   │   ├── Login.tsx          # Authentication page
+│   │   └── Profile.tsx        # User profile management
+│   ├── services/              # Service layer
+│   │   ├── FirebaseService.ts # Firebase Firestore operations
+│   │   ├── OpenAIService.ts   # AI integration service
+│   │   └── AnalyticsService.ts # Analytics data processing
+│   ├── hooks/                 # Custom React hooks
+│   │   ├── useAuth.js         # Authentication hook
+│   │   ├── useTodos.ts        # Firebase todo operations
+│   │   └── useResponsive.ts   # Responsive design utilities
+│   ├── context/               # React context providers
+│   │   ├── ThemeContext.tsx   # Dark/Light mode management
+│   │   ├── UserContext.tsx    # User state management
+│   │   └── DataContext.tsx    # Application data context
+│   └── models/                # TypeScript interfaces
+│       ├── User.ts            # User data models
+│       ├── Task.ts            # Task data models
+│       ├── PomodoroSession.ts # Session data models
+│       └── JournalEntry.ts    # Journal data models
+├── public/                    # Static assets
+├── firebase.json              # Firebase hosting configuration
+├── package.json               # Dependencies and scripts
+└── .env.example               # Environment variables template
 ```
-
-### 🚀 Quick Setup
-
-1. **Clone & Install**:
-```bash
-git clone <repository-url>
-cd focusmate-ai
-npm install
-```
-
-2. **Environment Configuration**:
-```bash
-cp .env.example .env.local
-# Edit .env.local with your database and JWT credentials
-```
-
-3. **Database Setup**:
-```bash
-node scripts/db-setup-rls.js
-```
-
-4. **Development**:
-```bash
-npm run dev
-```
-
-### 🌩️ Supabase Database Integration
-
-#### Production Database Schema
-Includes tables for users, todos, pomodoro sessions, and journal entries with Row Level Security (RLS) policies for user data isolation.
-
-#### Client-side Secure Access
-```tsx
-// Secure todo management with authentication
-const { todos, addTodo, toggleTodo, deleteTodo } = useTodos();
-```
-
-#### Server-side API Access
-```javascript
-// Serverless function database access
-const { query } = require('../lib/db');
-const result = await query('SELECT * FROM users WHERE id = $1', [userId]);
-```
-
----
 
 ## 🛠️ Tech Stack
 
@@ -107,84 +69,16 @@ const result = await query('SELECT * FROM users WHERE id = $1', [userId]);
 - **Chart.js with react-chartjs-2** for advanced analytics
 
 ### Backend & Database
-- **Vercel Serverless Functions** for scalable API endpoints
-- **Supabase PostgreSQL** database with real-time subscriptions
-- **JWT Authentication** with bcrypt password hashing
-- **Node.js with Express** for API middleware
-
-### Security & Validation
-- **bcryptjs** for password hashing (12 salt rounds)
-- **jsonwebtoken** for JWT token management
-- **Joi** for comprehensive input validation
-- **CORS & Security Headers** for protection
-- **Rate Limiting** to prevent abuse
-
-## 🏗️ Project Structure
-
-```
-focusmate-ai/
-├── api/                        # Vercel serverless functions
-│   ├── auth-login.js          # JWT authentication endpoint
-│   ├── auth-signup.js         # User registration endpoint
-│   └── get-db-host.js         # Secure database host provider
-├── lib/
-│   └── db.js                  # Supabase PostgreSQL connection pool
-├── middleware/
-│   ├── auth.js                # JWT middleware & validation
-│   └── cors.js                # CORS & security headers
-├── utils/
-│   ├── jwt.js                 # JWT token utilities
-│   ├── password.js            # Password hashing utilities
-│   └── validation.js          # Input validation schemas
-├── src/
-│   ├── components/            # Reusable UI components
-│   │   ├── Layout.tsx         # Main layout wrapper
-│   │   ├── Sidebar.tsx        # Navigation sidebar
-│   │   ├── TodoManager.tsx    # Database-connected todo manager
-│   │   ├── TaskManager.tsx    # Advanced task management
-│   │   ├── FloatingAssistant.tsx # AI assistant interface
-│   │   └── Charts.tsx         # Analytics visualizations
-│   ├── pages/                 # Main application pages
-│   │   ├── Dashboard.tsx      # Main dashboard with analytics
-│   │   ├── Pomodoro.tsx       # Advanced Pomodoro timer
-│   │   ├── Journal.tsx        # Journal with AI insights
-│   │   ├── Stats.tsx          # Comprehensive analytics
-│   │   ├── Login.tsx          # Authentication page
-│   │   └── Profile.tsx        # User profile management
-│   ├── services/              # API service layer
-│   │   ├── ProductionAuthService.js # Frontend auth service
-│   │   ├── DatabaseTaskService.ts   # Task database operations
-│   │   ├── DatabasePomodoroService.ts # Pomodoro session storage
-│   │   ├── OpenAIService.ts   # AI integration service
-│   │   └── AnalyticsService.ts # Analytics data processing
-│   ├── hooks/                 # Custom React hooks
-│   │   ├── useAuth.js         # Authentication hook
-│   │   ├── useTodos.ts        # Database todo operations
-│   │   └── useResponsive.ts   # Responsive design utilities
-│   ├── context/               # React context providers
-│   │   ├── ThemeContext.tsx   # Dark/Light mode management
-│   │   ├── UserContext.tsx    # User state management
-│   │   └── DataContext.tsx    # Application data context
-│   └── models/                # TypeScript interfaces
-│       ├── User.ts            # User data models
-│       ├── Task.ts            # Task data models
-│       ├── PomodoroSession.ts # Session data models
-│       └── JournalEntry.ts    # Journal data models
-├── scripts/
-│   └── db-setup-rls.js        # Database RLS setup script
-├── public/                    # Static assets
-├── vercel.json                # Vercel deployment configuration
-├── package.json               # Dependencies and scripts
-└── .env.example               # Environment variables template
-```
+- **Firebase Hosting** for static site deployment
+- **Firebase Firestore** for real-time NoSQL database
+- **Firebase Analytics** for user behavior tracking
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 - Node.js (v18.0.0 or higher)
 - npm (v10+ recommended)
-- Supabase PostgreSQL database
-- Vercel account (for deployment)
+- Firebase account
 
 ### Local Development Setup
 
@@ -199,128 +93,69 @@ cd focusmate-ai
 npm install
 ```
 
-3. **Environment setup**:
-```bash
-cp .env.example .env.local
-```
+3. **Firebase setup**:
+   - Create a Firebase project at https://console.firebase.google.com
+   - Enable Firestore database
+   - Enable Firebase Hosting
+   - Copy your Firebase config from Project Settings
 
-4. **Configure environment variables** in `.env.local`:
-```bash
-# Database Configuration
-DATABASE_URL=postgresql://username:password@host:port/database?sslmode=require
-
-# JWT Configuration  
-JWT_SECRET=your-super-secret-jwt-key-min-32-characters
-JWT_EXPIRES_IN=7d
-
-# Frontend URL (for CORS)
-FRONTEND_URL=http://localhost:3000
-
-# Environment
-NODE_ENV=development
-```
-
-5. **Set up database with Row Level Security**:
-```bash
-node scripts/db-setup-rls.js
-```
-
-6. **Start development server**:
+4. **Start development server**:
 ```bash
 npm run dev
 ```
 
-7. **Open application**:
+5. **Open application**:
 Navigate to [http://localhost:3000](http://localhost:3000)
 
-### Production Deployment (Vercel)
+### Production Deployment (Firebase)
 
-1. **Deploy to Vercel**:
+1. **Install Firebase CLI**:
 ```bash
-npx vercel --prod
+npm install -g firebase-tools
 ```
 
-2. **Set environment variables** in Vercel dashboard:
-   - `SUPABASE_URL` - Your Supabase project URL
-- `SUPABASE_KEY` - Your Supabase anon/public key
-   - `JWT_SECRET` - Secure random string (32+ characters)
-   - `NODE_ENV=production`
+2. **Login to Firebase**:
+```bash
+firebase login
+```
 
-3. **Verify deployment**:
-   - Frontend: https://your-app.vercel.app
-   - API Health: https://your-app.vercel.app/api/health
+3. **Initialize Firebase**:
+```bash
+firebase init
+```
 
-## 🔑 Environment Variables
-
-### Required Variables
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `SUPABASE_URL` | Supabase project URL | `https://your-project.supabase.co` |
-| `SUPABASE_KEY` | Supabase anon/public key | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV...` |
-| `JWT_SECRET` | Secret key for JWT signing (32+ chars) | `your-super-secret-jwt-key-min-32-characters` |
-| `NODE_ENV` | Environment mode | `development` or `production` |
-
-### Optional Variables
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `JWT_EXPIRES_IN` | JWT token expiration time | `7d` |
-| `FRONTEND_URL` | Frontend URL for CORS | `http://localhost:3000` |
-| `BCRYPT_SALT_ROUNDS` | Password hashing rounds | `12` |
+4. **Build and deploy**:
+```bash
+npm run build
+firebase deploy
+```
 
 ## 🎯 Current Features
 
 ### ✅ Complete Implementation
-- **🔐 JWT Authentication**: Full user registration, login, and session management
 - **📊 Dashboard**: Interactive 3-column layout with real-time data and AI insights
 - **🍅 Pomodoro Timer**: Advanced timer with session tracking and mood logging
-- **📝 Todo Management**: Database-connected CRUD operations with real-time updates
+- **📝 Todo Management**: Firebase-connected CRUD operations with real-time updates
 - **📈 Analytics**: Advanced charts showing productivity trends and insights
 - **📓 Journal**: Entry management with mood tracking and AI insights
 - **👤 User Profile**: Complete profile management with settings
 - **🎨 Theme System**: Dark/Light mode with system preference detection
 - **📱 Responsive Design**: Mobile-optimized layouts throughout
 
-### 🤖 Advanced AI Features (NEW)
+### 🤖 Advanced AI Features
 - **🧠 Intelligent Task Analysis**: AI-powered task complexity scoring and duration estimation
 - **🎯 Smart Prioritization**: Multi-factor task prioritization with contextual reasoning
 - **💡 Context-Aware Insights**: Personalized productivity recommendations based on time, mood, and patterns
 - **⚡ Real-time Suggestions**: Dynamic focus tips and optimization strategies
 - **📊 Pattern Recognition**: Learning from user behavior to improve recommendations
 
-### 📱 Progressive Web App (PWA) (NEW)
+### 📱 Progressive Web App (PWA)
 - **🌐 Offline Functionality**: Core features work without internet connection
 - **🔄 Background Sync**: Automatic data synchronization when back online
 - **📩 Push Notifications**: Configurable productivity reminders and focus alerts
 - **⬇️ App Installation**: Install as native app on desktop and mobile devices
 - **🔄 Auto Updates**: Seamless app updates with user notification
 - **💾 Local Storage**: Intelligent caching for optimal performance
-
-### 🔒 Security Features
-- **Password Security**: bcrypt hashing with 12 salt rounds
-- **JWT Tokens**: Secure authentication with automatic refresh
-- **Rate Limiting**: Protection against brute force attacks
-- **Input Validation**: Comprehensive Joi schema validation
-- **SQL Injection Protection**: Parameterized queries throughout
-- **CORS Protection**: Proper cross-origin resource sharing
-- **Row Level Security**: Database-level user data isolation
-
-### 🌐 API Endpoints
-**Authentication & Core**
-- `POST /api/auth-signup` - User registration
-- `POST /api/auth-login` - User authentication  
-- `GET /api/get-db-host` - Secure database host (authenticated)
-- `GET /api/health` - API health check
-
-**Advanced AI Features (NEW)**
-- `POST /api/ai-analyze-task` - Intelligent task complexity analysis
-- `POST /api/ai-prioritize-tasks` - Smart task prioritization
-- `POST /api/ai-contextual-insights` - Context-aware productivity insights
-- `POST /api/ai-schedule-recommendations` - AI-powered scheduling
-- `POST /api/ai-break-suggestions` - Intelligent break recommendations
-
-**PWA & Notifications (NEW)**
-- `POST /api/push-subscribe` - Push notification subscription
-- `GET /api/offline-sync` - Background data synchronization
 
 ## 🔧 Development Scripts
 
@@ -332,8 +167,9 @@ npm run dev              # Start Vite development server
 npm run build            # Build for production
 npm run preview          # Preview production build
 
-# Database
-node scripts/db-setup-rls.js  # Set up Row Level Security
+# Firebase
+firebase serve           # Serve locally with Firebase
+firebase deploy          # Deploy to Firebase Hosting
 ```
 
 ## 📱 Features by Page
@@ -377,39 +213,12 @@ node scripts/db-setup-rls.js  # Set up Row Level Security
 - **Icons**: Consistent Lucide React icon set
 - **Theme**: Complete dark/light mode implementation
 
----
-
-*Built with ❤️ for productivity enthusiasts using modern React, Vercel serverless functions, and Supabase PostgreSQL*
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📞 Support
-
-If you have any questions or need help getting started:
-
-- 📧 **Email**: support@focusmate-ai.com
-- 📚 **Documentation**: [Wiki](https://github.com/Aro-geo/focusmate-app/wiki)
-- 🐛 **Bug Reports**: [Issues](https://github.com/Aro-geo/focusmate-app/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/Aro-geo/focusmate-app/discussions)
-
 ## 🗺️ Roadmap
 
 ### 🚀 Upcoming Features
 - [ ] **Mobile App**: React Native implementation
 - [ ] **Team Collaboration**: Shared workspaces and team analytics
-- [✅] **Advanced AI**: Enhanced productivity insights and suggestions (COMPLETED)
 - [ ] **Integration Hub**: Connect with popular productivity tools
-- [✅] **Offline Mode**: Progressive Web App with offline capabilities (COMPLETED)
 - [ ] **Advanced Analytics**: Machine learning-powered insights
 
 ### 🏗️ Implementation Priority
@@ -434,7 +243,7 @@ If you have any questions or need help getting started:
    - Shared workspaces
    - Team productivity metrics
    - Collaborative task management
-   - Real-time updates with WebSockets
+   - Real-time updates
 
 #### Phase 3: Advanced Features
 4. **📊 Advanced Analytics & ML**
@@ -455,25 +264,34 @@ If you have any questions or need help getting started:
    - Native device features
    - Synchronized data across devices
 
-### 🔄 Recent Updates
-- ✅ **v1.0.0**: Initial release with full authentication and database integration
-- ✅ **JWT Security**: Implemented secure token-based authentication
-- ✅ **Vercel Deployment**: Production-ready serverless backend
-- ✅ **Supabase Integration**: Scalable PostgreSQL database with RLS
-- 🚀 **v1.1.0**: Advanced AI features and PWA capabilities (Current)
-  - ✅ Enhanced AI task analysis with complexity scoring
-  - ✅ Intelligent task prioritization with multi-factor scoring
-  - ✅ Context-aware productivity insights
-  - ✅ Progressive Web App (PWA) implementation
-  - ✅ Offline functionality with service workers
-  - ✅ Background sync for offline actions
-  - ✅ Push notifications for productivity reminders
-  - ✅ App installation prompts and update management
+---
+
+*Built with ❤️ for productivity enthusiasts using modern React, Firebase, and AI*
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📞 Support
+
+If you have any questions or need help getting started:
+
+- 📧 **Email**: support@focusmate-ai.com
+- 📚 **Documentation**: [Wiki](https://github.com/Aro-geo/focusmate-app/wiki)
+- 🐛 **Bug Reports**: [Issues](https://github.com/Aro-geo/focusmate-app/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/Aro-geo/focusmate-app/discussions)
 
 ## 🙏 Acknowledgments
 
-- **Vercel** for excellent serverless function hosting
-- **Supabase** for providing scalable PostgreSQL database
+- **Firebase** for excellent hosting and database services
 - **Framer Motion** for beautiful animation library
 - **Tailwind CSS** for rapid UI development
 - **React** team for the amazing framework
