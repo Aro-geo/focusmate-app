@@ -1,1 +1,76 @@
-.App {\n  text-align: center;\n}\n\n.App-logo {\n  height: 40vmin;\n  pointer-events: none;\n}\n\n@media (prefers-reduced-motion: no-preference) {\n  .App-logo {\n    animation: App-logo-spin infinite 20s linear;\n  }\n}\n\n.App-header {\n  background-color: #282c34;\n  min-height: 100vh;\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  font-size: calc(10px + 2vmin);\n  color: white;\n}\n\n.App-link {\n  color: #61dafb;\n}\n\n@keyframes App-logo-spin {\n  from {\n    transform: rotate(0deg);\n  }\n  to {\n    transform: rotate(360deg);\n  }\n}\n\n/* Floating Assistant Styles */\n.floating-assistant-size {\n  width: 60px;\n  height: 60px;\n}\n\n.floating-assistant-expanded {\n  width: 320px;\n  height: 280px;\n}\n\n.floating-assistant-expanded-chat {\n  width: 320px;\n  height: 400px;\n}\n\n/* Debug indicators */\n.debug-indicator-red {\n  position: absolute;\n  top: -20px;\n  left: 0;\n  background: red;\n  color: white;\n  padding: 2px 4px;\n  font-size: 10px;\n  z-index: 1000;\n}\n\n.debug-indicator-green {\n  position: absolute;\n  top: -40px;\n  left: 0;\n  background: green;\n  color: white;\n  padding: 2px 4px;\n  font-size: 10px;\n  z-index: 1000;\n  white-space: nowrap;\n}
+.App {
+  text-align: center;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.floating-assistant-size {
+  width: 60px;
+  height: 60px;
+}
+
+.floating-assistant-expanded {
+  width: 320px;
+  height: 280px;
+}
+
+.floating-assistant-expanded-chat {
+  width: 320px;
+  height: 400px;
+}
+
+.debug-indicator-red {
+  position: absolute;
+  top: -20px;
+  left: 0;
+  background: red;
+  color: white;
+  padding: 2px 4px;
+  font-size: 10px;
+  z-index: 1000;
+}
+
+.debug-indicator-green {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: green;
+  color: white;
+  padding: 2px 4px;
+  font-size: 10px;
+  z-index: 1000;
+  white-space: nowrap;
+}
