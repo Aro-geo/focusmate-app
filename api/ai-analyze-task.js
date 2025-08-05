@@ -184,3 +184,4 @@ function generateSubtasks(taskDescription, complexity) {
 }
 
 module.exports = handler;
+module.exports.default = handler;

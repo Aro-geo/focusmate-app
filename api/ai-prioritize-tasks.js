@@ -305,3 +305,4 @@ function generatePriorityReasoning(task, scoring, currentHour) {
 }
 
 module.exports = handler;
+module.exports.default = handler;
