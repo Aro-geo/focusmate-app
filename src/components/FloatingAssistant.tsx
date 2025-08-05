@@ -36,9 +36,9 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   const { darkMode } = useTheme();
   // Debug: Theme
   console.log('[FloatingAssistant] darkMode:', darkMode);
-  const [isMinimized, setIsMinimized] = useState(false); // Start expanded for visibility
-  const [showChat, setShowChat] = useState(true); // Start with chat open for visibility
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [showChat, setShowChat] = useState(true);
+  const [position, setPosition] = useState({ x: window.innerWidth - 340, y: window.innerHeight - 420 });
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   // Debug: State
@@ -51,17 +51,14 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
       const assistantWidth = isMinimized ? 60 : 320;
       const assistantHeight = isMinimized ? 60 : (showChat ? 400 : 280);
       const newPos = {
-        x: window.innerWidth - assistantWidth - margin,
-        y: window.innerHeight - assistantHeight - margin
+        x: Math.max(0, window.innerWidth - assistantWidth - margin),
+        y: Math.max(0, window.innerHeight - assistantHeight - margin)
       };
       setPosition(newPos);
-      // Debug: Position update
-      console.log('[FloatingAssistant] updatePosition:', newPos);
+      console.log('[FloatingAssistant] updatePosition:', newPos, 'viewport:', window.innerWidth, window.innerHeight);
     };
 
-    // Set initial position
     updatePosition();
-    // Update position on window resize
     window.addEventListener('resize', updatePosition);
     return () => window.removeEventListener('resize', updatePosition);
   }, [isMinimized, showChat]);
