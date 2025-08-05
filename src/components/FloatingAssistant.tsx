@@ -38,7 +38,7 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   console.log('[FloatingAssistant] darkMode:', darkMode);
   const [isMinimized, setIsMinimized] = useState(false);
   const [showChat, setShowChat] = useState(true);
-  const [position, setPosition] = useState({ x: window.innerWidth - 340, y: window.innerHeight - 420 });
+  const [position, setPosition] = useState({ x: 20, y: 20 });
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   // Debug: State
@@ -96,7 +96,7 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
           scale: isDragging ? 1.05 : 1
         }}
         whileHover={{ scale: 1.1 }}
-        className="fixed z-50 cursor-grab active:cursor-grabbing floating-assistant-size"
+        className="fixed z-[9999] cursor-grab active:cursor-grabbing floating-assistant-size"
         initial={{ opacity: 0, scale: 0 }}
         exit={{ opacity: 0, scale: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
@@ -142,7 +142,7 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
         y: position.y,
         scale: isDragging ? 1.02 : 1
       }}
-      className={`fixed z-50 cursor-grab active:cursor-grabbing ${showChat ? 'floating-assistant-expanded-chat' : 'floating-assistant-expanded'}`}
+      className={`fixed z-[9999] cursor-grab active:cursor-grabbing ${showChat ? 'floating-assistant-expanded-chat' : 'floating-assistant-expanded'}`}
       initial={{ opacity: 0, scale: 0.8, y: 50 }}
       exit={{ opacity: 0, scale: 0.8, y: 50 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
