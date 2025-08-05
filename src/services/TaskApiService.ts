@@ -25,7 +25,7 @@ class TaskApiService {
   }
 
   async addTask(title: string, priority: string = 'medium'): Promise<Task> {
-    const response = await fetch(`${this.baseURL}/add-task`, {
+    const response = await fetch(`${this.baseURL}/api/add-task`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ title, priority })
@@ -41,7 +41,7 @@ class TaskApiService {
   }
 
   async toggleTask(taskId: number): Promise<Task> {
-    const response = await fetch(`${this.baseURL}/toggle-task`, {
+    const response = await fetch(`${this.baseURL}/api/toggle-task`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ taskId })
@@ -57,7 +57,7 @@ class TaskApiService {
   }
 
   async getTasks(): Promise<Task[]> {
-    const response = await fetch(`${this.baseURL}/get-user-data`, {
+    const response = await fetch(`${this.baseURL}/api/get-user-data`, {
       method: 'GET',
       headers: this.getAuthHeaders()
     });
