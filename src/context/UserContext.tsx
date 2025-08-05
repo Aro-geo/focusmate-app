@@ -25,47 +25,21 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const navigate = useNavigate();
 
   const refreshUserData = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const token = realAuthService.getToken();
-      console.log('🔑 Token check:', token ? 'Token found' : 'No token found');
-      
-      if (!token) {
-        console.log('No token found, checking current route');
-        const currentPath = window.location.pathname;
-        if (!currentPath.includes('/login') && !currentPath.includes('/signup') && !currentPath.includes('/test')) {
-          console.log('Not on auth page, redirecting to login');
-          navigate('/login');
-        }
-        return;
+    // Bypass authentication - set demo user data
+    setUserData({
+      id: 1,
+      username: 'demo',
+      email: 'demo@example.com',
+      created_at: new Date().toISOString(),
+      tasks: [],
+      stats: {
+        totalTasks: 0,
+        completedTasks: 0,
+        pendingTasks: 0,
+        completionRate: 0
       }
-
-      console.log('📡 Fetching user data...');
-      const result = await userDataService.fetchUserData();
-      console.log('📡 User data result:', result);
-      
-      if (result.success && result.data) {
-        setUserData(result.data);
-        console.log('✅ User data loaded successfully:', result.data.username || result.data.email);
-      } else {
-        console.error('❌ Failed to fetch user data:', result.message);
-        setError(result.message || 'Failed to load user data');
-        
-        // If authentication failed, redirect to login
-        if (result.message?.includes('Authentication') || result.message?.includes('expired') || result.message?.includes('invalid')) {
-          console.log('🔄 Authentication issue detected, redirecting to login');
-          realAuthService.logout(); // Clear any invalid tokens
-          navigate('/login');
-        }
-      }
-    } catch (error) {
-      console.error('💥 Error refreshing user data:', error);
-      setError('Failed to load user data');
-    } finally {
-      setIsLoading(false);
-    }
+    });
+    setIsLoading(false);
   };
 
   const logout = async () => {
@@ -83,21 +57,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     return UserDataService.getTimeBasedGreeting();
   };
 
-  // Load user data on mount and when authentication changes
+  // Load demo user data on mount
   useEffect(() => {
-    const token = realAuthService.getToken();
-    if (token) {
-      refreshUserData();
-    } else {
-      setIsLoading(false);
-      // Only redirect to login if we're trying to access a protected route
-      // Don't redirect if we're already on login or signup pages
-      const currentPath = window.location.pathname;
-      if (!currentPath.includes('/login') && !currentPath.includes('/signup') && !currentPath.includes('/test')) {
-        navigate('/login');
-      }
-    }
-  }, [navigate]);
+    refreshUserData();
+  }, []);
 
   const value: UserContextType = {
     userData,

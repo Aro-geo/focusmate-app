@@ -159,47 +159,13 @@ export class RealAuthService {
   }
 
   getToken(): string | null {
-    const token = localStorage.getItem('token');
-    console.debug('Token retrieved from storage:', token ? 'Token exists' : 'No token found');
-    return token;
+    // Always return a dummy token
+    return 'demo-token';
   }
 
   isAuthenticated(): boolean {
-    const token = this.getToken();
-    
-    if (!token) {
-      console.debug('No token found, user is not authenticated');
-      return false;
-    }
-    
-    // Basic token structure validation (without using JWT library)
-    try {
-      // Check if the token has the correct JWT structure (3 parts separated by dots)
-      const parts = token.split('.');
-      if (parts.length !== 3) {
-        console.warn('Token has invalid format, clearing invalid token');
-        localStorage.removeItem('token');
-        return false;
-      }
-      
-      // Try to decode the payload to check basic validity
-      // Note: This doesn't verify the signature, just checks if it's valid base64
-      const payload = JSON.parse(atob(parts[1]));
-      
-      // Check if token is expired based on exp claim
-      if (payload.exp && payload.exp * 1000 < Date.now()) {
-        console.warn('Token has expired, clearing expired token');
-        this.logout(); // Clear all auth data
-        return false;
-      }
-      
-      console.debug('Token validated successfully, user is authenticated');
-      return true;
-    } catch (error) {
-      console.error('Error validating token:', error);
-      localStorage.removeItem('token');
-      return false;
-    }
+    // Always return true - bypass authentication
+    return true;
   }
 }
 
