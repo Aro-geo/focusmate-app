@@ -30,13 +30,8 @@ export function useTodos(): UseTodosReturn {
   const [loading, setLoading] = React.useState<boolean>(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Check authentication
+  // Check authentication - bypassed
   const checkAuth = React.useCallback(() => {
-    const token = localStorage.getItem('authToken');
-    if (!token) {
-      setError('Not authenticated. Please login first.');
-      return false;
-    }
     return true;
   }, []);
 
