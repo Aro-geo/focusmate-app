@@ -12,6 +12,7 @@ app.use(express.json());
 
 // Import API routes
 const authRegister = require('./api/auth-register');
+const authSignup = require('./api/auth-signup');
 const authLogin = require('./api/auth-login');
 const getUserData = require('./api/get-user-data');
 const addTask = require('./api/add-task');
@@ -20,10 +21,11 @@ const health = require('./api/health');
 
 // Route handlers
 app.post('/api/auth-register', authRegister);
+app.post('/api/auth-signup', authSignup);
 app.post('/api/auth-login', authLogin);
 app.get('/api/get-user-data', getUserData);
 app.post('/api/add-task', addTask);
-app.put('/api/toggle-task', toggleTask);
+app.post('/api/toggle-task', toggleTask);
 app.get('/api/health', health);
 
 
@@ -51,6 +53,7 @@ app.listen(PORT, () => {
   console.log(`🚀 API Server running on http://localhost:${PORT}`);
   console.log(`📚 Available endpoints:`);
   console.log(`  POST /api/auth-register - User registration`);
+  console.log(`  POST /api/auth-signup - User signup`);
   console.log(`  POST /api/auth-login - User login`);
   console.log(`  GET  /api/health - Health check`);
   console.log(`  GET  /api/db-test - Supabase database connection test`);
