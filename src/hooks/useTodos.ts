@@ -2,7 +2,7 @@ import React from 'react';
 import { firebaseService } from '../services/FirebaseService';
 
 export interface Todo {
-  id: number;
+  id: string;
   title: string;
   description?: string;
   completed: boolean;
@@ -18,9 +18,9 @@ interface UseTodosReturn {
   loading: boolean;
   error: string | null;
   addTodo: (todo: Omit<Todo, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => Promise<void>;
-  updateTodo: (id: number, updates: Partial<Todo>) => Promise<void>;
-  deleteTodo: (id: number) => Promise<void>;
-  toggleTodo: (id: number) => Promise<void>;
+  updateTodo: (id: string, updates: Partial<Todo>) => Promise<void>;
+  deleteTodo: (id: string) => Promise<void>;
+  toggleTodo: (id: string) => Promise<void>;
   refreshTodos: () => Promise<void>;
 }
 
@@ -73,7 +73,7 @@ export function useTodos(): UseTodosReturn {
   }, [checkAuth]);
 
   // Update a todo
-  const updateTodo = React.useCallback(async (id: number, updates: Partial<Todo>) => {
+  const updateTodo = React.useCallback(async (id: string, updates: Partial<Todo>) => {
     try {
       setError(null);
       // For now, just update locally - can implement API call later
@@ -87,7 +87,7 @@ export function useTodos(): UseTodosReturn {
   }, []);
 
   // Delete a todo
-  const deleteTodo = React.useCallback(async (id: number) => {
+  const deleteTodo = React.useCallback(async (id: string) => {
     try {
       setError(null);
       // For now, just delete locally - can implement API call later
@@ -99,7 +99,7 @@ export function useTodos(): UseTodosReturn {
   }, []);
 
   // Toggle todo completion status
-  const toggleTodo = React.useCallback(async (id: number) => {
+  const toggleTodo = React.useCallback(async (id: string) => {
     try {
       setError(null);
 
@@ -107,7 +107,7 @@ export function useTodos(): UseTodosReturn {
         return;
       }
 
-      const updatedTask = await firebaseService.toggleTask(id.toString());
+      const updatedTask = await firebaseService.toggleTask(id);
       setTodos(prev => prev.map(t => 
         t.id === id ? updatedTask : t
       ));

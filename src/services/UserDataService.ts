@@ -130,7 +130,7 @@ export class UserDataService {
         };
       }
 
-      const response = await axios.put<{success: boolean, message?: string, task?: any}>(`${this.apiUrl}/toggle-task`, {
+      const response = await axios.post<{success: boolean, message?: string, task?: any}>(`${this.apiUrl}/toggle-task`, {
         taskId
       }, {
         headers: {
