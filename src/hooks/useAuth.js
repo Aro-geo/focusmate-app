@@ -12,24 +12,9 @@ export function AuthProvider({ children }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Check if user is already logged in
-    const initializeAuth = () => {
-      try {
-        const currentUser = AuthService.getCurrentUser();
-        const token = AuthService.getToken();
-        
-        if (currentUser && token) {
-          setUser(currentUser);
-        }
-      } catch (error) {
-        console.error('Auth initialization error:', error);
-        AuthService.removeToken();
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeAuth();
+    // Bypass authentication - set default user
+    setUser({ id: 1, email: 'demo@example.com', username: 'demo' });
+    setLoading(false);
   }, []);
 
   const login = async (credentials) => {
@@ -102,7 +87,7 @@ export function AuthProvider({ children }) {
     logout,
     updateProfile,
     clearError,
-    isAuthenticated: !!user
+    isAuthenticated: true
   };
 
   return (
