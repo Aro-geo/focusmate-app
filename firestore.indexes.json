@@ -17,17 +17,11 @@
       ]
     },
     {
-      "collectionGroup": "pomodoro",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "startTime", "order": "DESCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "journal",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "date", "order": "DESCENDING" }
+        { "fieldPath": "date", "order": "DESCENDING" },
+        { "fieldPath": "mood", "order": "ASCENDING" }
       ]
     },
     {

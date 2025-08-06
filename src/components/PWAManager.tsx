@@ -79,10 +79,15 @@ const PWAManager: React.FC = () => {
   };
 
   const handleInstall = async () => {
-    const success = await pwaService.install();
-    if (success) {
+    try {
+      const success = await pwaService.install();
+      if (success) {
+        setShowInstallPrompt(false);
+        setAppInfo(pwaService.getAppInfo());
+      }
+    } catch (error) {
+      console.error('Install failed:', error);
       setShowInstallPrompt(false);
-      setAppInfo(pwaService.getAppInfo());
     }
   };
 
@@ -154,6 +159,7 @@ const PWAManager: React.FC = () => {
                   }`}
                   title="Close install prompt"
                   aria-label="Close install prompt"
+                  type="button"
                 >
                   <X className="w-5 h-5" />
                 </button>

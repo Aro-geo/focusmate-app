@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { motion, PanInfo } from 'framer-motion';
 import { 
   Brain, 
@@ -21,7 +21,7 @@ interface FloatingAssistantProps {
   onGetTip: () => void;
 }
 
-const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
+const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
   isAiLoading,
   aiMessage,
   aiChatInput,
@@ -29,20 +29,12 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
   onAskAI,
   onGetTip
 }) => {
-  // Debug: Component mount
-  console.log('[FloatingAssistant] Rendered');
-  // Debug: Props
-  console.log('[FloatingAssistant] Props:', { isAiLoading, aiMessage, aiChatInput, setAiChatInput, onAskAI, onGetTip });
   const { darkMode } = useTheme();
-  // Debug: Theme
-  console.log('[FloatingAssistant] darkMode:', darkMode);
   const [isMinimized, setIsMinimized] = useState(false);
   const [showChat, setShowChat] = useState(true);
   const [position, setPosition] = useState({ x: 20, y: 20 });
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  // Debug: State
-  console.log('[FloatingAssistant] State:', { isMinimized, showChat, position, isDragging });
 
   // Initialize position to bottom-right corner
   useEffect(() => {
@@ -55,7 +47,7 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
         y: Math.max(0, window.innerHeight - assistantHeight - margin)
       };
       setPosition(newPos);
-      console.log('[FloatingAssistant] updatePosition:', newPos, 'viewport:', window.innerWidth, window.innerHeight);
+
     };
 
     updatePosition();
@@ -72,15 +64,14 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
     const newX = Math.max(margin, Math.min(window.innerWidth - assistantWidth - margin, position.x + info.offset.x));
     const newY = Math.max(margin, Math.min(window.innerHeight - assistantHeight - margin, position.y + info.offset.y));
     setPosition({ x: newX, y: newY });
-    // Debug: Drag end
-    console.log('[FloatingAssistant] handleDragEnd:', { newX, newY });
+
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = useCallback(() => {
     if (aiChatInput.trim() && !isAiLoading) {
       onAskAI();
     }
-  };
+  }, [aiChatInput, isAiLoading, onAskAI]);
 
   if (isMinimized) {
     return (
@@ -100,12 +91,7 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
         initial={{ opacity: 0, scale: 0 }}
         exit={{ opacity: 0, scale: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        data-debug="FloatingAssistant-minimized"
       >
-        {/* Debug overlay */}
-        <div className="debug-indicator-red">
-          Debug: Minimized
-        </div>
         <motion.button
           onClick={() => setIsMinimized(false)}
           className={`w-full h-full rounded-full shadow-lg flex items-center justify-center transition-all duration-200 ${
@@ -146,16 +132,7 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
       initial={{ opacity: 0, scale: 0.8, y: 50 }}
       exit={{ opacity: 0, scale: 0.8, y: 50 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      data-debug="FloatingAssistant-main"
     >
-      {/* Debug overlay */}
-      <div className="debug-indicator-green">
-        Debug: Main<br/>
-        isMinimized: {String(isMinimized)}<br/>
-        showChat: {String(showChat)}<br/>
-        position: {JSON.stringify(position)}<br/>
-        darkMode: {String(darkMode)}
-      </div>
       <div className={`w-full h-full rounded-xl shadow-2xl overflow-hidden transition-all duration-300 ${
         darkMode 
           ? 'bg-gray-800 border border-gray-700 shadow-black/50' 
@@ -293,6 +270,8 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = ({
       </div>
     </motion.div>
   );
-};
+});
+
+FloatingAssistant.displayName = 'FloatingAssistant';
 
 export default FloatingAssistant;

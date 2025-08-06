@@ -4,7 +4,8 @@ import {
   signOut, 
   onAuthStateChanged,
   User,
-  updateProfile
+  updateProfile,
+  sendEmailVerification
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase.js';
@@ -23,6 +24,7 @@ class AuthService {
     const user = userCredential.user;
     
     await updateProfile(user, { displayName });
+    await sendEmailVerification(user);
     
     const userProfile: UserProfile = {
       uid: user.uid,

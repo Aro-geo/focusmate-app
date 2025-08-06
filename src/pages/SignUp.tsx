@@ -13,6 +13,7 @@ const SignUp: React.FC = () => {
   const [showPassword, setShowPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [errors, setErrors] = React.useState<{ [key: string]: string }>({});
+  const [helperText, setHelperText] = React.useState<React.ReactNode>(null);
   const navigate = useNavigate();
   const { signUp } = useAuth();
 
@@ -22,6 +23,7 @@ const SignUp: React.FC = () => {
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
+    setHelperText(null);
   };
 
   const validateForm = () => {
@@ -48,8 +50,17 @@ const SignUp: React.FC = () => {
       } else {
         setErrors({ general: 'Sign up failed. Please try again.' });
       }
-    } catch (error) {
-      setErrors({ general: 'An error occurred during sign up.' });
+    } catch (error: any) {
+      if (error.code === 'auth/email-already-in-use') {
+        setErrors({ general: 'This email address is already registered. Please use a different email or try logging in.' });
+        setHelperText(
+          <span>
+            Already have an account? <Link to="/login" className="text-indigo-500 hover:underline font-medium">Sign in here</Link>
+          </span>
+        );
+      } else {
+        setErrors({ general: `Registration failed: ${error.message}` });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -89,8 +100,14 @@ const SignUp: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {errors.general && (
-              <div className="bg-red-50 dark:bg-red-900/50 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
-                {errors.general}
+              <div className="bg-red-50 dark:bg-red-900/50 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm mb-4" role="alert">
+                <span className="block sm:inline">{errors.general}</span>
+              </div>
+            )}
+
+            {helperText && (
+              <div className="text-sm text-gray-600 dark:text-gray-400 mb-4 text-center">
+                {helperText}
               </div>
             )}
 

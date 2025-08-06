@@ -13,6 +13,7 @@ import SignUp from './pages/SignUp';
 import MobileTestComponent from './components/MobileTestComponent';
 import PWAManager from './components/PWAManager';
 import ProtectedRoute from './components/ProtectedRoute';
+import ErrorBoundary from './components/ErrorBoundary';
 import { DataProvider } from './context/DataContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
@@ -21,7 +22,8 @@ import './App.css';
 
 function App() {
   return (
-    <ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
       <DataProvider>
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AuthProvider>
@@ -71,7 +73,8 @@ function App() {
           </AuthProvider>
         </Router>
       </DataProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -55,13 +55,29 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       // Get user profile from Firebase
       const profile = await AuthService.getUserProfile(firebaseUser.uid);
       
-      if (profile) {
+      if (profile && profile.uid) {
         setUserData({
           id: parseInt(profile.uid.slice(-8), 16), // Convert Firebase UID to number
-          username: profile.displayName,
+          username: profile.displayName || 'User',
           email: profile.email,
           created_at: profile.createdAt.toString(),
           tasks: [], // TODO: Load tasks from Firestore
+          stats: {
+            totalTasks: 0,
+            completedTasks: 0,
+            pendingTasks: 0,
+            completionRate: 0
+          },
+          focusTime: '0m'
+        });
+      } else {
+        // Fallback to firebaseUser data if profile is incomplete
+        setUserData({
+          id: parseInt(firebaseUser.uid.slice(-8), 16),
+          username: firebaseUser.displayName || 'User',
+          email: firebaseUser.email || '',
+          created_at: new Date().toISOString(),
+          tasks: [],
           stats: {
             totalTasks: 0,
             completedTasks: 0,
