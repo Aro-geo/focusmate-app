@@ -2,6 +2,7 @@
   "name": "focusmate-ai",
   "version": "1.0.0",
   "description": "FocusMate AI productivity app",
+  "homepage": "/",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
