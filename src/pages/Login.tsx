@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, LogIn, User, Lock } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { realAuthService } from '../services/RealAuthService';
+import { useAuth } from '../context/AuthContext';
 
 const Login: React.FC = () => {
   const [formData, setFormData] = React.useState({
@@ -48,6 +48,8 @@ const Login: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const { login } = useAuth();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -59,48 +61,20 @@ const Login: React.FC = () => {
     setErrors({}); // Clear previous errors
     
     try {
-      // Use real authentication service
-      const result = await realAuthService.login({
-        email: formData.email,
-        password: formData.password
-      });
+      const success = await login(formData.email, formData.password);
       
-      console.log('Login result:', result);
-      if (result.success) {
-        // Login successful - token is already saved in localStorage by the service
+      if (success) {
         console.log('Login successful, navigating to dashboard...');
-        // Use the correct path for your app's route structure
         navigate('/app/dashboard');
       } else {
-        // Login failed
-        if (result.statusCode === 401) {
-          // Show alert for 401 errors and do NOT redirect
-          alert(result.message || 'Invalid email or password');
-        } else {
-          // For other errors, show in the form
-          setErrors({ 
-            general: result.message || 'Login failed. Please try again.'
-          });
-        }
+        setErrors({ 
+          general: 'Invalid email or password. Please try again.'
+        });
       }
     } catch (error: any) {
-      // This catch block handles any unexpected errors not caught by the service
-      console.error('Unexpected login error:', error);
-      
-      // Log more detailed error information
-      if (error.response) {
-        console.error('Error response data:', error.response.data);
-        console.error('Error response status:', error.response.status);
-        console.error('Error response headers:', error.response.headers);
-      } else if (error.request) {
-        console.error('Error request:', error.request);
-      } else {
-        console.error('Error message:', error.message);
-      }
-      
-      // Set a more descriptive error message
+      console.error('Login error:', error);
       setErrors({ 
-        general: `An unexpected error occurred: ${error.message}. Please check console for details.` 
+        general: 'An error occurred during login. Please try again.'
       });
     } finally {
       setIsLoading(false);

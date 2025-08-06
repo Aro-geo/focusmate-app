@@ -31,7 +31,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode }) => {
       }
 
       if (success) {
-        navigate('/dashboard');
+        navigate('/app/dashboard');
       } else {
         setError('Authentication failed. Please try again.');
       }
