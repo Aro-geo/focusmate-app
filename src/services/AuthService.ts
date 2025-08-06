@@ -1,79 +1,162 @@
-import { realAuthService, LoginData, RegisterData } from './RealAuthService';
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  User,
+  updateProfile
+} from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase.js';
 
-// Enhanced AuthService that wraps RealAuthService with additional functionality
-export class AuthService {
-  static async login(credentials: LoginData) {
-    try {
-      const result = await realAuthService.login(credentials);
-      
-      if (result.success) {
-        // Dispatch authentication success event
-        window.dispatchEvent(new CustomEvent('auth-success', { 
-          detail: { user: result.data?.user, type: 'login' } 
-        }));
-      }
-      
-      return result;
-    } catch (error) {
-      console.error('Auth login error:', error);
-      return {
-        success: false,
-        message: 'Login failed. Please try again.'
-      };
-    }
-  }
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  createdAt: Date;
+  lastLogin: Date;
+}
 
-  static async register(userData: RegisterData) {
-    try {
-      const result = await realAuthService.register(userData);
-      
-      if (result.success) {
-        // Dispatch authentication success event
-        window.dispatchEvent(new CustomEvent('auth-success', { 
-          detail: { user: result.data?.user, type: 'register' } 
-        }));
-      }
-      
-      return result;
-    } catch (error) {
-      console.error('Auth register error:', error);
-      return {
-        success: false,
-        message: 'Registration failed. Please try again.'
-      };
-    }
-  }
-
-  static async logout() {
-    await realAuthService.logout();
-    // Dispatch authentication logout event
-    window.dispatchEvent(new CustomEvent('auth-logout'));
-  }
-
-  static async getCurrentUser() {
-    const user = realAuthService.getCurrentUser();
-    return {
-      success: !!user,
-      data: user
+class AuthService {
+  async signUp(email: string, password: string, displayName: string): Promise<User> {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    
+    await updateProfile(user, { displayName });
+    
+    const userProfile: UserProfile = {
+      uid: user.uid,
+      email: user.email!,
+      displayName,
+      createdAt: new Date(),
+      lastLogin: new Date()
     };
+    
+    await setDoc(doc(db, 'users', user.uid), userProfile);
+    return user;
   }
 
-  static isAuthenticated(): boolean {
-    return realAuthService.isAuthenticated();
+  async signIn(email: string, password: string): Promise<User> {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    
+    await setDoc(doc(db, 'users', user.uid), { lastLogin: new Date() }, { merge: true });
+    return user;
   }
 
-  static getToken(): string | null {
-    return realAuthService.getToken();
+  async signOut(): Promise<void> {
+    await signOut(auth);
   }
 
-  // Event handlers for auth state changes
-  static onAuthError(callback: () => void) {
-    window.addEventListener('auth-error', callback);
+  onAuthStateChanged(callback: (user: User | null) => void) {
+    return onAuthStateChanged(auth, callback);
   }
 
-  static offAuthError(callback: () => void) {
-    window.removeEventListener('auth-error', callback);
+  async getUserProfile(uid: string): Promise<UserProfile | null> {
+    const docRef = doc(db, 'users', uid);
+    const docSnap = await getDoc(docRef);
+    return docSnap.exists() ? docSnap.data() as UserProfile : null;
+  }
+
+  async getCurrentUser(): Promise<{ success: boolean; data?: any; message?: string }> {
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        const profile = await this.getUserProfile(user.uid);
+        return {
+          success: true,
+          data: {
+            id: user.uid,
+            email: user.email,
+            fullName: profile?.displayName || user.displayName,
+            created_at: profile?.createdAt || new Date()
+          }
+        };
+      }
+      return { success: false, message: 'No user logged in' };
+    } catch (error) {
+      return { success: false, message: 'Failed to get current user' };
+    }
+  }
+
+  async login(credentials: { email: string; password: string }): Promise<{ success: boolean; data?: any; message?: string }> {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, credentials.email, credentials.password);
+      const user = userCredential.user;
+      
+      await setDoc(doc(db, 'users', user.uid), { lastLogin: new Date() }, { merge: true });
+      
+      const profile = await this.getUserProfile(user.uid);
+      return {
+        success: true,
+        data: {
+          user: {
+            id: user.uid,
+            email: user.email,
+            fullName: profile?.displayName || user.displayName,
+            created_at: profile?.createdAt || new Date()
+          }
+        }
+      };
+    } catch (error: any) {
+      return { success: false, message: error.message };
+    }
+  }
+
+  async register(userData: { email: string; password: string; fullName: string; agreeToTerms: boolean }): Promise<{ success: boolean; data?: any; message?: string }> {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, userData.email, userData.password);
+      const user = userCredential.user;
+      
+      await updateProfile(user, { displayName: userData.fullName });
+      
+      const userProfile: UserProfile = {
+        uid: user.uid,
+        email: user.email!,
+        displayName: userData.fullName,
+        createdAt: new Date(),
+        lastLogin: new Date()
+      };
+      
+      await setDoc(doc(db, 'users', user.uid), userProfile);
+      
+      return {
+        success: true,
+        data: {
+          user: {
+            id: user.uid,
+            email: user.email,
+            fullName: userData.fullName,
+            created_at: new Date()
+          }
+        }
+      };
+    } catch (error: any) {
+      return { success: false, message: error.message };
+    }
+  }
+
+  async logout(): Promise<void> {
+    await signOut(auth);
+  }
+
+  isAuthenticated(): boolean {
+    return auth.currentUser !== null;
+  }
+
+  private authErrorListeners: Array<() => void> = [];
+
+  onAuthError(callback: () => void): void {
+    this.authErrorListeners.push(callback);
+  }
+
+  offAuthError(callback: () => void): void {
+    this.authErrorListeners = this.authErrorListeners.filter(listener => listener !== callback);
+  }
+
+  private triggerAuthError(): void {
+    this.authErrorListeners.forEach(callback => callback());
   }
 }
 
-export default AuthService;
+export default new AuthService();

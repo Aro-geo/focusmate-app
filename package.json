@@ -2,15 +2,13 @@
   "name": "focusmate-ai",
   "version": "1.0.0",
   "description": "FocusMate AI productivity app",
-  "homepage": "/",
+  "homepage": "https://focusmate-ai-8cad6.web.app",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "dev": "vercel dev",
-    "server": "vercel dev",
-    "dev:local": "start-server.bat"
+    "deploy": "npm run build && firebase deploy"
   },
   "engines": {
     "node": ">=18.0.0"

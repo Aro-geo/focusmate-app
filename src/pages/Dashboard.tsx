@@ -26,6 +26,7 @@ import FloatingCard from '../components/FloatingCard';
 import StaggeredList from '../components/StaggeredList';
 import FloatingAssistant from '../components/FloatingAssistant';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { useUser } from '../context/UserContext';
 import { openAIService } from '../services/OpenAIService';
 import { UserDataService, userDataService } from '../services/UserDataService';
@@ -33,6 +34,7 @@ import { UserDataService, userDataService } from '../services/UserDataService';
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { darkMode } = useTheme();
+  const { user: authUser, isAuthenticated } = useAuth();
   const { userData, isLoading, error, refreshUserData, getGreeting } = useUser();
   
   const [newTask, setNewTask] = React.useState('');
@@ -146,11 +148,7 @@ const Dashboard: React.FC = () => {
         tipContext += `. Current mood: ${selectedMood}`;
       }
       
-      const suggestions = await openAIService.getFocusSuggestions(
-        incompleteTasks.length > 0 ? incompleteTasks[0].title : 'general productivity',
-        pomodoroTime / 60,
-        selectedMood === 'tired' ? 'fatigue' : undefined
-      );
+      const suggestions = await openAIService.getFocusSuggestions(incompleteTasks);
       
       setAiMessage(suggestions.length > 0 ? suggestions[0] : "Focus on one task at a time and take regular breaks!");
     } catch (error) {

@@ -1,7 +1,23 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { userDataService, UserData, UserDataService } from '../services/UserDataService';
-import { realAuthService } from '../services/RealAuthService';
+import { useAuth } from './AuthContext';
+import { UserDataService } from '../services/UserDataService';
+import AuthService from '../services/AuthService';
+
+interface UserData {
+  id: number;
+  username: string;
+  email: string;
+  created_at: string;
+  tasks: any[];
+  stats: {
+    totalTasks: number;
+    completedTasks: number;
+    pendingTasks: number;
+    completionRate: number;
+  };
+  focusTime?: string;
+}
 
 interface UserContextType {
   userData: UserData | null;
@@ -22,29 +38,50 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user, firebaseUser, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const refreshUserData = async () => {
-    // Bypass authentication - set demo user data
-    setUserData({
-      id: 1,
-      username: 'demo',
-      email: 'demo@example.com',
-      created_at: new Date().toISOString(),
-      tasks: [],
-      stats: {
-        totalTasks: 0,
-        completedTasks: 0,
-        pendingTasks: 0,
-        completionRate: 0
+    if (!isAuthenticated || !firebaseUser) {
+      setUserData(null);
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Get user profile from Firebase
+      const profile = await AuthService.getUserProfile(firebaseUser.uid);
+      
+      if (profile) {
+        setUserData({
+          id: parseInt(profile.uid.slice(-8), 16), // Convert Firebase UID to number
+          username: profile.displayName,
+          email: profile.email,
+          created_at: profile.createdAt.toString(),
+          tasks: [], // TODO: Load tasks from Firestore
+          stats: {
+            totalTasks: 0,
+            completedTasks: 0,
+            pendingTasks: 0,
+            completionRate: 0
+          },
+          focusTime: '0m'
+        });
       }
-    });
-    setIsLoading(false);
+    } catch (err) {
+      console.error('Error loading user data:', err);
+      setError('Failed to load user data');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const logout = async () => {
     try {
-      await realAuthService.logout();
+      await AuthService.signOut();
       setUserData(null);
       setError(null);
       navigate('/login');
@@ -57,10 +94,15 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     return UserDataService.getTimeBasedGreeting();
   };
 
-  // Load demo user data on mount
+  // Load user data when authentication state changes
   useEffect(() => {
-    refreshUserData();
-  }, []);
+    if (isAuthenticated && firebaseUser) {
+      refreshUserData();
+    } else {
+      setUserData(null);
+      setIsLoading(false);
+    }
+  }, [isAuthenticated, firebaseUser]);
 
   const value: UserContextType = {
     userData,
