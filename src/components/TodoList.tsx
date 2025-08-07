@@ -1,10 +1,9 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
-import supabaseClient from '../services/SupabaseClient';
+import { useAuth } from '../context/AuthContext';
+import firestoreService from '../services/FirestoreService';
 
 interface Todo {
-  id: number;
+  id: string;
   title: string;
   description?: string;
   completed: boolean;
@@ -12,10 +11,10 @@ interface Todo {
   due_date?: string;
   created_at: string;
   updated_at: string;
-  user_id: number;
 }
 
 export function TodoList() {
+  const { user } = useAuth();
   const [todos, setTodos] = useState<Array<Todo>>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,45 +32,26 @@ export function TodoList() {
 
   useEffect(() => {
     async function loadTodos() {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError(null);
       
       try {
-        // Get token from localStorage (where your auth service stores it)
-        const token = localStorage.getItem('token');
-
-        if (!token) {
-          setError("Not authenticated. Please login first.");
-          setLoading(false);
-          return;
-        }
-
-        // Get current user ID
-        const userData = localStorage.getItem('user');
-        if (!userData) {
-          setError("User data not found. Please login again.");
-          setLoading(false);
-          return;
-        }
-
-        const user = JSON.parse(userData);
-        const userId = user.id;
-
-        // Fetch todos for the current user
-        const todosData = await supabaseClient.query('todos', {
-          select: '*',
-          eq: { user_id: userId },
-          order: { column: 'created_at', ascending: false }
-        });
-        
-        // Update state with todos
-        if (Array.isArray(todosData) && todosData.every(item => item && typeof item === 'object' && 'id' in item)) {
-          setTodos(todosData as unknown as Todo[]);
-        } else {
-          console.error('Invalid todos response:', todosData);
-          setError('Failed to load todos');
-          setTodos([]);
-        }
+        const todosData = await firestoreService.getTasks();
+        setTodos(todosData.map(task => ({
+          id: task.id!,
+          title: task.title,
+          description: task.description,
+          completed: task.completed,
+          priority: task.priority as 'low' | 'medium' | 'high',
+          due_date: task.dueDate,
+          created_at: task.createdAt,
+          updated_at: task.updatedAt
+        })));
       } catch (err: any) {
         console.error('Error loading todos:', err);
         setError(err.message || 'Failed to load todos');
@@ -81,83 +61,92 @@ export function TodoList() {
     }
 
     loadTodos();
-  }, []);
+  }, [user]);
 
   const addTodo = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newTodo.title.trim()) return;
+    if (!newTodo.title.trim() || !user) return;
 
     try {
-      const userData = localStorage.getItem('user');
-      if (!userData) {
-        setError("User data not found. Please login again.");
-        return;
-      }
-
-      const user = JSON.parse(userData);
-      const userId = user.id;
-
-      const todoData = {
+      const taskData = {
         title: newTodo.title.trim(),
-        description: newTodo.description.trim() || null,
+        description: newTodo.description.trim() || '',
         priority: newTodo.priority,
-        due_date: newTodo.due_date || null,
-        completed: false,
-        user_id: userId,
+        dueDate: newTodo.due_date || '',
+        completed: false
+      };
+
+      const taskId = await firestoreService.addTask(
+        taskData.title, 
+        taskData.priority, 
+        taskData.description, 
+        taskData.dueDate
+      );
+      const newTask = {
+        id: taskId,
+        title: taskData.title,
+        description: taskData.description,
+        completed: taskData.completed,
+        priority: taskData.priority,
+        due_date: taskData.dueDate,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
-
-      const result = await supabaseClient.insert('todos', todoData);
       
-      if (result && result.length > 0) {
-        setTodos(prev => [result[0] as Todo, ...prev]);
-        setNewTodo({
-          title: '',
-          description: '',
-          priority: 'medium',
-          due_date: ''
-        });
-      }
+      setTodos(prev => [newTask, ...prev]);
+      
+      setNewTodo({
+        title: '',
+        description: '',
+        priority: 'medium',
+        due_date: ''
+      });
     } catch (err: any) {
       console.error('Error adding todo:', err);
       setError(err.message || 'Failed to add todo');
     }
   };
 
-  const toggleTodo = async (id: number) => {
+  const toggleTodo = async (id: string) => {
+    if (!user) return;
+    
     try {
       const todo = todos.find(t => t.id === id);
       if (!todo) return;
 
-      const updateData = {
-        completed: !todo.completed,
-        updated_at: new Date().toISOString()
-      };
-
-      const result = await supabaseClient.update('todos', updateData, { id });
+      await firestoreService.updateTask(id, {
+        completed: !todo.completed
+      });
       
-      if (result && result.length > 0) {
-        setTodos(prev => prev.map(t => 
-          t.id === id ? { ...t, ...result[0] } : t
-        ));
-      }
+      setTodos(prev => prev.map(t => 
+        t.id === id ? { ...t, completed: !t.completed, updated_at: new Date().toISOString() } : t
+      ));
     } catch (err: any) {
       console.error('Error toggling todo:', err);
       setError(err.message || 'Failed to toggle todo');
     }
   };
 
-  const deleteTodo = async (id: number) => {
+  const deleteTodo = async (id: string) => {
+    if (!user) return;
+    
     try {
-      await supabaseClient.delete('todos', { id });
+      await firestoreService.deleteTask(id);
       setTodos(prev => prev.filter(todo => todo.id !== id));
     } catch (err: any) {
       console.error('Error deleting todo:', err);
       setError(err.message || 'Failed to delete todo');
     }
   };
+
+  if (!user) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg">
+        Please log in to view your todos.
+      </div>
+    );
+  }
 
   if (loading) {
     return (

@@ -22,6 +22,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   signUp: (email: string, password: string, displayName: string) => Promise<boolean>;
+  signInWithGoogle: () => Promise<boolean>;
   logout: () => Promise<void>;
   loading: boolean;
 }
@@ -40,15 +41,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const unsubscribe = AuthService.onAuthStateChanged(async (firebaseUser) => {
+      console.log('Auth state changed:', firebaseUser?.email);
       setFirebaseUser(firebaseUser);
       
       if (firebaseUser) {
-        const profile = await AuthService.getUserProfile(firebaseUser.uid);
-        if (profile) {
+        try {
+          const profile = await AuthService.getUserProfile(firebaseUser.uid);
           const userData: User = {
-            id: profile.uid,
-            name: profile.displayName,
-            email: profile.email,
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName || profile?.displayName || 'User',
+            email: firebaseUser.email || '',
+            preferences: {
+              theme: 'light',
+              notifications: true,
+              pomodoroLength: 25,
+              shortBreakLength: 5,
+              longBreakLength: 15,
+            }
+          };
+          setUser(userData);
+          setIsAuthenticated(true);
+        } catch (error) {
+          console.error('Error loading user profile:', error);
+          // Use Firebase user data as fallback
+          const userData: User = {
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName || 'User',
+            email: firebaseUser.email || '',
             preferences: {
               theme: 'light',
               notifications: true,
@@ -61,6 +80,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setIsAuthenticated(true);
         }
       } else {
+        console.log('User signed out');
         setUser(null);
         setIsAuthenticated(false);
       }
@@ -90,6 +110,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const signInWithGoogle = async (): Promise<boolean> => {
+    try {
+      await AuthService.signInWithGoogle();
+      return true;
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      return false;
+    }
+  };
+
   const logout = async (): Promise<void> => {
     try {
       await AuthService.signOut();
@@ -105,6 +135,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       isAuthenticated,
       login,
       signUp,
+      signInWithGoogle,
       logout,
       loading
     }}>

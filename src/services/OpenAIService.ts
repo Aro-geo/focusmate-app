@@ -17,7 +17,7 @@ class OpenAIService {
 
   async generateResponse(prompt: string): Promise<string> {
     if (!this.apiKey) {
-      return 'OpenAI API key not configured. Please check your environment variables.';
+      return 'Hi! I\'m your productivity assistant. While OpenAI integration is being configured, here are some quick tips: Take regular breaks, prioritize your most important tasks, and stay hydrated!';
     }
 
     try {
@@ -32,28 +32,40 @@ class OpenAIService {
           messages: [
             {
               role: 'system',
-              content: 'You are a helpful productivity assistant for FocusMate AI. Provide concise, actionable advice.'
+              content: 'You are a helpful productivity assistant for FocusMate AI. Provide concise, actionable advice in 1-2 sentences.'
             },
             {
               role: 'user',
               content: prompt
             }
           ],
-          max_tokens: 150,
+          max_tokens: 100,
           temperature: 0.7
         })
       });
 
       if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status}`);
+        console.error('OpenAI API error:', response.status, response.statusText);
+        return this.getFallbackResponse(prompt);
       }
 
       const data = await response.json();
-      return data.choices[0]?.message?.content || 'No response generated';
+      return data.choices[0]?.message?.content || this.getFallbackResponse(prompt);
     } catch (error) {
       console.error('OpenAI API error:', error);
-      return 'Sorry, I encountered an error. Please try again later.';
+      return this.getFallbackResponse(prompt);
     }
+  }
+
+  private getFallbackResponse(prompt: string): string {
+    const responses = [
+      'Focus on one task at a time for better productivity!',
+      'Take a 5-minute break every 25 minutes to stay fresh.',
+      'Break large tasks into smaller, manageable chunks.',
+      'Eliminate distractions and create a dedicated workspace.',
+      'Set clear goals and deadlines for your tasks.'
+    ];
+    return responses[Math.floor(Math.random() * responses.length)];
   }
 
   async chat(message: string, context?: any): Promise<string> {
@@ -61,9 +73,23 @@ class OpenAIService {
   }
 
   async getFocusSuggestions(tasks: any[]): Promise<string[]> {
-    const prompt = `Based on these tasks, provide 3 focus suggestions: ${JSON.stringify(tasks)}`;
+    if (tasks.length === 0) {
+      return ['Start by adding some tasks to your list', 'Set clear goals for today', 'Take time to plan your priorities'];
+    }
+    
+    const prompt = `I have ${tasks.length} tasks. Give me 3 focus tips.`;
     const response = await this.generateResponse(prompt);
-    return ['Focus on high-priority tasks first', 'Take regular breaks', 'Eliminate distractions'];
+    
+    // Fallback suggestions
+    const fallbackSuggestions = [
+      'Focus on high-priority tasks first',
+      'Use the Pomodoro technique for better focus',
+      'Eliminate distractions from your workspace',
+      'Take regular breaks to maintain productivity',
+      'Break complex tasks into smaller steps'
+    ];
+    
+    return [response, ...fallbackSuggestions.slice(0, 2)];
   }
 
   async generateSessionSummary(sessionData: {

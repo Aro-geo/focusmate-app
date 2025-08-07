@@ -135,13 +135,16 @@ const Journal: React.FC = () => {
 
   // Functions
   const handleSaveEntry = () => {
-    if (!currentEntry.trim()) return;
+    if (!currentEntry.trim()) {
+      alert('Please write something before saving your entry.');
+      return;
+    }
     
     const newEntry: JournalEntry = {
       id: Date.now().toString(),
       date: selectedDate,
       title: currentTitle.trim() || `Entry ${new Date(selectedDate).toLocaleDateString()}`,
-      content: currentEntry,
+      content: currentEntry.trim(),
       mood: currentMood,
       tags: currentTags.split(',').map(tag => tag.trim()).filter(tag => tag !== '')
     };
@@ -153,6 +156,9 @@ const Journal: React.FC = () => {
     setCurrentTitle('');
     setCurrentMood('neutral');
     setCurrentTags('');
+    
+    // Show success message
+    alert('Journal entry saved successfully!');
   };
 
   const handleDeleteEntry = (id: string) => {
@@ -185,7 +191,8 @@ const Journal: React.FC = () => {
   };
 
   const addSuggestionToEntry = (suggestion: string) => {
-    setCurrentEntry(prev => prev ? `${prev}\n\n${suggestion} ` : `${suggestion} `);
+    const newContent = currentEntry ? `${currentEntry}\n\n${suggestion} ` : `${suggestion} `;
+    setCurrentEntry(newContent);
   };
 
   // AI Assistant handlers
@@ -618,8 +625,10 @@ const Journal: React.FC = () => {
                 </label>
                 <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto">
                   {autoSuggestions.map((suggestion, index) => (
-                    <button
+                    <motion.button
                       key={index}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => addSuggestionToEntry(suggestion)}
                       className={`text-left p-2 rounded-lg text-sm transition-all ${
                         darkMode
@@ -628,7 +637,7 @@ const Journal: React.FC = () => {
                       }`}
                     >
                       {suggestion}
-                    </button>
+                    </motion.button>
                   ))}
                 </div>
               </div>
@@ -638,7 +647,7 @@ const Journal: React.FC = () => {
                 <label className={`block text-sm font-medium mb-2 ${
                   darkMode ? 'text-gray-300' : 'text-gray-700'
                 }`}>
-                  Your thoughts
+                  Your thoughts *
                 </label>
                 <textarea
                   value={currentEntry}
@@ -651,6 +660,11 @@ const Journal: React.FC = () => {
                       : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
                   } focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none`}
                 />
+                <div className={`text-xs mt-1 ${
+                  darkMode ? 'text-gray-400' : 'text-gray-500'
+                }`}>
+                  {currentEntry.length} characters
+                </div>
               </div>
 
               {/* Tags Input */}
@@ -676,22 +690,22 @@ const Journal: React.FC = () => {
 
               {/* Save Button */}
               <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: currentEntry.trim() ? 1.02 : 1 }}
+                whileTap={{ scale: currentEntry.trim() ? 0.98 : 1 }}
                 onClick={handleSaveEntry}
                 disabled={!currentEntry.trim()}
                 className={`w-full py-3 rounded-xl font-medium transition-all ${
                   currentEntry.trim()
                     ? (darkMode 
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                        : 'bg-blue-500 hover:bg-blue-600 text-white')
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg' 
+                        : 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg')
                     : (darkMode 
                         ? 'bg-gray-700 text-gray-500 cursor-not-allowed' 
                         : 'bg-gray-200 text-gray-400 cursor-not-allowed')
                 }`}
               >
                 <Save className="w-5 h-5 inline mr-2" />
-                Save Entry
+                {currentEntry.trim() ? 'Save Entry' : 'Write something to save'}
               </motion.button>
             </motion.div>
 

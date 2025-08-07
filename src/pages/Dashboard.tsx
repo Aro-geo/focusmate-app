@@ -34,7 +34,7 @@ import { UserDataService, userDataService } from '../services/UserDataService';
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { darkMode } = useTheme();
-  const { user: authUser, isAuthenticated } = useAuth();
+  const { user: authUser, firebaseUser, isAuthenticated } = useAuth();
   const { userData, isLoading, error, refreshUserData, getGreeting } = useUser();
   
   const [newTask, setNewTask] = React.useState('');
@@ -210,7 +210,7 @@ const Dashboard: React.FC = () => {
     return null;
   }
 
-  const userDisplayName = UserDataService.formatUserDisplayName(userData);
+  const firstName = firebaseUser?.displayName?.split(' ')[0] || authUser?.name?.split(' ')[0] || userData?.username?.split(' ')[0] || 'User';
   const greeting = getGreeting();
   const pendingTasks = userData.tasks.filter(task => task.status === 'pending');
   const completedTasks = userData.stats.completedTasks;
@@ -233,7 +233,7 @@ const Dashboard: React.FC = () => {
               transition={{ duration: 0.5, delay: 0.1 }}
             >
               <h1 className="text-3xl font-bold text-gray-800 dark:text-white">
-                {greeting}, {userDisplayName}!
+                {greeting}, {firstName}!
               </h1>
               <p className="text-gray-600 dark:text-gray-300 mt-1">
                 {pendingTasks.length > 0 

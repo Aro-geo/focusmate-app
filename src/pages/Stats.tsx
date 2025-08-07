@@ -14,13 +14,17 @@ import AdvancedChart, {
 import { FocusTimeBarChart, TaskDistributionChart } from '../components/Charts';
 import { analyticsService, AnalyticsData } from '../services/AnalyticsService';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import FirestoreService from '../services/FirestoreService';
 import FloatingAssistant from '../components/FloatingAssistant';
 import AnimatedPage from '../components/AnimatedPage';
 
 const Stats: React.FC = () => {
   const { darkMode, toggleTheme } = useTheme();
+  const { user, firebaseUser } = useAuth();
   const [timePeriod, setTimePeriod] = useState<'week' | 'month' | 'quarter'>('week');
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [userTasks, setUserTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState<'overview' | 'productivity' | 'focus' | 'mood'>('overview');
 
@@ -31,8 +35,15 @@ const Stats: React.FC = () => {
 
   useEffect(() => {
     const loadAnalytics = async () => {
+      if (!firebaseUser) return;
+      
       setLoading(true);
       try {
+        // Load user's actual tasks
+        const tasks = await FirestoreService.getTasks();
+        setUserTasks(tasks);
+        
+        // Load analytics data
         const data = await analyticsService.getAnalyticsData(timePeriod);
         setAnalyticsData(data);
       } catch (error) {
@@ -43,7 +54,7 @@ const Stats: React.FC = () => {
     };
 
     loadAnalytics();
-  }, [timePeriod]);
+  }, [timePeriod, firebaseUser]);
   // Extract analytics data safely
   const dailyStats = analyticsData?.dailyStats || [];
   const totalCompletedTasks = analyticsData?.totalCompletedTasks || 0;
@@ -119,12 +130,12 @@ const Stats: React.FC = () => {
               <h1 className={`text-3xl font-bold transition-colors ${
                 darkMode ? 'text-white' : 'text-gray-800'
               }`}>
-                Productivity Statistics
+                {user?.name?.split(' ')[0] || 'Your'} Productivity Statistics
               </h1>
               <p className={`mt-1 transition-colors ${
                 darkMode ? 'text-gray-300' : 'text-gray-600'
               }`}>
-                Track your progress and identify patterns in your work habits
+                Track your progress and identify patterns • {userTasks.length} total tasks
               </p>
             </div>
             

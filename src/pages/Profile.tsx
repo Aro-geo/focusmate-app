@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, Edit, Save, Award, Sparkles, LogOut } from 'lucide-react';
-import { useData } from '../context/DataContext';
-import AvatarUploader from '../components/profile/AvatarUploader';
-import AchievementBadge from '../components/profile/AchievementBadge';
-import ToggleSwitch from '../components/profile/ToggleSwitch';
+import { useAuth } from '../context/AuthContext';
+import firestoreService from '../services/FirestoreService';
 
 const Profile: React.FC = () => {
-  const { users, tasks, pomodoro, journal } = useData();
-  const [userData, setUserData] = useState<any>(null);
+  const { user, logout } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editableData, setEditableData] = useState({
@@ -30,60 +27,39 @@ const Profile: React.FC = () => {
     weeklyReports: false,
   });
 
-  // Load real user data from database
+  // Load real user data from Firebase
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        setIsLoading(true);
-        const currentUser = await users.getCurrentUser();
-        
-        if (currentUser) {
-          setUserData(currentUser);
-          setEditableData({
-            name: currentUser.username,
-            email: currentUser.email,
-            bio: '',
-            avatarUrl: currentUser.avatarUrl || ''
-          });
-        } else {
-          window.location.href = '/login';
-        }
-      } catch (error) {
-        console.error('Error loading user data:', error);
-        window.location.href = '/login';
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadUserData();
-  }, [users]);
+    if (user) {
+      setEditableData({
+        name: user.name,
+        email: user.email,
+        bio: '',
+        avatarUrl: user.avatar || ''
+      });
+      setIsLoading(false);
+    }
+  }, [user]);
 
   // Fetch real user statistics
   useEffect(() => {
     const fetchUserStats = async () => {
-      if (!userData) return;
+      if (!user) return;
       
       try {
-        // Get real statistics from services
-        const userTasks = await tasks.getAllForUser();
-        const completedTasks = userTasks.filter(task => task.completed || task.status === 'completed');
-        const pomodoroStats = await pomodoro.getUserStats(userData.id);
+        const userTasks = await firestoreService.getTasks();
+        const completedTasks = userTasks.filter(task => task.completed);
         
         setStats({
           totalTasks: userTasks.length,
           completedTasks: completedTasks.length,
-          focusTime: pomodoroStats.total_minutes / 60, // Convert to hours
+          focusTime: 0, // TODO: Implement pomodoro stats
           journalEntries: 0, // TODO: Implement journal service
         });
 
-        // Generate AI feedback based on real data
         const completionRate = userTasks.length > 0 ? (completedTasks.length / userTasks.length) * 100 : 0;
-        const focusHours = pomodoroStats.total_minutes / 60;
         
         setAiFeedback(
-          `Great progress, ${userData.username}! You've completed ${completionRate.toFixed(0)}% of your tasks ` +
-          `and logged ${focusHours.toFixed(1)} hours of focused work. ` +
+          `Great progress, ${user.name}! You've completed ${completionRate.toFixed(0)}% of your tasks. ` +
           `${completionRate > 80 ? "You're crushing your goals!" : "Keep pushing - you're on the right track!"}`
         );
       } catch (error) {
@@ -93,26 +69,13 @@ const Profile: React.FC = () => {
     };
 
     fetchUserStats();
-  }, [userData, tasks, pomodoro]);
+  }, [user]);
 
   // Handle save profile edits
   const handleSaveProfile = async () => {
-    if (!userData) return;
-    
-    try {
-      const updatedUser = await users.updateProfile({
-        username: editableData.name,
-        email: editableData.email
-      });
-      
-      if (updatedUser) {
-        setUserData(updatedUser);
-        setIsEditing(false);
-      }
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      alert('Failed to update profile. Please try again.');
-    }
+    // TODO: Implement profile update in Firebase
+    setIsEditing(false);
+    alert('Profile update functionality will be implemented soon.');
   };
 
   // Define type for notification preference keys
@@ -120,22 +83,19 @@ const Profile: React.FC = () => {
   
   // Handle notification preferences change
   const handleNotificationChange = (key: NotificationKey) => {
-    setUserData({
-      ...userData,
-      notificationPreferences: {
-        ...userData.notificationPreferences,
-        [key]: !userData.notificationPreferences[key],
-      },
-    });
-    // In a real app: users.updatePreferences(userData.id, { [key]: !userData.notificationPreferences[key] });
+    setNotificationPreferences(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
   };
 
   // Handle logout
-  const handleLogout = () => {
-    // Implementation would depend on your authentication system
-    alert('Logout functionality would go here');
-    // Example: authService.logout();
-    // window.location.href = '/login';
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (
@@ -146,12 +106,9 @@ const Profile: React.FC = () => {
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-4">
-            <AvatarUploader
-              currentUrl={userData.avatarUrl}
-              onAvatarChange={(url) => setEditableData({ ...editableData, avatarUrl: url })}
-              size="lg"
-              editable={isEditing}
-            />
+            <div className="w-20 h-20 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+              {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+            </div>
             <div>
               {isEditing ? (
                 <input
@@ -163,12 +120,12 @@ const Profile: React.FC = () => {
                   placeholder="Your Name"
                 />
               ) : (
-                <h2 className="text-xl font-semibold">{userData.name}</h2>
+                <h2 className="text-xl font-semibold">{user?.name}</h2>
               )}
-              <p className="text-gray-600">{userData.email}</p>
+              <p className="text-gray-600">{user?.email}</p>
               <div className="flex items-center mt-1">
                 <Award size={16} className="text-indigo-600 mr-1" />
-                <span className="text-sm">{userData.role} since {new Date(userData.joinDate).toLocaleDateString()}</span>
+                <span className="text-sm">Member since {new Date().toLocaleDateString()}</span>
               </div>
             </div>
           </div>
@@ -208,7 +165,7 @@ const Profile: React.FC = () => {
               />
             </div>
           ) : (
-            <p className="text-gray-700">{userData.bio}</p>
+            <p className="text-gray-700">{editableData.bio || 'No bio added yet.'}</p>
           )}
         </div>
       </div>
@@ -266,10 +223,10 @@ const Profile: React.FC = () => {
           <div className="mt-6">
             <h3 className="text-md font-semibold mb-3">Recent Achievements</h3>
             <div className="flex flex-wrap gap-2">
-              <AchievementBadge type="streak" label="7-Day Streak" color="yellow" />
-              <AchievementBadge type="focus" label="Focus Master" color="blue" />
-              <AchievementBadge type="journal" label="Journal Pro" color="purple" />
-              <AchievementBadge type="completion" label="Task Champion" color="green" value="10+" />
+              <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">🔥 7-Day Streak</span>
+              <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">🎯 Focus Master</span>
+              <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">📝 Journal Pro</span>
+              <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">✅ Task Champion</span>
             </div>
           </div>
         </div>
@@ -284,14 +241,19 @@ const Profile: React.FC = () => {
             <h2 className="text-lg font-semibold">Notification Preferences</h2>
           </div>
           <div className="space-y-3">
-            {Object.entries(userData.notificationPreferences).map(([key, value]) => (
+            {Object.entries(notificationPreferences).map(([key, value]) => (
               <div key={key} className="flex items-center justify-between">
-                <ToggleSwitch
-                  id={key}
-                  checked={Boolean(value)}
-                  onChange={() => handleNotificationChange(key as NotificationKey)}
-                  label={key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                />
+                <div className="flex items-center justify-between w-full">
+                  <label className="text-sm font-medium text-gray-700">
+                    {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                  </label>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(value)}
+                    onChange={() => handleNotificationChange(key as NotificationKey)}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
+                </div>
               </div>
             ))}
           </div>

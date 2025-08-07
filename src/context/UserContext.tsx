@@ -61,7 +61,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           username: profile.displayName || 'User',
           email: profile.email,
           created_at: profile.createdAt.toString(),
-          tasks: [], // TODO: Load tasks from Firestore
+          tasks: [], // Tasks loaded separately via FirestoreService
           stats: {
             totalTasks: 0,
             completedTasks: 0,

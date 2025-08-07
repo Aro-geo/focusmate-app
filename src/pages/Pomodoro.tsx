@@ -220,7 +220,10 @@ const Pomodoro: React.FC = () => {
     
     try {
       setIsAiLoading(true);
-      const response = await openAIService.chat(aiChatInput);
+      const context = `User is in ${mode} mode with ${timeRemaining} seconds remaining. They have completed ${completedSessions} sessions today. Current task: ${selectedTask || 'none selected'}. Timer is ${isActive ? 'running' : 'paused'}.`;
+      const prompt = `${context} User asks: ${aiChatInput}. Provide helpful, contextual advice.`;
+      
+      const response = await openAIService.chat(prompt);
       setAiMessage(response);
       setAiChatInput('');
     } catch (error) {
@@ -238,11 +241,20 @@ const Pomodoro: React.FC = () => {
   const handleGetTip = async () => {
     try {
       setIsAiLoading(true);
-      const response = await openAIService.chat("Give me a quick productivity tip for staying focused during work sessions.");
+      const context = `User has completed ${completedSessions} Pomodoro sessions today. Current mode: ${mode}. Time remaining: ${Math.floor(timeRemaining/60)} minutes. Task: ${selectedTask || 'none selected'}.`;
+      const prompt = `${context} Give a personalized productivity tip based on their current situation.`;
+      
+      const response = await openAIService.chat(prompt);
       setAiMessage(response);
     } catch (error) {
       console.error('Failed to get tip:', error);
-      setAiMessage("💡 Tip: Try the 2-minute rule - if something takes less than 2 minutes, do it now!");
+      const tips = [
+        "💡 Focus on one task at a time - multitasking reduces productivity by up to 40%!",
+        "🎯 Break large tasks into 25-minute chunks for better focus and progress tracking.",
+        "⏰ Take your breaks seriously - they help prevent mental fatigue and maintain peak performance.",
+        "🧠 If you're struggling to focus, try the 2-minute rule: do quick tasks immediately."
+      ];
+      setAiMessage(tips[Math.floor(Math.random() * tips.length)]);
     } finally {
       setIsAiLoading(false);
     }

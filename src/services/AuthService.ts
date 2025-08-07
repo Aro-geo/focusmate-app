@@ -5,7 +5,9 @@ import {
   onAuthStateChanged,
   User,
   updateProfile,
-  sendEmailVerification
+  sendEmailVerification,
+  GoogleAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase.js';
@@ -58,6 +60,23 @@ class AuthService {
     const docRef = doc(db, 'users', uid);
     const docSnap = await getDoc(docRef);
     return docSnap.exists() ? docSnap.data() as UserProfile : null;
+  }
+
+  async signInWithGoogle(): Promise<User> {
+    const provider = new GoogleAuthProvider();
+    const userCredential = await signInWithPopup(auth, provider);
+    const user = userCredential.user;
+    
+    const userProfile: UserProfile = {
+      uid: user.uid,
+      email: user.email!,
+      displayName: user.displayName || 'User',
+      createdAt: new Date(),
+      lastLogin: new Date()
+    };
+    
+    await setDoc(doc(db, 'users', user.uid), userProfile, { merge: true });
+    return user;
   }
 
   async getCurrentUser(): Promise<{ success: boolean; data?: any; message?: string }> {
