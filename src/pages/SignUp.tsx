@@ -48,12 +48,12 @@ const SignUp: React.FC = () => {
       if (success) {
         setErrors({ general: '' });
         setHelperText(
-          <div className="text-green-600 text-center">
+          <div className="text-green-600 dark:text-green-400 text-center">
             <p>Account created successfully! Please check your email to verify your account.</p>
-            <p className="text-sm mt-2">You can continue using the app while verification is pending.</p>
+            <p className="text-sm mt-2">You must verify your email before you can sign in.</p>
           </div>
         );
-        setTimeout(() => navigate('/app/dashboard'), 3000);
+        setTimeout(() => navigate('/login'), 3000);
       } else {
         setErrors({ general: 'Sign up failed. Please try again.' });
       }

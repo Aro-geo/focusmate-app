@@ -1,0 +1,83 @@
+{
+  "name": "@focusmate/ai-productivity-app",
+  "version": "1.0.0",
+  "description": "FocusMate AI productivity app with enhanced security",
+  "homepage": "https://focusmate-ai-8cad6.web.app",
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build && npm run security-check",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "deploy": "npm run build && firebase deploy",
+    "security-check": "npm audit --audit-level moderate",
+    "lint": "eslint src --ext .ts,.tsx,.js,.jsx",
+    "lint:fix": "eslint src --ext .ts,.tsx,.js,.jsx --fix"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.11.0",
+    "chart.js": "^4.4.0",
+    "date-fns": "^2.30.0",
+    "firebase": "^12.0.0",
+    "framer-motion": "^10.16.16",
+    "lucide-react": "^0.294.0",
+    "react": "^18.2.0",
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.8.1",
+    "react-scripts": "^5.0.1",
+    "web-vitals": "^3.0.0",
+    "dompurify": "^3.0.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@types/dompurify": "^3.0.5",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^8.45.0",
+    "eslint-plugin-react": "^7.33.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-security": "^1.7.1",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^4.9.5"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest",
+      "plugin:security/recommended"
+    ],
+    "rules": {
+      "security/detect-object-injection": "error",
+      "security/detect-non-literal-regexp": "error",
+      "security/detect-unsafe-regex": "error",
+      "security/detect-buffer-noassert": "error",
+      "security/detect-child-process": "error",
+      "security/detect-disable-mustache-escape": "error",
+      "security/detect-eval-with-expression": "error",
+      "security/detect-no-csrf-before-method-override": "error",
+      "security/detect-non-literal-fs-filename": "error",
+      "security/detect-non-literal-require": "error",
+      "security/detect-possible-timing-attacks": "error",
+      "security/detect-pseudoRandomBytes": "error"
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { useTodos } from '../hooks/useTodos';
+import { useTheme } from '../context/ThemeContext';
 
 interface Todo {
   id: number;
@@ -15,6 +16,7 @@ interface Todo {
 // Create a TodoManager component that uses our custom hook
 export default function TodoManager() {
   const { todos, loading, error: todoError, addTodo, toggleTodo, deleteTodo, refreshTodos } = useTodos();
+  const { darkMode } = useTheme();
   const [newTask, setNewTask] = React.useState('');
   const [error, setError] = React.useState<string | null>(todoError);
   
@@ -37,12 +39,12 @@ export default function TodoManager() {
   };
 
   return (
-    <div className="max-w-lg mx-auto p-6 bg-white rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-6">Todo List</h2>
+    <div className="max-w-lg mx-auto p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md mx-4">
+      <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-gray-900 dark:text-white">Todo List</h2>
       
       {/* Error message */}
       {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
+        <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded">
           {error}
           <button 
             className="ml-2 text-red-500 font-bold"
@@ -54,18 +56,18 @@ export default function TodoManager() {
       )}
       
       {/* Add todo form */}
-      <form onSubmit={handleSubmit} className="mb-6 flex">
+      <form onSubmit={handleSubmit} className="mb-4 sm:mb-6 flex flex-col sm:flex-row gap-2">
         <input
           type="text"
           value={newTask}
           onChange={(e) => setNewTask(e.target.value)}
           placeholder="Add a new task..."
           aria-label="New task"
-          className="flex-grow p-2 border rounded-l"
+          className="flex-grow p-2 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-l-lg sm:rounded-r-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
         />
         <button 
           type="submit"
-          className="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600"
+          className="bg-blue-500 text-white px-4 py-2 rounded-lg sm:rounded-l-none sm:rounded-r-lg hover:bg-blue-600"
         >
           Add
         </button>
@@ -73,13 +75,13 @@ export default function TodoManager() {
       
       {/* Todo list */}
       {loading ? (
-        <div className="text-center py-4">Loading...</div>
+        <div className="text-center py-4 text-gray-900 dark:text-white">Loading...</div>
       ) : todos.length === 0 ? (
-        <div className="text-center py-4 text-gray-500">No tasks yet. Add one to get started!</div>
+        <div className="text-center py-4 text-gray-500 dark:text-gray-400">No tasks yet. Add one to get started!</div>
       ) : (
         <ul className="space-y-2">
           {todos.map((todo) => (
-            <li key={todo.id} className="p-3 border rounded flex items-center justify-between">
+            <li key={todo.id} className="p-3 border border-gray-200 dark:border-gray-600 rounded flex items-center justify-between bg-gray-50 dark:bg-gray-700">
               <div className="flex items-center">
                 <input
                   type="checkbox"
@@ -88,7 +90,7 @@ export default function TodoManager() {
                   className="mr-3"
                   aria-label={`Mark "${todo.title}" as ${todo.completed ? 'incomplete' : 'complete'}`}
                 />
-                <span className={todo.completed ? 'line-through text-gray-500' : ''}>
+                <span className={todo.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'}>
                   {todo.title}
                 </span>
               </div>

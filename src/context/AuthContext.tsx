@@ -41,10 +41,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const unsubscribe = AuthService.onAuthStateChanged(async (firebaseUser) => {
-      console.log('Auth state changed:', firebaseUser?.email);
+      console.log('Auth state changed:', firebaseUser?.email, 'Email verified:', firebaseUser?.emailVerified);
       setFirebaseUser(firebaseUser);
       
-      if (firebaseUser) {
+      if (firebaseUser && firebaseUser.emailVerified) {
         try {
           const profile = await AuthService.getUserProfile(firebaseUser.uid);
           const userData: User = {
@@ -80,7 +80,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setIsAuthenticated(true);
         }
       } else {
-        console.log('User signed out');
+        console.log('User signed out or email not verified');
         setUser(null);
         setIsAuthenticated(false);
       }
@@ -92,17 +92,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      await AuthService.signIn(email, password);
+      const user = await AuthService.signIn(email, password);
+      // Check if email is verified
+      if (!user.emailVerified) {
+        await AuthService.signOut();
+        throw new Error('Please verify your email before signing in. Check your inbox for a verification link.');
+      }
       return true;
     } catch (error) {
       console.error('Login error:', error);
-      return false;
+      throw error;
     }
   };
 
   const signUp = async (email: string, password: string, displayName: string): Promise<boolean> => {
     try {
       await AuthService.signUp(email, password, displayName);
+      // Sign out immediately after signup to force email verification
+      await AuthService.signOut();
       return true;
     } catch (error) {
       console.error('Sign up error:', error);
@@ -112,7 +119,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signInWithGoogle = async (): Promise<boolean> => {
     try {
-      await AuthService.signInWithGoogle();
+      const user = await AuthService.signInWithGoogle();
+      // User state will be updated automatically by onAuthStateChanged
       return true;
     } catch (error) {
       console.error('Google sign-in error:', error);

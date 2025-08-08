@@ -1,21 +1,27 @@
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { SecurityUtils } from '../utils/security';
 
 export class FirebaseService {
   async addTask(title: string, priority: 'low' | 'medium' | 'high' = 'medium') {
+    // Validate and sanitize input
+    const validation = SecurityUtils.validateTaskInput(title);
+    if (!validation.isValid) {
+      throw new Error('Invalid task title');
+    }
     try {
       const docRef = await addDoc(collection(db, 'tasks'), {
-        title,
+        title: validation.sanitized,
         priority,
         completed: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         user_id: 1
       });
-      console.log("Task added with ID: ", docRef.id);
+      console.log("Task added with ID: ", SecurityUtils.sanitizeForLog(docRef.id));
       return { 
         id: docRef.id, 
-        title, 
+        title: validation.sanitized, 
         priority: priority as 'low' | 'medium' | 'high', 
         completed: false,
         created_at: new Date().toISOString(),
@@ -23,7 +29,7 @@ export class FirebaseService {
         user_id: 1
       };
     } catch (e) {
-      console.error("Error adding task: ", e);
+      console.error("Error adding task: ", SecurityUtils.sanitizeForLog(String(e)));
       throw e;
     }
   }
@@ -37,7 +43,7 @@ export class FirebaseService {
       });
       return tasks;
     } catch (e) {
-      console.error("Error getting tasks: ", e);
+      console.error("Error getting tasks: ", SecurityUtils.sanitizeForLog(String(e)));
       throw e;
     }
   }
@@ -53,12 +59,12 @@ export class FirebaseService {
           completed: !task.completed,
           updated_at: new Date().toISOString()
         });
-        console.log("Task toggled: ", taskId);
+        console.log("Task toggled: ", SecurityUtils.sanitizeForLog(taskId));
         return { ...task, completed: !task.completed };
       }
       throw new Error('Task not found');
     } catch (e) {
-      console.error("Error toggling task: ", e);
+      console.error("Error toggling task: ", SecurityUtils.sanitizeForLog(String(e)));
       throw e;
     }
   }
@@ -66,9 +72,9 @@ export class FirebaseService {
   async deleteTask(taskId: string) {
     try {
       await deleteDoc(doc(db, 'tasks', taskId));
-      console.log("Task deleted: ", taskId);
+      console.log("Task deleted: ", SecurityUtils.sanitizeForLog(taskId));
     } catch (e) {
-      console.error("Error deleting task: ", e);
+      console.error("Error deleting task: ", SecurityUtils.sanitizeForLog(String(e)));
       throw e;
     }
   }

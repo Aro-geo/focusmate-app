@@ -6,16 +6,17 @@ import {
   Timer, 
   BookOpen, 
   BarChart3, 
-  User,
   CheckSquare
 } from 'lucide-react';
 import StaggeredList from './StaggeredList';
 import UserProfileDropdown from './UserProfileDropdown';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 
 const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const { user, logout } = useAuth();
   
   const navItems = [
     { to: '/app/dashboard', icon: Home, label: 'Dashboard' },
@@ -25,15 +26,18 @@ const Sidebar: React.FC = () => {
     { to: '/app/todos', icon: CheckSquare, label: 'Todos' },
   ];
 
-  const handleLogout = () => {
-    // In a real app, you would call your authentication service here
-    // authService.logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (
     <motion.div 
-      className="w-64 bg-white dark:bg-gray-900 shadow-lg h-screen flex flex-col border-r border-gray-200 dark:border-gray-700"
+      className="w-64 bg-white dark:bg-gray-900 shadow-lg h-screen flex flex-col border-r border-gray-200 dark:border-gray-700 flex-shrink-0"
       initial={{ x: -260 }}
       animate={{ x: 0 }}
       transition={{ type: "spring", stiffness: 100, damping: 20 }}
@@ -101,8 +105,8 @@ const Sidebar: React.FC = () => {
         transition={{ delay: 0.5 }}
       >
         <UserProfileDropdown
-          name="George Okullo"
-          email="geokullo@gmail.com"
+          name={user?.name || 'User'}
+          email={user?.email || ''}
           onLogout={handleLogout}
           onThemeToggle={toggleTheme}
           isDarkMode={theme === 'dark'}
