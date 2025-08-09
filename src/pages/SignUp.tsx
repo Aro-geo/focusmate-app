@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Eye, EyeOff, UserPlus, User, Lock, Mail } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { FocusMateAvatar } from '../components/FocusMateAvatar';
 
 const SignUp: React.FC = () => {
   const [formData, setFormData] = React.useState({
@@ -114,10 +115,10 @@ const SignUp: React.FC = () => {
         >
           <motion.div className="text-center mb-8">
             <motion.div 
-              className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full mb-4"
+              className="inline-flex items-center justify-center w-16 h-16 mb-4"
               whileHover={{ scale: 1.1, rotate: 5 }}
             >
-              <UserPlus className="w-8 h-8 text-white" />
+              <FocusMateAvatar size="xl" animated />
             </motion.div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Create Account</h1>
             <p className="text-gray-600 dark:text-gray-400">Join FocusMate AI today</p>

@@ -39,12 +39,12 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
   // Initialize position to bottom-right corner
   useEffect(() => {
     const updatePosition = () => {
-      const margin = 20;
-      const assistantWidth = isMinimized ? 60 : 320;
-      const assistantHeight = isMinimized ? 60 : (showChat ? 400 : 280);
+      const margin = window.innerWidth < 768 ? 10 : 20;
+      const assistantWidth = isMinimized ? (window.innerWidth < 768 ? 50 : 60) : (window.innerWidth < 768 ? 280 : 320);
+      const assistantHeight = isMinimized ? (window.innerWidth < 768 ? 50 : 60) : (showChat ? (window.innerWidth < 768 ? 350 : 400) : (window.innerWidth < 768 ? 240 : 280));
       const newPos = {
         x: Math.max(0, window.innerWidth - assistantWidth - margin),
-        y: Math.max(0, window.innerHeight - assistantHeight - margin)
+        y: Math.max(0, window.innerHeight - assistantHeight - margin - (window.innerWidth < 768 ? 80 : 0))
       };
       setPosition(newPos);
 
@@ -58,11 +58,11 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
   const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     setIsDragging(false);
     // Keep within viewport bounds
-    const margin = 10;
-    const assistantWidth = isMinimized ? 60 : 320;
-    const assistantHeight = isMinimized ? 60 : (showChat ? 400 : 280);
+    const margin = window.innerWidth < 768 ? 5 : 10;
+    const assistantWidth = isMinimized ? (window.innerWidth < 768 ? 50 : 60) : (window.innerWidth < 768 ? 280 : 320);
+    const assistantHeight = isMinimized ? (window.innerWidth < 768 ? 50 : 60) : (showChat ? (window.innerWidth < 768 ? 350 : 400) : (window.innerWidth < 768 ? 240 : 280));
     const newX = Math.max(margin, Math.min(window.innerWidth - assistantWidth - margin, position.x + info.offset.x));
-    const newY = Math.max(margin, Math.min(window.innerHeight - assistantHeight - margin, position.y + info.offset.y));
+    const newY = Math.max(margin, Math.min(window.innerHeight - assistantHeight - margin - (window.innerWidth < 768 ? 80 : 0), position.y + info.offset.y));
     setPosition({ x: newX, y: newY });
 
   };
@@ -101,7 +101,7 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
           }`}
           whileTap={{ scale: 0.95 }}
         >
-          <Brain className="w-6 h-6" />
+          <Brain className={`${window.innerWidth < 768 ? 'w-5 h-5' : 'w-6 h-6'}`} />
           {isAiLoading && (
             <motion.div
               className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center"
@@ -210,7 +210,7 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
                   value={aiChatInput}
                   onChange={(e) => setAiChatInput(e.target.value)}
                   placeholder="Ask me anything..."
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm border focus:outline-none focus:ring-2 transition-all ${
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm border focus:outline-none focus:ring-2 transition-all mobile-input ${
                     darkMode 
                       ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:ring-purple-500 focus:border-purple-500'
                       : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:ring-indigo-500 focus:border-indigo-500'

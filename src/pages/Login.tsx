@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Eye, EyeOff, LogIn, User, Lock } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { FocusMateAvatar } from '../components/FocusMateAvatar';
 
 const Login: React.FC = () => {
   const [formData, setFormData] = React.useState({
@@ -112,11 +113,11 @@ const Login: React.FC = () => {
             transition={{ delay: 0.4 }}
           >
             <motion.div 
-              className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full mb-4"
+              className="inline-flex items-center justify-center w-16 h-16 mb-4"
               whileHover={{ scale: 1.1, rotate: 5 }}
               transition={{ duration: 0.3 }}
             >
-              <LogIn className="w-8 h-8 text-white" />
+              <FocusMateAvatar size="xl" animated />
             </motion.div>
             <motion.h1 
               className="text-3xl font-bold text-gray-900 dark:text-white mb-2"

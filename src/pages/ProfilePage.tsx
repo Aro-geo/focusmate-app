@@ -12,7 +12,8 @@ import {
   Lightbulb
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
-import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { FocusMateAvatar } from '../components/FocusMateAvatar';
 
 // Card Component
 const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ 
@@ -121,7 +122,7 @@ const AITipCard: React.FC = () => (
 
 const ProfilePage: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
-  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [notifications, setNotifications] = useState(true);
   const [isEditingAvatar, setIsEditingAvatar] = useState(false);
 
@@ -137,9 +138,13 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    // Navigate to login page
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      // Navigation handled by AuthContext
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const handleAvatarEdit = () => {
@@ -158,7 +163,10 @@ const ProfilePage: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Profile</h1>
+          <div className="flex items-center justify-center mb-4">
+            <FocusMateAvatar size="sm" animated />
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white ml-2">Profile</h1>
+          </div>
           <p className="text-gray-600 dark:text-gray-400">Manage your FocusMate AI experience</p>
         </motion.div>
 
@@ -252,17 +260,14 @@ const ProfilePage: React.FC = () => {
 
         {/* Logout Button */}
         <motion.button
-          className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-4 rounded-xl shadow-lg flex items-center justify-center space-x-2 transition-colors"
           onClick={handleLogout}
+          className="w-full px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center"
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
         >
-          <LogOut className="w-5 h-5" />
-          <span>Log Out</span>
+          <LogOut className="w-4 h-4 mr-2" />
+          Sign Out
         </motion.button>
-
-        {/* Bottom Spacing */}
-        <div className="h-6"></div>
       </div>
     </div>
   );

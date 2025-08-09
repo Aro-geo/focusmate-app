@@ -1,0 +1,65 @@
+/* Mobile-specific styles */
+@media (max-width: 768px) {
+  .floating-assistant-size {
+    width: 50px !important;
+    height: 50px !important;
+  }
+  
+  .floating-assistant-expanded {
+    width: 280px !important;
+    height: 240px !important;
+  }
+  
+  .floating-assistant-expanded-chat {
+    width: 280px !important;
+    height: 350px !important;
+  }
+  
+  /* Touch-friendly buttons */
+  .mobile-button {
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+  
+  /* Mobile form inputs */
+  .mobile-input {
+    font-size: 16px !important;
+    padding: 0.75rem !important;
+  }
+}
+
+/* Tablet styles */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .floating-assistant-size {
+    width: 55px !important;
+    height: 55px !important;
+  }
+  
+  .floating-assistant-expanded {
+    width: 300px !important;
+    height: 260px !important;
+  }
+  
+  .floating-assistant-expanded-chat {
+    width: 300px !important;
+    height: 380px !important;
+  }
+}
+
+/* Desktop styles */
+@media (min-width: 1025px) {
+  .floating-assistant-size {
+    width: 60px !important;
+    height: 60px !important;
+  }
+  
+  .floating-assistant-expanded {
+    width: 320px !important;
+    height: 280px !important;
+  }
+  
+  .floating-assistant-expanded-chat {
+    width: 320px !important;
+    height: 400px !important;
+  }
+}

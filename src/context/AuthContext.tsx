@@ -131,6 +131,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async (): Promise<void> => {
     try {
       await AuthService.signOut();
+      // Redirect to landing page after logout
+      window.location.href = '/';
     } catch (error) {
       console.error('Logout error:', error);
     }

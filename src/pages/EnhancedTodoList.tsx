@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { firebaseService } from '../services/FirebaseService';
+import MobileTodoList from '../components/MobileTodoList';
+import useResponsive from '../hooks/useResponsive';
 
 interface Task {
   id: string;
@@ -38,6 +40,19 @@ interface Task {
 
 const EnhancedTodoList: React.FC = () => {
   const { user } = useAuth();
+  const { isMobile } = useResponsive();
+
+  // Use mobile-optimized component for mobile devices
+  if (isMobile) {
+    return <MobileTodoList />;
+  }
+
+  // Use desktop component
+  return <EnhancedTodoListDesktop user={user} />;
+};
+
+// Desktop todo list component
+const EnhancedTodoListDesktop: React.FC<{ user: any }> = ({ user }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTask, setNewTask] = useState('');
   const [filter, setFilter] = useState<'all' | 'today' | 'upcoming' | 'completed'>('all');

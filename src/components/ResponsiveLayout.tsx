@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 import Sidebar from './Sidebar';
 import useResponsive from '../hooks/useResponsive';
+import FocusMateAvatar from './FocusMateAvatar';
 
 interface ResponsiveLayoutProps {
   children: React.ReactNode;
@@ -36,9 +37,7 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({ children }) => {
                 <Menu className="h-5 w-5" />
               </motion.button>
               <div className="flex items-center space-x-2">
-                <div className="w-6 h-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-md flex items-center justify-center">
-                  <span className="text-white font-bold text-xs">FM</span>
-                </div>
+                <FocusMateAvatar size="sm" />
                 <span className="font-bold text-gray-800 dark:text-white">FocusMate AI</span>
               </div>
             </div>
@@ -79,12 +78,30 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({ children }) => {
         </AnimatePresence>
 
         {/* Mobile Main Content */}
-        <div className="flex-1 flex flex-col pt-16 min-h-0">
-          <main className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 flex flex-col pt-16 pb-20 min-h-0">
+          <main className="flex-1 overflow-y-auto p-2">
             <div className="max-w-full">
               {children}
             </div>
           </main>
+        </div>
+        
+        {/* Mobile Bottom Navigation */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-2 py-2">
+          <div className="flex justify-around">
+            <button className="flex flex-col items-center p-2 text-indigo-600 dark:text-indigo-400">
+              <span className="text-xs mt-1">Dashboard</span>
+            </button>
+            <button className="flex flex-col items-center p-2 text-gray-500 dark:text-gray-400">
+              <span className="text-xs mt-1">Timer</span>
+            </button>
+            <button className="flex flex-col items-center p-2 text-gray-500 dark:text-gray-400">
+              <span className="text-xs mt-1">Journal</span>
+            </button>
+            <button className="flex flex-col items-center p-2 text-gray-500 dark:text-gray-400">
+              <span className="text-xs mt-1">Stats</span>
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -96,9 +113,7 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({ children }) => {
       <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
         {/* Tablet Sidebar - Collapsed */}
         <div className="w-16 bg-white dark:bg-gray-900 shadow-lg border-r border-gray-200 dark:border-gray-700 flex flex-col items-center py-4 space-y-4">
-          <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">FM</span>
-          </div>
+          <FocusMateAvatar size="sm" animated />
           {/* Collapsed nav items would go here */}
         </div>
 

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { FocusMateAvatar } from './FocusMateAvatar';
 
 interface FloatingAuthModalProps {
   isOpen: boolean;
@@ -96,6 +97,9 @@ const FloatingAuthModal: React.FC<FloatingAuthModalProps> = ({ isOpen, onClose, 
             </button>
 
             <div className="text-center mb-8">
+              <div className="flex justify-center mb-4">
+                <FocusMateAvatar size="lg" animated />
+              </div>
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                 {mode === 'signin' ? 'Welcome Back' : 'Get Started'}
               </h2>

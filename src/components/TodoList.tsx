@@ -83,11 +83,11 @@ export function TodoList() {
         taskData.description, 
         taskData.dueDate
       );
-      const newTask = {
+      const newTask: Todo = {
         id: taskId,
         title: taskData.title,
         description: taskData.description,
-        completed: taskData.completed,
+        completed: false,
         priority: taskData.priority,
         due_date: taskData.dueDate,
         created_at: new Date().toISOString(),

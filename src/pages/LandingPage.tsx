@@ -18,9 +18,20 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import FloatingAuthModal from '../components/FloatingAuthModal';
+import { FocusMateAvatar } from '../components/FocusMateAvatar';
 
 const LandingPage: React.FC = () => {
   const [authModal, setAuthModal] = useState<{ isOpen: boolean; mode: 'signin' | 'signup' }>({ isOpen: false, mode: 'signin' });
+  
+  // Check if user was redirected after logout
+  React.useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('logout') === 'true' || window.location.pathname === '/' && document.referrer.includes('/app/')) {
+      setAuthModal({ isOpen: true, mode: 'signin' });
+      // Clean up URL
+      window.history.replaceState({}, document.title, '/');
+    }
+  }, []);
   const features = [
     {
       icon: Brain,
@@ -96,10 +107,13 @@ const LandingPage: React.FC = () => {
               initial={{ scale: 0.8 }}
               animate={{ scale: 1 }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="inline-flex items-center px-4 py-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm font-medium mb-8"
+              className="flex flex-col items-center mb-8"
             >
-              <Sparkles className="w-4 h-4 mr-2" />
-              AI-Powered Productivity Platform
+              <FocusMateAvatar size="2xl" animated />
+              <div className="inline-flex items-center px-4 py-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm font-medium">
+                <Sparkles className="w-4 h-4 mr-2" />
+                AI-Powered Productivity Platform
+              </div>
             </motion.div>
             
             <h1 className="text-5xl md:text-7xl font-bold text-gray-900 dark:text-white mb-6">
@@ -274,8 +288,8 @@ const LandingPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="col-span-1 md:col-span-2">
               <div className="flex items-center mb-4">
-                <Brain className="w-8 h-8 text-indigo-400 mr-3" />
-                <span className="text-2xl font-bold">FocusMate AI</span>
+                <FocusMateAvatar size="lg" animated />
+                <span className="text-2xl font-bold ml-3">FocusMate AI</span>
               </div>
               <p className="text-gray-400 mb-6 max-w-md">
                 The intelligent productivity platform that helps you focus smarter, 
@@ -317,7 +331,7 @@ const LandingPage: React.FC = () => {
           
           <div className="border-t border-gray-800 mt-12 pt-8 text-center">
             <p className="text-gray-400">
-              © 2024 FocusMate AI. All rights reserved. Built with ❤️ for productivity enthusiasts.
+              © 2025 FocusMate AI. All rights reserved. Built with ❤️ for productivity enthusiasts.
             </p>
           </div>
         </div>

@@ -26,11 +26,33 @@ import StaggeredList from '../components/StaggeredList';
 import FloatingAssistant from '../components/FloatingAssistant';
 import SmartTaskInput from '../components/SmartTaskInput';
 import ProductivityInsights from '../components/ProductivityInsights';
+import MobileDashboard from '../components/MobileDashboard';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { firebaseService } from '../services/FirebaseService';
+import useResponsive from '../hooks/useResponsive';
 
 const EnhancedDashboard: React.FC = () => {
+  const navigate = useNavigate();
+  const { darkMode } = useTheme();
+  const { user, firebaseUser, isAuthenticated } = useAuth();
+  const { isMobile } = useResponsive();
+
+  // Render mobile component if on mobile
+  if (isMobile) {
+    return (
+      <AnimatedPage>
+        <MobileDashboard />
+      </AnimatedPage>
+    );
+  }
+
+  // Render desktop component
+  return <EnhancedDashboardDesktop />;
+};
+
+// Desktop dashboard component with all hooks
+const EnhancedDashboardDesktop: React.FC = () => {
   const navigate = useNavigate();
   const { darkMode } = useTheme();
   const { user, firebaseUser, isAuthenticated } = useAuth();
