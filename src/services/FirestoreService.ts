@@ -19,7 +19,8 @@ class FirestoreService {
     if (!user) throw new Error('User not authenticated');
 
     const now = new Date().toISOString();
-    const docRef = await addDoc(collection(db, 'tasks'), {
+    const userTasksCollection = collection(db, 'users', user.uid, 'tasks');
+    const docRef = await addDoc(userTasksCollection, {
       title,
       description: description || '',
       completed: false,
@@ -36,9 +37,9 @@ class FirestoreService {
     const user = auth.currentUser;
     if (!user) throw new Error('User not authenticated');
 
+    const userTasksCollection = collection(db, 'users', user.uid, 'tasks');
     const q = query(
-      collection(db, 'tasks'),
-      where('userId', '==', user.uid),
+      userTasksCollection,
       orderBy('createdAt', 'desc')
     );
     
@@ -50,7 +51,10 @@ class FirestoreService {
   }
 
   async updateTask(taskId: string, updates: Partial<Task>): Promise<void> {
-    const taskRef = doc(db, 'tasks', taskId);
+    const user = auth.currentUser;
+    if (!user) throw new Error('User not authenticated');
+    
+    const taskRef = doc(db, 'users', user.uid, 'tasks', taskId);
     await updateDoc(taskRef, {
       ...updates,
       updatedAt: new Date().toISOString()
@@ -58,7 +62,10 @@ class FirestoreService {
   }
 
   async deleteTask(taskId: string): Promise<void> {
-    await deleteDoc(doc(db, 'tasks', taskId));
+    const user = auth.currentUser;
+    if (!user) throw new Error('User not authenticated');
+    
+    await deleteDoc(doc(db, 'users', user.uid, 'tasks', taskId));
   }
 }
 

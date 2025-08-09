@@ -11,7 +11,7 @@ import {
   limit,
   Timestamp 
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { SecurityUtils } from '../utils/security';
 
 export interface SecureTask {
@@ -64,7 +64,8 @@ class SecureFirestoreService {
         updatedAt: Timestamp.now()
       };
 
-      const docRef = await addDoc(collection(db, 'tasks'), taskData);
+      const userTasksCollection = collection(db, 'users', userId, 'tasks');
+      const docRef = await addDoc(userTasksCollection, taskData);
       console.log('Task added successfully:', SecurityUtils.sanitizeForLog(docRef.id));
       return docRef.id;
     } catch (error) {
@@ -80,9 +81,9 @@ class SecureFirestoreService {
 
     try {
       // Use parameterized query to prevent NoSQL injection
+      const userTasksCollection = collection(db, 'users', userId, 'tasks');
       const q = query(
-        collection(db, 'tasks'),
-        where('userId', '==', userId),
+        userTasksCollection,
         orderBy('createdAt', 'desc'),
         limit(100) // Limit results for performance
       );
@@ -133,19 +134,9 @@ class SecureFirestoreService {
     }
 
     try {
-      const taskRef = doc(db, 'tasks', taskId);
+      const taskRef = doc(db, 'users', userId, 'tasks', taskId);
       
-      // Verify ownership before updating
-      const taskDoc = await getDocs(query(
-        collection(db, 'tasks'),
-        where('__name__', '==', taskId),
-        where('userId', '==', userId)
-      ));
-
-      if (taskDoc.empty) {
-        throw new Error('Task not found or access denied');
-      }
-
+      // No need to verify ownership since we're already using the user's subcollection
       await updateDoc(taskRef, {
         ...updates,
         updatedAt: Timestamp.now()
@@ -168,18 +159,8 @@ class SecureFirestoreService {
     }
 
     try {
-      // Verify ownership before deleting
-      const taskDoc = await getDocs(query(
-        collection(db, 'tasks'),
-        where('__name__', '==', taskId),
-        where('userId', '==', userId)
-      ));
-
-      if (taskDoc.empty) {
-        throw new Error('Task not found or access denied');
-      }
-
-      await deleteDoc(doc(db, 'tasks', taskId));
+      // No need to verify ownership since we're already using the user's subcollection
+      await deleteDoc(doc(db, 'users', userId, 'tasks', taskId));
       console.log('Task deleted successfully:', SecurityUtils.sanitizeForLog(taskId));
     } catch (error) {
       console.error('Error deleting task:', SecurityUtils.sanitizeForLog(String(error)));
@@ -219,7 +200,8 @@ class SecureFirestoreService {
         updatedAt: Timestamp.now()
       };
 
-      const docRef = await addDoc(collection(db, 'journal_entries'), entryData);
+      const userJournalCollection = collection(db, 'users', userId, 'journal_entries');
+      const docRef = await addDoc(userJournalCollection, entryData);
       console.log('Journal entry added successfully:', SecurityUtils.sanitizeForLog(docRef.id));
       return docRef.id;
     } catch (error) {
@@ -234,9 +216,9 @@ class SecureFirestoreService {
     }
 
     try {
+      const userJournalCollection = collection(db, 'users', userId, 'journal_entries');
       const q = query(
-        collection(db, 'journal_entries'),
-        where('userId', '==', userId),
+        userJournalCollection,
         orderBy('createdAt', 'desc'),
         limit(50)
       );

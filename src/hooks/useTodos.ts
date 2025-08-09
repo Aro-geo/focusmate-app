@@ -10,7 +10,7 @@ export interface Todo {
   due_date?: string;
   created_at: string;
   updated_at: string;
-  user_id: number;
+  user_id: string;
 }
 
 interface UseTodosReturn {

@@ -1,5 +1,5 @@
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { SecurityUtils } from '../utils/security';
 
 export class FirebaseService {
@@ -9,14 +9,19 @@ export class FirebaseService {
     if (!validation.isValid) {
       throw new Error('Invalid task title');
     }
+    
+    const user = auth.currentUser;
+    if (!user) throw new Error('User not authenticated');
+    
     try {
-      const docRef = await addDoc(collection(db, 'tasks'), {
+      const userTasksCollection = collection(db, 'users', user.uid, 'tasks');
+      const docRef = await addDoc(userTasksCollection, {
         title: validation.sanitized,
         priority,
         completed: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        user_id: 1
+        user_id: user.uid
       });
       console.log("Task added with ID: ", SecurityUtils.sanitizeForLog(docRef.id));
       return { 
@@ -26,7 +31,7 @@ export class FirebaseService {
         completed: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        user_id: 1
+        user_id: user.uid
       };
     } catch (e) {
       console.error("Error adding task: ", SecurityUtils.sanitizeForLog(String(e)));
@@ -35,8 +40,12 @@ export class FirebaseService {
   }
 
   async getTasks() {
+    const user = auth.currentUser;
+    if (!user) throw new Error('User not authenticated');
+    
     try {
-      const querySnapshot = await getDocs(collection(db, 'tasks'));
+      const userTasksCollection = collection(db, 'users', user.uid, 'tasks');
+      const querySnapshot = await getDocs(userTasksCollection);
       const tasks: any[] = [];
       querySnapshot.forEach((doc) => {
         tasks.push({ id: doc.id, ...doc.data() });
