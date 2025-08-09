@@ -22,7 +22,9 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../context/ThemeContext';
 import FloatingAssistant from '../components/FloatingAssistant';
-import { openAIService } from '../services/OpenAIService';
+import MobilePomodoro from '../components/MobilePomodoro';
+import aiService from '../services/AIService';
+import useResponsive from '../hooks/useResponsive';
 
 // Types
 type PomodoroMode = 'work' | 'shortBreak' | 'longBreak';
@@ -46,7 +48,19 @@ interface Session {
 
 const Pomodoro: React.FC = () => {
   const { darkMode } = useTheme();
+  const { isMobile } = useResponsive();
   
+  // Use mobile-optimized component for mobile devices
+  if (isMobile) {
+    return <MobilePomodoro />;
+  }
+
+  // Use desktop component
+  return <PomodoroDesktop darkMode={darkMode} />;
+};
+
+// Desktop Pomodoro component
+const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
   // Configuration
   const workDuration = 25 * 60; // 25 minutes in seconds
   const shortBreakDuration = 5 * 60; // 5 minutes
@@ -205,8 +219,8 @@ const Pomodoro: React.FC = () => {
       const prompt = `A user just completed a ${session.duration / 60} minute focus session working on "${session.task}". 
       Provide a brief, encouraging feedback message about their productivity. Keep it under 50 words and be motivational.`;
       
-      const response = await openAIService.chat(prompt);
-      setFeedback(response);
+      const response = await aiService.chat(prompt);
+      setFeedback(response.response);
     } catch (error) {
       console.error('Failed to generate AI feedback:', error);
       setFeedback("Great job completing this focus session! You're building excellent productivity habits.");
@@ -223,8 +237,8 @@ const Pomodoro: React.FC = () => {
       const context = `User is in ${mode} mode with ${timeRemaining} seconds remaining. They have completed ${completedSessions} sessions today. Current task: ${selectedTask || 'none selected'}. Timer is ${isActive ? 'running' : 'paused'}.`;
       const prompt = `${context} User asks: ${aiChatInput}. Provide helpful, contextual advice.`;
       
-      const response = await openAIService.chat(prompt);
-      setAiMessage(response);
+      const response = await aiService.chat(prompt);
+      setAiMessage(response.response);
       setAiChatInput('');
     } catch (error) {
       console.error('Failed to send AI message:', error);
@@ -244,8 +258,8 @@ const Pomodoro: React.FC = () => {
       const context = `User has completed ${completedSessions} Pomodoro sessions today. Current mode: ${mode}. Time remaining: ${Math.floor(timeRemaining/60)} minutes. Task: ${selectedTask || 'none selected'}.`;
       const prompt = `${context} Give a personalized productivity tip based on their current situation.`;
       
-      const response = await openAIService.chat(prompt);
-      setAiMessage(response);
+      const response = await aiService.chat(prompt);
+      setAiMessage(response.response);
     } catch (error) {
       console.error('Failed to get tip:', error);
       const tips = [

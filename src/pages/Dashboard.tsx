@@ -28,6 +28,7 @@ import FloatingAssistant from '../components/FloatingAssistant';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import firestoreService from '../services/FirestoreService';
+import aiService from '../services/AIService';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -155,15 +156,8 @@ const Dashboard: React.FC = () => {
       const completedTasks = tasks.filter(task => task.status === 'completed');
       const context = `User: ${user.name}. Current tasks: ${incompleteTasks.map(t => t.title).join(', ')}. Completed: ${completedTasks.length}/${tasks.length} tasks. Mood: ${selectedMood || 'not set'}.`;
       
-      // Simple AI response for now
-      const responses = [
-        `Based on your ${incompleteTasks.length} pending tasks, I suggest focusing on one at a time using the Pomodoro technique.`,
-        `Great progress on completing ${completedTasks.length} tasks! Let's tackle the remaining ones step by step.`,
-        `I see you're feeling ${selectedMood || 'focused'}. This is a good time to work on your priority tasks.`,
-        `Try breaking down your larger tasks into smaller, manageable chunks for better productivity.`
-      ];
-      
-      setAiMessage(responses[Math.floor(Math.random() * responses.length)]);
+      const response = await aiService.chat(aiChatInput, context);
+      setAiMessage(response.response);
       setAiChatInput('');
     } catch (error) {
       console.error('AI chat error:', error);
@@ -179,22 +173,10 @@ const Dashboard: React.FC = () => {
     setIsAiLoading(true);
     try {
       const incompleteTasks = tasks.filter(task => task.status === 'pending');
-      const highPriorityTasks = incompleteTasks.filter(task => task.priority === 'high');
+      const currentActivity = incompleteTasks.length > 0 ? incompleteTasks[0].title : undefined;
       
-      const tips = [
-        "Focus on one task at a time and take regular breaks!",
-        "Try the 2-minute rule: If it takes less than 2 minutes, do it now!",
-        "Break larger tasks into smaller, manageable chunks.",
-        "Use the Pomodoro technique: 25 minutes focused work, 5 minute break.",
-        "Tackle your most important task when your energy is highest.",
-        "Remove distractions and create a dedicated workspace."
-      ];
-      
-      if (highPriorityTasks.length > 0) {
-        setAiMessage(`You have ${highPriorityTasks.length} high priority tasks. Focus on these first: ${highPriorityTasks.map(t => t.title).join(', ')}`);
-      } else {
-        setAiMessage(tips[Math.floor(Math.random() * tips.length)]);
-      }
+      const tip = await aiService.getProductivityTip(currentActivity);
+      setAiMessage(tip);
     } catch (error) {
       console.error('AI tip error:', error);
       setAiMessage("Here's a quick tip: Break your next task into smaller 15-minute chunks for better focus!");
@@ -268,7 +250,7 @@ const Dashboard: React.FC = () => {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-100 dark:border-gray-700 px-8 py-6"
+          className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-100 dark:border-gray-700 px-4 md:px-8 py-4 md:py-6"
         >
           <div className="flex justify-between items-center">
             <motion.div
@@ -276,10 +258,10 @@ const Dashboard: React.FC = () => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
             >
-              <h1 className="text-3xl font-bold text-gray-800 dark:text-white">
+              <h1 className="text-xl md:text-3xl font-bold text-gray-800 dark:text-white">
                 {greeting}, {firstName}!
               </h1>
-              <p className="text-gray-600 dark:text-gray-300 mt-1">
+              <p className="text-sm md:text-base text-gray-600 dark:text-gray-300 mt-1">
                 {pendingTasks.length > 0 
                   ? `You have ${pendingTasks.length} tasks to complete today.`
                   : "All caught up! Ready for something new?"
@@ -293,9 +275,9 @@ const Dashboard: React.FC = () => {
               className="flex items-center space-x-4"
             >
               <div className="text-right">
-                <p className="text-sm text-gray-500 dark:text-gray-400">Today's Progress</p>
+                <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Today's Progress</p>
                 <motion.p 
-                  className="text-2xl font-bold text-indigo-600 dark:text-indigo-400"
+                  className="text-lg md:text-2xl font-bold text-indigo-600 dark:text-indigo-400"
                   key={`${completedTasks}-${totalTasks}`}
                   initial={{ scale: 1.2 }}
                   animate={{ scale: 1 }}
@@ -309,26 +291,26 @@ const Dashboard: React.FC = () => {
         </motion.header>
 
         {/* Main Dashboard Content */}
-        <div className="p-8">
-          <div className="grid grid-cols-2 gap-8">
+        <div className="p-4 md:p-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8">
             
             {/* Left Column - Daily Tasks & Pomodoro */}
-            <div className="space-y-6">
+            <div className="space-y-4 md:space-y-6">
               {/* Quick Stats */}
               <FloatingCard 
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700"
+                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 md:p-6 border border-gray-100 dark:border-gray-700"
                 delay={0.1}
               >
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Today's Overview</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <h3 className="text-base md:text-lg font-semibold text-gray-800 dark:text-white mb-3 md:mb-4">Today's Overview</h3>
+                <div className="grid grid-cols-2 gap-3 md:gap-4">
                   <motion.div 
-                    className="text-center p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg"
+                    className="text-center p-3 md:p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <Target className="w-6 h-6 text-indigo-600 dark:text-indigo-400 mx-auto mb-2" />
+                    <Target className="w-5 h-5 md:w-6 md:h-6 text-indigo-600 dark:text-indigo-400 mx-auto mb-2" />
                     <motion.p 
-                      className="text-2xl font-bold text-indigo-600 dark:text-indigo-400"
+                      className="text-xl md:text-2xl font-bold text-indigo-600 dark:text-indigo-400"
                       key={completedTasks}
                       initial={{ scale: 1.2 }}
                       animate={{ scale: 1 }}
@@ -336,7 +318,7 @@ const Dashboard: React.FC = () => {
                     >
                       {completedTasks}
                     </motion.p>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">Completed</p>
+                    <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300">Completed</p>
                   </motion.div>
                   <motion.div 
                     className="text-center p-4 bg-purple-50 dark:bg-purple-900/30 rounded-lg"
@@ -380,7 +362,7 @@ const Dashboard: React.FC = () => {
                     value={newTask}
                     onChange={(e) => setNewTask(e.target.value)}
                     placeholder="Add a new task..."
-                    className="flex-1 px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                    className="flex-1 px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 mobile-input"
                     onKeyPress={(e) => e.key === 'Enter' && addTask()}
                   />
                   <motion.button
@@ -540,7 +522,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Right Column - Mood & Quick Actions */}
-            <div className="space-y-6">
+            <div className="space-y-4 md:space-y-6">
               {/* Mood Selector */}
               <FloatingCard 
                 className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700"

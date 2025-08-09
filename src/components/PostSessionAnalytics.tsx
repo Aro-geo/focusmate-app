@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import { CheckCircle, Target, Brain, TrendingUp, Clock, Star } from 'lucide-react';
-import { openAIService, AIResponse } from '../services/OpenAIService';
+import aiService from '../services/AIService';
+
+interface AIResponse {
+  summary?: string;
+  insights?: string;
+  suggestions?: string[];
+}
 
 interface SessionData {
   id: string;
@@ -49,12 +55,19 @@ const PostSessionAnalytics: React.FC<PostSessionAnalyticsProps> = ({
 
     setGeneratingInsights(true);
     try {
-      const insights = await openAIService.generateSessionSummary({
-        duration: sessionData.duration,
-        task: accomplishment,
-        mood: selectedMood || 'okay',
-        mode: sessionData.taskMode
-      });
+      const analysis = await aiService.analyzeFocusSession(
+        sessionData.duration,
+        sessionData.completed,
+        selectedMood || 'okay'
+      );
+      
+      // Format the response to match AIResponse interface
+      const insights: AIResponse = {
+        summary: "Focus Session Analysis",
+        insights: analysis,
+        suggestions: ["Try to maintain this momentum", "Set a specific goal for your next session"]
+      };
+      
       setAiInsights(insights);
       setShowAiPanel(true);
     } catch (error) {

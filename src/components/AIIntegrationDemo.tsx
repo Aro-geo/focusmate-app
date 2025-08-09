@@ -1,5 +1,5 @@
 import React from 'react';
-import NewOpenAIService from '../services/NewOpenAIService';
+import aiService from '../services/AIService';
 
 interface Message {
   id: string;
@@ -53,14 +53,17 @@ const AIIntegrationDemo: React.FC<AIIntegrationDemoProps> = ({ className = '' })
       const assistantMessageId = addMessage('assistant', '🤔 Thinking...', true);
 
       // Call AI service
-      const response = await NewOpenAIService.chat(userMessage);
+      const response = await aiService.chat(userMessage);
 
       // Update with actual response
       updateMessage(assistantMessageId, response.response, false);
 
+      // No need to check source anymore as we're using a consolidated service
+      /*
       if (response.source === 'fallback') {
         setError('Using fallback response - AI service may be unavailable');
       }
+      */
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get AI response');
       // Add error message
@@ -84,17 +87,24 @@ const AIIntegrationDemo: React.FC<AIIntegrationDemoProps> = ({ className = '' })
         { id: '3', title: 'Update documentation', priority: 'low', estimated_duration: 30 }
       ];
 
-      const response = await NewOpenAIService.getFocusSuggestions(mockTasks);
+      const response = await aiService.chat("Give me focus suggestions for these tasks: " + 
+        mockTasks.map(task => `${task.title} (${task.priority} priority, ${task.estimated_duration} minutes)`).join(", "));
+      
+      // Parse the response into bullet points
+      const suggestions = response.response.split('.').filter(item => item.trim().length > 0);
       
       const suggestionsText = `Here are personalized focus suggestions:\n\n${
-        response.suggestions.map((suggestion, index) => `${index + 1}. ${suggestion}`).join('\n')
+        suggestions.map((suggestion, index) => `${index + 1}. ${suggestion.trim()}`).join('\n')
       }`;
 
       updateMessage(assistantMessageId, suggestionsText, false);
 
+      // No need to check source anymore
+      /*
       if (response.source === 'fallback') {
         setError('Using fallback suggestions - AI service may be unavailable');
       }
+      */
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get focus suggestions');
       addMessage('assistant', 'Sorry, I couldn\'t generate focus suggestions right now.');
@@ -117,17 +127,20 @@ const AIIntegrationDemo: React.FC<AIIntegrationDemoProps> = ({ className = '' })
         "Great flow state during coding session. The Pomodoro technique really helped."
       ];
 
-      const response = await NewOpenAIService.analyzeJournal(mockEntries);
+      const response = await aiService.analyzeJournal(mockEntries);
       
-      const analysisText = `**Journal Analysis:**\n\n${response.insights}\n\n**Suggestions for improvement:**\n${
-        response.suggestions.map((suggestion, index) => `${index + 1}. ${suggestion}`).join('\n')
+      const analysisText = `Journal Analysis:\n\n${response.insights}\n\nSuggestions for improvement:\n${
+        response.suggestions.map((suggestion: string, index: number) => `${index + 1}. ${suggestion}`).join('\n')
       }`;
 
       updateMessage(assistantMessageId, analysisText, false);
 
+      // No need to check source anymore
+      /*
       if (response.source === 'fallback') {
         setError('Using fallback analysis - AI service may be unavailable');
       }
+      */
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to analyze journal');
       addMessage('assistant', 'Sorry, I couldn\'t analyze your journal entries right now.');
