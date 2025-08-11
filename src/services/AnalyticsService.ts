@@ -1,3 +1,10 @@
+import FirestoreService from './FirestoreService';
+import DatabaseFocusSessionService from './DatabaseFocusSessionService';
+import DatabasePomodoroService from './DatabasePomodoroService';
+import { FocusSession } from './DatabaseFocusSessionService';
+import { PomodoroSession } from './DatabasePomodoroService';
+import { Task } from './FirestoreService';
+
 export interface AnalyticsData {
   productivity: {
     daily: number[];
@@ -98,29 +105,284 @@ class AnalyticsService {
   }
 
   async getAnalyticsData(timeRange: 'week' | 'month' | 'quarter' = 'week'): Promise<AnalyticsData> {
-    // In a real app, this would fetch from your database
-    // For now, return mock data that adapts to time range
-    const baseData = this.generateMockData();
+    try {
+      // Calculate the date range based on the selected time period
+      const endDate = new Date();
+      const startDate = new Date();
+      
+      if (timeRange === 'week') {
+        startDate.setDate(endDate.getDate() - 7);
+      } else if (timeRange === 'month') {
+        startDate.setDate(endDate.getDate() - 30);
+      } else { // quarter
+        startDate.setDate(endDate.getDate() - 90);
+      }
+      
+      // Fetch real data from Firestore
+      const tasks = await FirestoreService.getTasks();
+      const focusSessions = await DatabaseFocusSessionService.getSessionsForPeriod(startDate, endDate);
+      const pomodoroSessions = await DatabasePomodoroService.getSessionsForPeriod(startDate, endDate);
+      
+      // Combine focus and pomodoro sessions
+      const allSessions = [
+        ...focusSessions,
+        ...pomodoroSessions.map(ps => ({
+          id: ps.id,
+          userId: ps.userId,
+          sessionType: ps.sessionType === 'pomodoro' ? 'focus' : ps.sessionType,
+          durationMinutes: ps.durationMinutes,
+          startedAt: ps.startTime,
+          completedAt: ps.endTime,
+          notes: ps.notes,
+          taskId: '', // We don't have this mapping in pomodoro sessions
+          createdAt: ps.createdAt
+        } as FocusSession))
+      ];
+      
+      // If no real data is available, return mock data with a warning
+      if (tasks.length === 0 && allSessions.length === 0) {
+        console.warn('No real user data found, using mock data');
+        return this.generateMockData();
+      }
+      
+      // Process tasks and sessions into analytics data
+      return this.processRealData(tasks, allSessions, startDate, endDate, timeRange);
+    } catch (error) {
+      console.error('Error fetching analytics data:', error);
+      return this.generateMockData();
+    }
+  }
+  
+  private processRealData(
+    tasks: Task[], 
+    sessions: FocusSession[], 
+    startDate: Date, 
+    endDate: Date,
+    timeRange: 'week' | 'month' | 'quarter'
+  ): AnalyticsData {
+    // Filter tasks and sessions to the selected time period
+    const tasksInPeriod = tasks.filter(task => {
+      const createdDate = new Date(task.createdAt);
+      return createdDate >= startDate && createdDate <= endDate;
+    });
     
-    if (timeRange === 'month') {
-      // Adjust data for monthly view
-      const monthlyLabels = Array.from({ length: 30 }, (_, i) => {
-        const date = new Date();
-        date.setDate(date.getDate() - (29 - i));
-        return date.getDate().toString();
+    const completedTasks = tasksInPeriod.filter(task => task.completed);
+    
+    // Process session data
+    const totalFocusMinutes = sessions.reduce((total, session) => {
+      return total + session.durationMinutes;
+    }, 0);
+    
+    const totalSessions = sessions.length;
+    
+    // Generate daily stats based on the selected time period
+    const dailyStats = this.generateDailyStats(tasks, sessions, startDate, endDate);
+    
+    // Generate labels based on the time range
+    const labels = this.generateLabels(startDate, endDate, timeRange);
+    
+    // Generate task categories based on real data
+    const taskCategories = this.generateTaskCategories(tasksInPeriod, sessions);
+    
+    // Build and return the analytics data structure
+    const baseData = this.generateMockData(); // Use as a template
+    
+    return {
+      ...baseData,
+      // Override with real data
+      dailyStats,
+      totalCompletedTasks: completedTasks.length,
+      totalFocusMinutes,
+      totalSessions,
+      taskCategories,
+      insights: {
+        ...baseData.insights,
+        totalFocusTime: totalFocusMinutes,
+        averageSessionLength: totalSessions > 0 ? totalFocusMinutes / totalSessions : 0,
+        // Other insights could be calculated from real data as well
+      },
+      // Update chart data with real data
+      pomodoro: {
+        ...baseData.pomodoro,
+        sessionsCompleted: this.aggregateSessionsByDay(sessions, labels),
+        labels
+      },
+      tasks: {
+        ...baseData.tasks,
+        completed: this.aggregateTasksByDay(completedTasks, labels, 'completed'),
+        created: this.aggregateTasksByDay(tasksInPeriod, labels, 'created'),
+        labels
+      }
+    };
+  }
+  
+  private generateDailyStats(
+    tasks: Task[], 
+    sessions: FocusSession[], 
+    startDate: Date, 
+    endDate: Date
+  ) {
+    const dailyStats: Array<{
+      date: string;
+      focusMinutes: number;
+      sessions: number;
+      completedTasks: number;
+      mood: string;
+    }> = [];
+    
+    // Create a map of dates
+    const dateMap = new Map();
+    const currentDate = new Date(startDate);
+    
+    while (currentDate <= endDate) {
+      const dateString = currentDate.toISOString().split('T')[0];
+      dateMap.set(dateString, {
+        date: dateString,
+        focusMinutes: 0,
+        sessions: 0,
+        completedTasks: 0,
+        mood: 'Neutral'
       });
       
-      return {
-        ...baseData,
-        productivity: {
-          ...baseData.productivity,
-          daily: Array.from({ length: 30 }, () => Math.floor(Math.random() * 40) + 60),
-          labels: monthlyLabels
-        }
-      };
+      currentDate.setDate(currentDate.getDate() + 1);
     }
     
-    return baseData;
+    // Process sessions
+    sessions.forEach(session => {
+      const dateString = session.startedAt.toISOString().split('T')[0];
+      
+      if (dateMap.has(dateString)) {
+        const dayStats = dateMap.get(dateString);
+        dayStats.focusMinutes += session.durationMinutes;
+        dayStats.sessions += 1;
+        // If session has a mood note, use the most recent one for the day
+        if (session.notes) {
+          dayStats.mood = session.notes;
+        }
+      }
+    });
+    
+    // Process tasks
+    tasks.forEach(task => {
+      const dateString = new Date(task.updatedAt).toISOString().split('T')[0];
+      
+      if (dateMap.has(dateString) && task.completed) {
+        const dayStats = dateMap.get(dateString);
+        dayStats.completedTasks += 1;
+      }
+    });
+    
+    // Convert map to array
+    dateMap.forEach(stats => {
+      dailyStats.push(stats);
+    });
+    
+    return dailyStats.sort((a, b) => a.date.localeCompare(b.date));
+  }
+  
+  private generateLabels(startDate: Date, endDate: Date, timeRange: 'week' | 'month' | 'quarter'): string[] {
+    const labels: string[] = [];
+    const currentDate = new Date(startDate);
+    
+    while (currentDate <= endDate) {
+      let label;
+      
+      if (timeRange === 'week') {
+        // For week view, use day names
+        label = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
+      } else {
+        // For month and quarter views, use date format
+        label = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+      
+      labels.push(label);
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    return labels;
+  }
+  
+  private generateTaskCategories(tasks: Task[], sessions: FocusSession[]) {
+    // In a real app, you'd have task categories stored with tasks
+    // For now, we'll create mock categories based on task names
+    const categories = new Map<string, { totalMinutes: number, count: number }>();
+    
+    // Initialize with some default categories
+    categories.set('Work', { totalMinutes: 0, count: 0 });
+    categories.set('Study', { totalMinutes: 0, count: 0 });
+    categories.set('Personal', { totalMinutes: 0, count: 0 });
+    
+    // Assign tasks to categories based on keywords in the title
+    tasks.forEach(task => {
+      let category = 'Other';
+      const title = task.title.toLowerCase();
+      
+      if (title.includes('work') || title.includes('project') || title.includes('meeting')) {
+        category = 'Work';
+      } else if (title.includes('study') || title.includes('learn') || title.includes('read')) {
+        category = 'Study';
+      } else if (title.includes('personal') || title.includes('health') || title.includes('hobby')) {
+        category = 'Personal';
+      }
+      
+      if (!categories.has(category)) {
+        categories.set(category, { totalMinutes: 0, count: 0 });
+      }
+      
+      const categoryData = categories.get(category)!;
+      categoryData.count += 1;
+      
+      // Find related sessions for this task
+      const taskSessions = sessions.filter(session => session.taskId === task.id);
+      taskSessions.forEach(session => {
+        categoryData.totalMinutes += session.durationMinutes;
+      });
+    });
+    
+    // Convert to array and calculate percentages
+    const totalMinutes = Array.from(categories.values()).reduce((total, cat) => total + cat.totalMinutes, 0);
+    
+    return Array.from(categories.entries()).map(([name, data]) => ({
+      name,
+      totalMinutes: data.totalMinutes,
+      percentage: totalMinutes > 0 ? (data.totalMinutes / totalMinutes) * 100 : 0
+    }));
+  }
+  
+  private aggregateSessionsByDay(sessions: FocusSession[], labels: string[]): number[] {
+    const sessionsPerDay = new Array(labels.length).fill(0);
+    
+    sessions.forEach(session => {
+      const sessionDate = session.startedAt;
+      const dayLabel = sessionDate.toLocaleDateString('en-US', { weekday: 'short' });
+      const dateLabel = sessionDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      
+      // Find the matching label index
+      const index = labels.findIndex(label => label === dayLabel || label === dateLabel);
+      if (index !== -1) {
+        sessionsPerDay[index]++;
+      }
+    });
+    
+    return sessionsPerDay;
+  }
+  
+  private aggregateTasksByDay(tasks: Task[], labels: string[], type: 'created' | 'completed'): number[] {
+    const tasksPerDay = new Array(labels.length).fill(0);
+    
+    tasks.forEach(task => {
+      const taskDate = new Date(type === 'created' ? task.createdAt : task.updatedAt);
+      const dayLabel = taskDate.toLocaleDateString('en-US', { weekday: 'short' });
+      const dateLabel = taskDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      
+      // Find the matching label index
+      const index = labels.findIndex(label => label === dayLabel || label === dateLabel);
+      if (index !== -1) {
+        tasksPerDay[index]++;
+      }
+    });
+    
+    return tasksPerDay;
   }
 
   async getProductivityScore(timeRange: 'week' | 'month' = 'week'): Promise<number> {

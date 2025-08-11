@@ -9,6 +9,7 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let config: any;
 try {
   config = getConfig();
@@ -47,7 +48,7 @@ export const analyzeTask = onCall(async (request) => {
           role: "system",
           content: "You are a friendly productivity assistant. Write in a " +
             "conversational, warm tone as if speaking to a friend. Don't use " +
-            "markdown, bullet points, or formal language."
+            "markdown, bullet points, or formal language.",
         },
         {
           role: "user",
@@ -93,7 +94,7 @@ export const prioritizeTasks = onCall(async (request) => {
           role: "system",
           content: "You are a friendly productivity assistant. Write in a " +
             "conversational, warm tone as if speaking to a friend. Don't use " +
-            "markdown, bullet points, or formal language."
+            "markdown, bullet points, or formal language.",
         },
         {
           role: "user",
@@ -106,6 +107,7 @@ export const prioritizeTasks = onCall(async (request) => {
     const data = await response.json();
     const aiResponse = data.choices[0]?.message?.content || "";
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return {
       aiSuggestion: aiResponse,
       prioritizedTasks: tasks.map((task: any, index: number) => ({
@@ -156,10 +158,12 @@ export const aiChat = onCall(async (request) => {
   }
 
   try {
-    const systemMsg = "You are a friendly productivity assistant for FocusMate AI. " +
-      "Respond conversationally as if speaking to a friend. Do not use markdown " +
-      "formatting, bullet points, or numbered lists. Keep your tone warm, helpful " +
-      "and human-like. Avoid being overly formal or robotic.";
+    // Split long string into multiple lines to avoid max-len issues
+    const systemMsg = "You are a friendly productivity assistant for " +
+      "FocusMate AI. Respond conversationally as if speaking to a friend. " +
+      "Do not use markdown formatting, bullet points, or numbered lists. " +
+      "Keep your tone warm, helpful and human-like.";
+
     const messages = [
       {role: "system", content: systemMsg},
       ...(context ? [{role: "user", content: context}] : []),

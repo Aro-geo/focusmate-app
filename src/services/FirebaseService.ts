@@ -3,7 +3,7 @@ import { db, auth } from '../firebase';
 import { SecurityUtils } from '../utils/security';
 
 export class FirebaseService {
-  async addTask(title: string, priority: 'low' | 'medium' | 'high' = 'medium') {
+  async addTask(title: string, priority: 'low' | 'medium' | 'high' = 'medium', dueDate?: string) {
     // Validate and sanitize input
     const validation = SecurityUtils.validateTaskInput(title);
     if (!validation.isValid) {
@@ -14,6 +14,9 @@ export class FirebaseService {
     if (!user) throw new Error('User not authenticated');
     
     try {
+      // If no due date provided, default to today
+      const today = new Date().toISOString().split('T')[0];
+      
       const userTasksCollection = collection(db, 'users', user.uid, 'tasks');
       const docRef = await addDoc(userTasksCollection, {
         title: validation.sanitized,
@@ -21,6 +24,7 @@ export class FirebaseService {
         completed: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        due_date: dueDate || today, // Default to today
         user_id: user.uid
       });
       console.log("Task added with ID: ", SecurityUtils.sanitizeForLog(docRef.id));
@@ -31,6 +35,7 @@ export class FirebaseService {
         completed: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        due_date: dueDate || today, // Default to today
         user_id: user.uid
       };
     } catch (e) {
@@ -58,8 +63,11 @@ export class FirebaseService {
   }
 
   async toggleTask(taskId: string) {
+    const user = auth.currentUser;
+    if (!user) throw new Error('User not authenticated');
+    
     try {
-      const taskRef = doc(db, 'tasks', taskId);
+      const taskRef = doc(db, 'users', user.uid, 'tasks', taskId);
       const tasks = await this.getTasks();
       const task = tasks.find(t => t.id === taskId);
       
@@ -79,8 +87,11 @@ export class FirebaseService {
   }
 
   async deleteTask(taskId: string) {
+    const user = auth.currentUser;
+    if (!user) throw new Error('User not authenticated');
+    
     try {
-      await deleteDoc(doc(db, 'tasks', taskId));
+      await deleteDoc(doc(db, 'users', user.uid, 'tasks', taskId));
       console.log("Task deleted: ", SecurityUtils.sanitizeForLog(taskId));
     } catch (e) {
       console.error("Error deleting task: ", SecurityUtils.sanitizeForLog(String(e)));

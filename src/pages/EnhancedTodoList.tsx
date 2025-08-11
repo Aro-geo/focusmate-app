@@ -21,6 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { firebaseService } from '../services/FirebaseService';
 import MobileTodoList from '../components/MobileTodoList';
 import useResponsive from '../hooks/useResponsive';
+import aiService from '../services/AIService';
 
 interface Task {
   id: string;
@@ -136,27 +137,36 @@ const EnhancedTodoListDesktop: React.FC<{ user: any }> = ({ user }) => {
     return task;
   };
 
-  const generateAISuggestions = (taskTitle: string): string[] => {
-    const suggestions = [];
-    
-    if (taskTitle.toLowerCase().includes('project')) {
-      suggestions.push('Break into smaller subtasks', 'Set milestone deadlines', 'Assign team members');
+  const generateAISuggestions = async (taskTitle: string): Promise<string[]> => {
+    try {
+      // Use the AI service to get personalized suggestions
+      const analysis = await aiService.analyzeTask(taskTitle);
+      return analysis.suggestions || [];
+    } catch (error) {
+      console.error('Error getting AI suggestions:', error);
+      
+      // Provide more varied fallback suggestions based on task type
+      if (taskTitle.toLowerCase().includes('project')) {
+        return ['Break into smaller subtasks', 'Set milestone deadlines', 'Assign team members'];
+      }
+      
+      if (taskTitle.toLowerCase().includes('meeting')) {
+        return ['Prepare agenda', 'Send calendar invite', 'Book meeting room'];
+      }
+      
+      if (taskTitle.toLowerCase().includes('email')) {
+        return ['Draft key points first', 'Schedule for optimal send time', 'Follow up in 3 days'];
+      }
+      
+      // More varied default suggestions
+      return [
+        'Break task into smaller steps',
+        'Schedule a specific time to work on this',
+        'Connect this to your bigger goals',
+        'Consider delegating if possible',
+        'Set a reward for completing this task'
+      ].sort(() => Math.random() - 0.5).slice(0, 3); // Randomize and pick 3
     }
-    
-    if (taskTitle.toLowerCase().includes('meeting')) {
-      suggestions.push('Prepare agenda', 'Send calendar invite', 'Book meeting room');
-    }
-    
-    if (taskTitle.toLowerCase().includes('email')) {
-      suggestions.push('Draft key points first', 'Schedule for optimal send time', 'Follow up in 3 days');
-    }
-    
-    // Default suggestions
-    if (suggestions.length === 0) {
-      suggestions.push('Set a specific deadline', 'Break into smaller steps', 'Estimate time needed');
-    }
-    
-    return suggestions;
   };
 
   const addTask = async () => {
@@ -164,27 +174,36 @@ const EnhancedTodoListDesktop: React.FC<{ user: any }> = ({ user }) => {
     
     try {
       const parsedTask = parseNaturalLanguage(newTask);
-      const aiSuggestions = generateAISuggestions(parsedTask.title || newTask);
       
-      const taskData = {
+      // Create initial task object without AI suggestions
+      const initialTaskData = {
         ...parsedTask,
-        aiSuggestions,
         completed: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
       
-      const taskId = await firebaseService.addTask(taskData.title!, taskData.priority!);
+      // If no dueDate is specified, default to today for new tasks
+      const dueDate = initialTaskData.dueDate || new Date().toISOString().split('T')[0];
+      
+      const taskId = await firebaseService.addTask(
+        initialTaskData.title!, 
+        initialTaskData.priority!, 
+        dueDate
+      );
+      
+      // Get AI suggestions asynchronously
+      const aiSuggestions = await generateAISuggestions(parsedTask.title || newTask);
       
       const newTaskObj: Task = {
         id: typeof taskId === 'string' ? taskId : taskId.id,
-        title: taskData.title!,
+        title: initialTaskData.title!,
         completed: false,
-        priority: taskData.priority!,
-        dueDate: taskData.dueDate,
+        priority: initialTaskData.priority!,
+        dueDate: initialTaskData.dueDate,
         aiSuggestions,
-        createdAt: taskData.createdAt,
-        updatedAt: taskData.updatedAt,
+        createdAt: initialTaskData.createdAt,
+        updatedAt: initialTaskData.updatedAt,
         streak: 0
       };
       

@@ -11,6 +11,7 @@ import {
   Send
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import FormattedMessage from './FormattedMessage';
 
 interface FloatingAssistantProps {
   isAiLoading: boolean;
@@ -178,22 +179,31 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
           <div className={`flex-1 mb-4 p-3 rounded-lg ${
             darkMode ? 'bg-gray-700/50' : 'bg-gray-50'
           }`}>
-            <motion.p 
-              className={`text-sm leading-relaxed ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}
-              key={aiMessage}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              {isAiLoading ? (
+            {isAiLoading ? (
+              <motion.div
+                className={`text-sm leading-relaxed ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+              >
                 <span className="flex items-center space-x-2">
                   <Loader className="w-4 h-4 animate-spin" />
                   <span>Thinking...</span>
                 </span>
-              ) : (
-                aiMessage || "Hi! I'm here to help you stay focused and productive. Ask me anything or get a quick tip!"
-              )}
-            </motion.p>
+              </motion.div>
+            ) : (
+              <motion.div
+                key={aiMessage}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <FormattedMessage
+                  message={aiMessage || "## Hello! 👋\n\nI'm here to help you stay focused and productive. Ask me anything or get a quick tip!"}
+                  className={`text-sm leading-relaxed ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}
+                />
+              </motion.div>
+            )}
           </div>
 
           {/* Chat Input */}

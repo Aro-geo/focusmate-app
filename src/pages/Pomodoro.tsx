@@ -22,9 +22,12 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../context/ThemeContext';
 import FloatingAssistant from '../components/FloatingAssistant';
+import FormattedMessage from '../components/FormattedMessage';
 import MobilePomodoro from '../components/MobilePomodoro';
 import aiService from '../services/AIService';
 import useResponsive from '../hooks/useResponsive';
+import DatabasePomodoroService from '../services/DatabasePomodoroService';
+import { useAuth } from '../context/AuthContext';
 
 // Types
 type PomodoroMode = 'work' | 'shortBreak' | 'longBreak';
@@ -199,6 +202,10 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
 
         // Add to sessions history
         setSessions(prev => [...prev, updatedSession]);
+        
+        // Save to Firestore
+        const durationMinutes = Math.round((workDuration - timeRemaining) / 60);
+        saveSessionToFirestore(updatedSession, durationMinutes);
       }
 
       // Determine next break type
@@ -213,17 +220,36 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
     }
   }, [completedSessions, currentSession, mode, soundEnabled, timeRemaining, workDuration, sessionsBeforeLongBreak]);
 
+  // New function to save session to Firestore
+  const saveSessionToFirestore = async (session: Session, durationMinutes: number) => {
+    try {
+      await DatabasePomodoroService.saveSession({
+        taskName: session.task,
+        startTime: session.startTime,
+        endTime: session.endTime,
+        durationMinutes: durationMinutes,
+        sessionType: 'pomodoro',
+        completed: true,
+        notes: session.feedback || ''
+      });
+      console.log('Pomodoro session saved to Firestore');
+    } catch (error) {
+      console.error('Error saving Pomodoro session to Firestore:', error);
+    }
+  };
+
   const generateAIFeedback = async (session: Session) => {
     try {
       setIsAiLoading(true);
       const prompt = `A user just completed a ${session.duration / 60} minute focus session working on "${session.task}". 
-      Provide a brief, encouraging feedback message about their productivity. Keep it under 50 words and be motivational.`;
+      Provide a brief, encouraging feedback message about their productivity. Format it with a short bold header followed by a motivational message. 
+      Keep it under 50 words total. Use markdown formatting with ## for headers.`;
       
       const response = await aiService.chat(prompt);
       setFeedback(response.response);
     } catch (error) {
       console.error('Failed to generate AI feedback:', error);
-      setFeedback("Great job completing this focus session! You're building excellent productivity habits.");
+      setFeedback("## Well Done! 🎉\nGreat job completing this focus session! You're building excellent productivity habits.");
     } finally {
       setIsAiLoading(false);
     }
@@ -235,14 +261,20 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
     try {
       setIsAiLoading(true);
       const context = `User is in ${mode} mode with ${timeRemaining} seconds remaining. They have completed ${completedSessions} sessions today. Current task: ${selectedTask || 'none selected'}. Timer is ${isActive ? 'running' : 'paused'}.`;
-      const prompt = `${context} User asks: ${aiChatInput}. Provide helpful, contextual advice.`;
+      const prompt = `${context} User asks: ${aiChatInput}. 
+      
+      Provide helpful, contextual advice formatted with clear structure:
+      1. Use markdown ## for a brief engaging header related to their question
+      2. Break your response into 2-3 short paragraphs with line breaks between them
+      3. If appropriate, include a bullet point list of 2-3 actionable tips
+      4. Be encouraging and personalized, but concise (max 120 words total)`;
       
       const response = await aiService.chat(prompt);
       setAiMessage(response.response);
       setAiChatInput('');
     } catch (error) {
       console.error('Failed to send AI message:', error);
-      setAiMessage("I'm having trouble connecting right now, but I'm here to help you stay focused!");
+      setAiMessage("## Focus Assistant\n\nI'm having trouble connecting right now, but I'm here to help you stay focused!\n\nTry again in a moment or use the 'Get Tip' button for quick advice.");
     } finally {
       setIsAiLoading(false);
     }
@@ -256,17 +288,24 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
     try {
       setIsAiLoading(true);
       const context = `User has completed ${completedSessions} Pomodoro sessions today. Current mode: ${mode}. Time remaining: ${Math.floor(timeRemaining/60)} minutes. Task: ${selectedTask || 'none selected'}.`;
-      const prompt = `${context} Give a personalized productivity tip based on their current situation.`;
+      const prompt = `${context} Give a personalized productivity tip based on their current situation.
+      
+      Format your response with:
+      1. A brief, engaging header with markdown ## syntax
+      2. A short paragraph explaining the tip (2-3 sentences)
+      3. If appropriate, include 2-3 bullet points with actionable advice
+      4. End with a short encouraging sentence
+      5. Total response should be under 100 words`;
       
       const response = await aiService.chat(prompt);
       setAiMessage(response.response);
     } catch (error) {
       console.error('Failed to get tip:', error);
       const tips = [
-        "💡 Focus on one task at a time - multitasking reduces productivity by up to 40%!",
-        "🎯 Break large tasks into 25-minute chunks for better focus and progress tracking.",
-        "⏰ Take your breaks seriously - they help prevent mental fatigue and maintain peak performance.",
-        "🧠 If you're struggling to focus, try the 2-minute rule: do quick tasks immediately."
+        "## Focus Fundamentals 💡\n\nFocus on one task at a time - multitasking reduces productivity by up to 40%!\n\n* Break large tasks into smaller chunks\n* Set clear goals before each session\n* Celebrate small wins\n\nYou're making great progress!",
+        "## Pomodoro Power 🎯\n\nBreaking large tasks into 25-minute chunks improves focus and makes progress tracking easier.\n\n* Start with the most challenging task\n* Document your accomplishments\n* Gradually increase focus duration\n\nConsistency is key to success!",
+        "## Strategic Breaks ⏰\n\nTake your breaks seriously - they help prevent mental fatigue and maintain peak performance.\n\n* Stand up and stretch\n* Look away from screens\n* Take deep breaths\n\nRest is a crucial part of productivity!",
+        "## 2-Minute Rule 🧠\n\nIf you're struggling to focus, try the 2-minute rule: do quick tasks immediately.\n\n* Eliminate small distractions first\n* Build momentum with easy wins\n* Save complex tasks for deep work sessions\n\nSmall steps lead to big results!"
       ];
       setAiMessage(tips[Math.floor(Math.random() * tips.length)]);
     } finally {
@@ -645,11 +684,12 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
               <div className={`p-4 rounded-xl mb-4 ${
                 darkMode ? 'bg-gray-700/50' : 'bg-gray-50'
               }`}>
-                <p className={`text-sm leading-relaxed ${
-                  darkMode ? 'text-gray-300' : 'text-gray-700'
-                }`}>
-                  {aiMessage}
-                </p>
+                <FormattedMessage 
+                  message={aiMessage}
+                  className={`text-md leading-relaxed ${
+                    darkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}
+                />
               </div>
 
               <div className="flex space-x-2">
