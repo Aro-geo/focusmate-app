@@ -35,6 +35,11 @@ export interface AIResponse {
   source?: string;
 }
 
+interface JournalingTipResponse {
+  tip: string;
+  source: 'openai' | 'fallback';
+}
+
 interface OpenAIProxyResponse {
   success: boolean;
   response?: string;
@@ -334,6 +339,42 @@ Keep it encouraging and actionable.`;
     } catch (error) {
       console.error('AI service availability check failed:', error);
       return false;
+    }
+  }
+
+  /**
+   * Get a journaling tip to help users improve their journaling practice
+   */
+  async getJournalingTip(): Promise<JournalingTipResponse> {
+    try {
+      const prompt = "Please provide a helpful tip for effective journaling that improves self-reflection and productivity. The tip should be concise, actionable, and formatted with an emoji at the start.";
+
+      const messages = [{ role: 'user', content: prompt }];
+
+      const response = await this.callOpenAIProxy(
+        messages,
+        'journaling_tip',
+        undefined
+      );
+
+      return {
+        tip: response.trim(),
+        source: 'openai'
+      };
+    } catch (error) {
+      console.error('Journaling tip error:', error);
+      // Fallback tips
+      const tips = [
+        "💡 Try the 'Morning Pages' technique - write three pages of stream-of-consciousness thoughts each morning to clear your mind.",
+        "✨ End each entry with one thing you're grateful for to boost positive emotions and build a gratitude practice.",
+        "🎯 Use the STAR method (Situation, Task, Action, Result) to structure entries about problem-solving or challenges.",
+        "🌱 Review your entries weekly to identify patterns in your mood, productivity, and challenges.",
+        "⏰ Consistency is key - set a specific time each day for journaling to build the habit."
+      ];
+      return {
+        tip: tips[Math.floor(Math.random() * tips.length)],
+        source: 'fallback'
+      };
     }
   }
 }

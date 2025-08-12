@@ -55,6 +55,53 @@ export interface AnalyticsData {
 }
 
 class AnalyticsService {
+  private generateEmptyData(timeRange: 'week' | 'month' | 'quarter'): AnalyticsData {
+    const days = timeRange === 'week' ? 7 : timeRange === 'month' ? 30 : 90;
+    const labels = Array.from({ length: days }, (_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (days - 1 - i));
+      return date.toLocaleDateString('en-US', { weekday: 'short' });
+    });
+    
+    return {
+      productivity: {
+        daily: new Array(days).fill(0),
+        weekly: new Array(Math.ceil(days/7)).fill(0),
+        monthly: new Array(Math.ceil(days/30)).fill(0),
+        labels
+      },
+      pomodoro: {
+        sessionsCompleted: new Array(days).fill(0),
+        averageFocusTime: new Array(days).fill(0),
+        breakTimeUsed: new Array(days).fill(0),
+        labels
+      },
+      mood: {
+        data: [],
+        trends: new Array(days).fill(0),
+        labels
+      },
+      tasks: {
+        completed: new Array(days).fill(0),
+        created: new Array(days).fill(0),
+        overdue: new Array(days).fill(0),
+        labels
+      },
+      insights: {
+        mostProductiveTime: 'No data yet',
+        averageSessionLength: 0,
+        totalFocusTime: 0,
+        streakDays: 0,
+        improvementPercentage: 0
+      },
+      dailyStats: [],
+      totalCompletedTasks: 0,
+      totalFocusMinutes: 0,
+      totalSessions: 0,
+      taskCategories: []
+    };
+  }
+  
   private generateMockData(): AnalyticsData {
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const date = new Date();
@@ -118,10 +165,28 @@ class AnalyticsService {
         startDate.setDate(endDate.getDate() - 90);
       }
       
-      // Fetch real data from Firestore
-      const tasks = await FirestoreService.getTasks();
-      const focusSessions = await DatabaseFocusSessionService.getSessionsForPeriod(startDate, endDate);
-      const pomodoroSessions = await DatabasePomodoroService.getSessionsForPeriod(startDate, endDate);
+      // Fetch real data from Firestore with error handling
+      let tasks: Task[] = [];
+      let focusSessions: FocusSession[] = [];
+      let pomodoroSessions: PomodoroSession[] = [];
+      
+      try {
+        tasks = await FirestoreService.getTasks();
+      } catch (error) {
+        console.warn('Failed to fetch tasks:', error);
+      }
+      
+      try {
+        focusSessions = await DatabaseFocusSessionService.getSessionsForPeriod(startDate, endDate);
+      } catch (error) {
+        console.warn('Failed to fetch focus sessions:', error);
+      }
+      
+      try {
+        pomodoroSessions = await DatabasePomodoroService.getSessionsForPeriod(startDate, endDate);
+      } catch (error) {
+        console.warn('Failed to fetch pomodoro sessions:', error);
+      }
       
       // Combine focus and pomodoro sessions
       const allSessions = [
@@ -139,17 +204,14 @@ class AnalyticsService {
         } as FocusSession))
       ];
       
-      // If no real data is available, return mock data with a warning
-      if (tasks.length === 0 && allSessions.length === 0) {
-        console.warn('No real user data found, using mock data');
-        return this.generateMockData();
-      }
+      console.log(`Analytics data: ${tasks.length} tasks, ${allSessions.length} sessions`);
       
-      // Process tasks and sessions into analytics data
+      // Always process real data, even if empty
       return this.processRealData(tasks, allSessions, startDate, endDate, timeRange);
     } catch (error) {
       console.error('Error fetching analytics data:', error);
-      return this.generateMockData();
+      // Return empty data structure instead of mock data
+      return this.generateEmptyData(timeRange);
     }
   }
   

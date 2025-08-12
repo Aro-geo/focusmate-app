@@ -22,13 +22,31 @@ export interface TaskPrioritization {
   prioritizedTasks: any[];
 }
 
+type UseCase = 'coding' | 'analysis' | 'conversation' | 'translation' | 'creative';
+
 class SecureDeepSeekService {
   private functions = getFunctions();
+  
+  private getTemperature(useCase: UseCase): number {
+    const temperatures = {
+      coding: 0.0,      // Coding / Math
+      analysis: 1.0,    // Data Analysis
+      conversation: 1.3, // General Conversation
+      translation: 1.3, // Translation
+      creative: 1.5     // Creative Writing
+    };
+    return temperatures[useCase];
+  }
 
-  async chat(message: string, context?: string): Promise<AIResponse> {
+  async chat(message: string, context?: string, useCase: UseCase = 'conversation'): Promise<AIResponse> {
     try {
       const aiChat = httpsCallable(this.functions, 'aiChat');
-      const result = await aiChat({ message, context });
+      const result = await aiChat({ 
+        message, 
+        context, 
+        model: 'deepseek-chat',
+        temperature: this.getTemperature(useCase)
+      });
       return result.data as AIResponse;
     } catch (error) {
       console.error('AI chat error:', error);
@@ -39,7 +57,11 @@ class SecureDeepSeekService {
   async analyzeTask(task: string): Promise<TaskAnalysis> {
     try {
       const analyzeTask = httpsCallable(this.functions, 'analyzeTask');
-      const result = await analyzeTask({ task });
+      const result = await analyzeTask({ 
+        task,
+        model: 'deepseek-chat',
+        temperature: this.getTemperature('analysis')
+      });
       return result.data as TaskAnalysis;
     } catch (error) {
       console.error('Task analysis error:', error);
@@ -50,7 +72,11 @@ class SecureDeepSeekService {
   async prioritizeTasks(tasks: any[]): Promise<TaskPrioritization> {
     try {
       const prioritizeTasks = httpsCallable(this.functions, 'prioritizeTasks');
-      const result = await prioritizeTasks({ tasks });
+      const result = await prioritizeTasks({ 
+        tasks,
+        model: 'deepseek-chat',
+        temperature: this.getTemperature('analysis')
+      });
       return result.data as TaskPrioritization;
     } catch (error) {
       console.error('Task prioritization error:', error);
@@ -65,7 +91,8 @@ class SecureDeepSeekService {
     
     const response = await this.chat(
       'Give me a short productivity tip to help me stay focused.',
-      context
+      context,
+      'conversation'
     );
     
     return response.response;
@@ -77,7 +104,7 @@ class SecureDeepSeekService {
                      My mood was: ${mood}. 
                      Give me brief feedback and suggestions for improvement.`;
     
-    const response = await this.chat(message);
+    const response = await this.chat(message, undefined, 'analysis');
     return response.response;
   }
 
@@ -85,9 +112,27 @@ class SecureDeepSeekService {
     const message = `Analyze this journal entry and provide insights about productivity patterns, 
                      mood, and suggestions for improvement: "${entry}"`;
     
-    const response = await this.chat(message);
+    const response = await this.chat(message, undefined, 'analysis');
+    return response.response;
+  }
+
+  async generateCreativeContent(prompt: string, context?: string): Promise<string> {
+    const response = await this.chat(prompt, context, 'creative');
+    return response.response;
+  }
+
+  async translateText(text: string, targetLanguage: string): Promise<string> {
+    const message = `Translate the following text to ${targetLanguage}: "${text}"`;
+    const response = await this.chat(message, undefined, 'translation');
+    return response.response;
+  }
+
+  async generateCode(description: string, language: string): Promise<string> {
+    const message = `Generate ${language} code for: ${description}`;
+    const response = await this.chat(message, undefined, 'coding');
     return response.response;
   }
 }
 
 export default new SecureDeepSeekService();
+export type { UseCase };

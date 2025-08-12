@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   FileText, 
@@ -12,11 +12,15 @@ import {
   TrendingUp,
   Lightbulb,
   Tag,
-  X
+  X,
+  Loader
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../context/ThemeContext';
 import FloatingAssistant from '../components/FloatingAssistant';
+import DatabaseJournalService from '../services/DatabaseJournalService';
+import SecureDeepSeekService from '../services/SecureDeepSeekService';
+import FormattedMessage from '../components/FormattedMessage';
 
 interface JournalEntry {
   id: string;
@@ -37,7 +41,7 @@ const Journal: React.FC = () => {
   const { darkMode } = useTheme();
 
   // Mood emojis mapping
-  const moodEmojis = {
+  const moodEmojis: {[key: string]: string} = {
     'excited': '🤩',
     'happy': '😊',
     'neutral': '😐',
@@ -49,17 +53,6 @@ const Journal: React.FC = () => {
     'reflective': '🤔',
     'grateful': '🙏'
   };
-
-  // Mock mood trend data (last 7 days)
-  const moodTrendData: MoodData[] = [
-    { date: '2024-01-20', mood: 'happy', value: 4 },
-    { date: '2024-01-21', mood: 'productive', value: 5 },
-    { date: '2024-01-22', mood: 'neutral', value: 3 },
-    { date: '2024-01-23', mood: 'excited', value: 5 },
-    { date: '2024-01-24', mood: 'tired', value: 2 },
-    { date: '2024-01-25', mood: 'creative', value: 4 },
-    { date: '2024-01-26', mood: 'grateful', value: 5 }
-  ];
 
   // Auto-suggestions
   const autoSuggestions = [
@@ -73,51 +66,115 @@ const Journal: React.FC = () => {
     "What distracted me the most?"
   ];
 
-  // Sample entries with more data
-  const [entries, setEntries] = useState<JournalEntry[]>([
-    {
-      id: '1',
-      date: '2024-01-26',
-      title: 'Productive Coding Session',
-      content: 'Today I completed the dashboard component for the FocusMate AI app. I found myself getting into flow state after about 25 minutes of work. The Pomodoro technique helped me maintain focus throughout the session. Really excited about the progress!',
-      mood: 'productive',
-      tags: ['coding', 'react', 'productivity', 'flow-state']
-    },
-    {
-      id: '2',
-      date: '2024-01-25',
-      title: 'Reflection on Challenges',
-      content: 'I struggled with motivation today. After analyzing my patterns, I realized I need to start with smaller tasks to build momentum before tackling the larger project requirements. This insight will help me structure my work better.',
-      mood: 'reflective',
-      tags: ['challenges', 'planning', 'self-awareness', 'motivation']
-    },
-    {
-      id: '3',
-      date: '2024-01-24',
-      title: 'Team Collaboration',
-      content: 'Had a great brainstorming session with the team today. We came up with some innovative solutions for the user interface. Feeling grateful for having such creative colleagues to work with.',
-      mood: 'grateful',
-      tags: ['teamwork', 'creativity', 'brainstorming', 'ui-design']
-    }
-  ]);
-
   // State
+  const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [currentEntry, setCurrentEntry] = useState<JournalEntry | null>(null);
+  const [saving, setSaving] = useState<boolean>(false);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [currentEntry, setCurrentEntry] = useState<string>('');
-  const [currentTitle, setCurrentTitle] = useState<string>('');
-  const [currentMood, setCurrentMood] = useState<string>('neutral');
-  const [currentTags, setCurrentTags] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedMoodFilter, setSelectedMoodFilter] = useState<string>('all');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string>('all');
   const [showCalendarFilter, setShowCalendarFilter] = useState<boolean>(false);
   const [aiInsight, setAiInsight] = useState<string>('');
   const [isGeneratingInsight, setIsGeneratingInsight] = useState<boolean>(false);
+  const [moodTrendData, setMoodTrendData] = useState<MoodData[]>([]);
+  
+  // Form state
+  const [currentTitle, setCurrentTitle] = useState<string>('');
+  const [currentMood, setCurrentMood] = useState<string>('neutral');
+  const [currentTags, setCurrentTags] = useState<string>('');
+  const [currentContent, setCurrentContent] = useState<string>('');
 
   // AI Assistant state
   const [aiMessage, setAiMessage] = useState<string>("Ready to help you reflect on your thoughts and experiences! Ask me about journaling techniques or insights.");
   const [isAiLoading, setIsAiLoading] = useState<boolean>(false);
   const [aiChatInput, setAiChatInput] = useState<string>('');
+
+  // Load entries from Firestore
+  useEffect(() => {
+    const loadEntries = async () => {
+      setLoading(true);
+      try {
+        // Get journal entries from the database
+        const dbEntries = await DatabaseJournalService.getEntries();
+        
+        // Transform entries to match our component interface
+        const formattedEntries = dbEntries.map(entry => ({
+          id: entry.id || '',
+          date: entry.createdAt.toISOString().split('T')[0],
+          content: entry.content,
+          mood: entry.mood || 'neutral',
+          tags: entry.tags || [],
+          title: entry.title || 'Journal Entry'
+        }));
+        
+        setEntries(formattedEntries);
+        
+        // Initialize form with default values
+        setCurrentTitle('');
+        setCurrentContent('');
+        setCurrentMood('neutral');
+        setCurrentTags('');
+        
+        // Generate mood trend data from the last 7 days of entries
+        generateMoodTrendData(formattedEntries);
+      } catch (error) {
+        console.error('Error loading journal entries:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    // if (user) {
+      loadEntries();
+    // }
+  }, []);
+  
+  // Generate mood trend data from entries
+  const generateMoodTrendData = (journalEntries: JournalEntry[]) => {
+    // Get last 7 days
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      return date.toISOString().split('T')[0];
+    }).reverse();
+    
+    // Map entries to days
+    const trendData: MoodData[] = last7Days.map(date => {
+      const entriesForDay = journalEntries.filter(entry => entry.date === date);
+      
+      // If there are entries for this day, use the mood of the first one
+      // Otherwise, use neutral as default
+      if (entriesForDay.length > 0) {
+        const mood = entriesForDay[0].mood;
+        const value = getMoodValue(mood);
+        return { date, mood, value };
+      }
+      
+      return { date, mood: 'neutral', value: 3 };
+    });
+    
+    setMoodTrendData(trendData);
+  };
+  
+  // Get numerical value for mood (for chart)
+  const getMoodValue = (mood: string): number => {
+    const moodValues: {[key: string]: number} = {
+      'excited': 5,
+      'happy': 4,
+      'productive': 5,
+      'creative': 4,
+      'grateful': 5,
+      'reflective': 3,
+      'neutral': 3,
+      'tired': 2,
+      'frustrated': 2,
+      'sad': 1
+    };
+    
+    return moodValues[mood] || 3; // Default to neutral (3)
+  };
 
   // Filtered entries
   const filteredEntries = entries.filter(entry => {
@@ -133,59 +190,120 @@ const Journal: React.FC = () => {
   // Get unique tags for filter
   const allTags = Array.from(new Set(entries.flatMap(entry => entry.tags)));
 
-  // Functions
-  const handleSaveEntry = () => {
-    if (!currentEntry.trim()) return;
+
+
+  // Save the current entry
+  const handleSaveEntry = async () => {
+    if (!currentContent.trim()) return;
     
-    const newEntry: JournalEntry = {
-      id: Date.now().toString(),
-      date: selectedDate,
-      title: currentTitle.trim() || `Entry ${new Date(selectedDate).toLocaleDateString()}`,
-      content: currentEntry,
-      mood: currentMood,
-      tags: currentTags.split(',').map(tag => tag.trim()).filter(tag => tag !== '')
-    };
+    setSaving(true);
+    try {
+      // Create a new entry
+      const entryId = await DatabaseJournalService.createEntry({
+        content: currentContent,
+        title: currentTitle || 'Journal Entry',
+        mood: currentMood,
+        tags: currentTags.split(',').map(tag => tag.trim()).filter(tag => tag)
+      });
+      
+      // Create the saved entry object
+      const savedEntry: JournalEntry = {
+        id: entryId,
+        date: selectedDate,
+        title: currentTitle || 'Journal Entry',
+        content: currentContent,
+        mood: currentMood,
+        tags: currentTags.split(',').map(tag => tag.trim()).filter(tag => tag)
+      };
+      
+      // Update the entries list
+      setEntries([savedEntry, ...entries]);
+      
+      // Clear the form
+      setCurrentTitle('');
+      setCurrentContent('');
+      setCurrentMood('neutral');
+      setCurrentTags('');
+      setSelectedDate(new Date().toISOString().split('T')[0]);
+    } catch (error) {
+      console.error('Error saving journal entry:', error);
+      alert('Failed to save your journal entry. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
     
-    setEntries([newEntry, ...entries]);
+    // Delete the current entry
+  const handleDeleteEntry = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this entry?')) {
+      return;
+    }
     
-    // Reset form
-    setCurrentEntry('');
-    setCurrentTitle('');
-    setCurrentMood('neutral');
-    setCurrentTags('');
+    try {
+      await DatabaseJournalService.deleteEntry(id);
+      
+      // Remove from entries list
+      const updatedEntries = entries.filter(entry => entry.id !== id);
+      setEntries(updatedEntries);
+      
+      // Keep form as is - user can continue writing new entries
+    } catch (error) {
+      console.error('Error deleting journal entry:', error);
+      alert('Failed to delete your journal entry. Please try again.');
+    }
   };
 
-  const handleDeleteEntry = (id: string) => {
-    setEntries(entries.filter(entry => entry.id !== id));
-  };
-
+  // Generate AI insight from journal entries
   const handleGenerateInsight = async () => {
     setIsGeneratingInsight(true);
     
-    // Mock AI insight generation with realistic delay
-    setTimeout(() => {
-      const insights = [
-        "Based on your recent entries, you seem most productive when you start with smaller tasks. Consider breaking larger projects into 25-minute focused sessions.",
-        "Your mood patterns show higher satisfaction on days when you practice gratitude. Try incorporating more reflection on positive experiences.",
-        "You mention 'flow state' frequently in productive sessions. Identifying your optimal work environment could help recreate these conditions.",
-        "Your entries show a pattern of breakthrough insights during collaborative work. Consider scheduling more brainstorming sessions.",
-        "You tend to be more reflective after challenging days. This self-awareness is a strength that helps you grow and improve."
-      ];
+    try {
+      if (entries.length === 0) {
+        setAiInsight("No journal entries to analyze. Create a journal entry first.");
+        return;
+      }
       
-      const randomInsight = insights[Math.floor(Math.random() * insights.length)];
-      setAiInsight(randomInsight);
+      // Take the most recent 5 entries for analysis
+      const recentEntries = entries.slice(0, 5);
+      const entryContents = recentEntries.map(entry => 
+        `[${entry.date}] ${entry.title}: ${entry.content} (Mood: ${entry.mood})`
+      ).join("\n\n");
+      
+      const response = await SecureDeepSeekService.getJournalInsights(entryContents);
+      
+      // Format the response with markdown-like structure
+      const formattedResponse = `## Journal Insights\n\n${response}`;
+      setAiInsight(formattedResponse);
+    } catch (error) {
+      console.error('Error getting AI insights:', error);
+      // Fallback content in case of error
+      setAiInsight("## Journaling Patterns\n\nI've noticed you're documenting your work sessions regularly. This consistent reflection helps identify patterns in your productivity.\n\n## Suggestions\n\n* Try adding more specific details about challenges you faced\n* Consider noting your energy levels at different times of day\n* Experiment with gratitude journaling to improve overall mindset");
+    } finally {
       setIsGeneratingInsight(false);
-    }, 2000);
+    }
   };
 
   const handleExport = () => {
     // Mock export functionality
-    console.log('Exporting journal entries...');
-    alert('Journal exported successfully! (This is a demo)');
+    const exportData = JSON.stringify(entries, null, 2);
+    const blob = new Blob([exportData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `journal_export_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    
+    URL.revokeObjectURL(url);
   };
 
   const addSuggestionToEntry = (suggestion: string) => {
-    setCurrentEntry(prev => prev ? `${prev}\n\n${suggestion} ` : `${suggestion} `);
+    if (!currentContent) {
+      setCurrentContent(suggestion + " ");
+      return;
+    }
+    
+    setCurrentContent(currentContent ? `${currentContent}\n\n${suggestion} ` : `${suggestion} `);
   };
 
   // AI Assistant handlers
@@ -193,23 +311,30 @@ const Journal: React.FC = () => {
     if (!aiChatInput.trim()) return;
     
     setIsAiLoading(true);
-    // Mock AI response
-    setTimeout(() => {
-      const responses = [
-        "That's a great question about journaling! Regular reflection can significantly improve self-awareness and goal achievement.",
-        "I notice you're interested in improving your journaling practice. Try setting a consistent time each day for reflection.",
-        "Based on journaling research, writing about both challenges and successes can lead to better emotional processing and problem-solving.",
-        "Consider using the 'Three Good Things' technique - write about three positive experiences each day and why they were meaningful."
-      ];
-      setAiMessage(responses[Math.floor(Math.random() * responses.length)]);
+    try {
+      const context = `User has ${entries.length} journal entries. Currently writing a new entry with mood "${currentMood}".`;
+      
+      const response = await SecureDeepSeekService.chat(aiChatInput, context);
+      setAiMessage(response.response);
       setAiChatInput('');
+    } catch (error) {
+      console.error('Failed to get AI response:', error);
+      setAiMessage("I'm having trouble connecting right now. Try using some of the journal prompts in the suggestions panel!");
+    } finally {
       setIsAiLoading(false);
-    }, 1500);
+    }
   };
 
   const handleGetTip = async () => {
     setIsAiLoading(true);
-    setTimeout(() => {
+    try {
+      // Get journaling tip from AI
+      const currentActivity = "journaling";
+      const tipResponse = await SecureDeepSeekService.getProductivityTip(currentActivity);
+      setAiMessage(tipResponse);
+    } catch (error) {
+      console.error('Failed to get AI tip:', error);
+      // Fallback tips
       const tips = [
         "💡 Tip: Try the 'Morning Pages' technique - write three pages of stream-of-consciousness thoughts each morning.",
         "✨ Insight: End each entry with one thing you're grateful for to boost positive emotions.",
@@ -217,8 +342,9 @@ const Journal: React.FC = () => {
         "🌱 Growth: Review your entries weekly to identify patterns and areas for improvement."
       ];
       setAiMessage(tips[Math.floor(Math.random() * tips.length)]);
+    } finally {
       setIsAiLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -632,8 +758,8 @@ const Journal: React.FC = () => {
                   Your thoughts
                 </label>
                 <textarea
-                  value={currentEntry}
-                  onChange={(e) => setCurrentEntry(e.target.value)}
+                  value={currentContent}
+                  onChange={(e) => setCurrentContent(e.target.value)}
                   placeholder="What's on your mind today? Reflect on your experiences, challenges, achievements, or insights..."
                   rows={8}
                   className={`w-full p-3 rounded-xl border transition-all resize-none ${
@@ -670,9 +796,9 @@ const Journal: React.FC = () => {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleSaveEntry}
-                disabled={!currentEntry.trim()}
+                disabled={!currentContent.trim() || saving}
                 className={`w-full py-3 rounded-xl font-medium transition-all ${
-                  currentEntry.trim()
+                  currentContent.trim() && !saving
                     ? (darkMode 
                         ? 'bg-blue-600 hover:bg-blue-700 text-white' 
                         : 'bg-blue-500 hover:bg-blue-600 text-white')
@@ -681,8 +807,17 @@ const Journal: React.FC = () => {
                         : 'bg-gray-200 text-gray-400 cursor-not-allowed')
                 }`}
               >
-                <Save className="w-5 h-5 inline mr-2" />
-                Save Entry
+                {saving ? (
+                  <div className="flex items-center justify-center">
+                    <Loader className="w-5 h-5 mr-2 animate-spin" />
+                    Saving...
+                  </div>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5 inline mr-2" />
+                    Save Entry
+                  </>
+                )}
               </motion.button>
             </motion.div>
 

@@ -18,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import FirestoreService from '../services/FirestoreService';
 import FloatingAssistant from '../components/FloatingAssistant';
 import AnimatedPage from '../components/AnimatedPage';
+import { generateTestData } from '../utils/testDataGenerator';
 
 const Stats: React.FC = () => {
   const { darkMode, toggleTheme } = useTheme();
@@ -27,6 +28,7 @@ const Stats: React.FC = () => {
   const [userTasks, setUserTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState<'overview' | 'productivity' | 'focus' | 'mood'>('overview');
+  const [isGeneratingTestData, setIsGeneratingTestData] = useState(false);
 
   // AI Assistant state
   const [aiMessage, setAiMessage] = useState<string>("Ready to analyze your productivity patterns! Ask me about your stats or request tips for improvement.");
@@ -139,20 +141,47 @@ const Stats: React.FC = () => {
               </p>
             </div>
             
-            {/* Theme Toggle */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={toggleTheme}
-              className={`p-3 rounded-xl transition-all ${
-                darkMode
-                  ? 'bg-gray-700 hover:bg-gray-600 text-yellow-400'
-                  : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
-              }`}
-              title={`Switch to ${darkMode ? 'light' : 'dark'} mode`}
-            >
-              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </motion.button>
+            <div className="flex items-center space-x-3">
+              {/* Debug: Generate Test Data */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={async () => {
+                  setIsGeneratingTestData(true);
+                  const success = await generateTestData();
+                  if (success) {
+                    // Reload analytics data
+                    const data = await analyticsService.getAnalyticsData(timePeriod);
+                    setAnalyticsData(data);
+                  }
+                  setIsGeneratingTestData(false);
+                }}
+                disabled={isGeneratingTestData}
+                className={`px-4 py-2 rounded-xl text-sm transition-all ${
+                  darkMode
+                    ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                    : 'bg-purple-500 hover:bg-purple-600 text-white'
+                } disabled:opacity-50`}
+                title="Generate test data for debugging"
+              >
+                {isGeneratingTestData ? 'Generating...' : 'Generate Test Data'}
+              </motion.button>
+              
+              {/* Theme Toggle */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={toggleTheme}
+                className={`p-3 rounded-xl transition-all ${
+                  darkMode
+                    ? 'bg-gray-700 hover:bg-gray-600 text-yellow-400'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                }`}
+                title={`Switch to ${darkMode ? 'light' : 'dark'} mode`}
+              >
+                {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </motion.button>
+            </div>
           </div>
         </div>
       </motion.header>
@@ -160,6 +189,39 @@ const Stats: React.FC = () => {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
+        {/* Data Status Indicator */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`mb-6 p-4 rounded-xl border ${
+            darkMode 
+              ? 'bg-gray-800 border-gray-700' 
+              : 'bg-blue-50 border-blue-200'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className={`font-medium ${
+                darkMode ? 'text-white' : 'text-gray-900'
+              }`}>
+                Data Collection Status
+              </h3>
+              <p className={`text-sm mt-1 ${
+                darkMode ? 'text-gray-400' : 'text-gray-600'
+              }`}>
+                Tasks: {userTasks.length} • Sessions: {totalSessions} • Focus Time: {formatMinutes(totalFocusMinutes)}
+              </p>
+            </div>
+            <div className={`px-3 py-1 rounded-full text-sm ${
+              totalSessions > 0 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-yellow-100 text-yellow-800'
+            }`}>
+              {totalSessions > 0 ? 'Data Available' : 'No Sessions Yet'}
+            </div>
+          </div>
+        </motion.div>
+
         {/* Time Period Filter */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
