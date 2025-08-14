@@ -152,7 +152,12 @@ export const generateUserAnalytics = onDocumentCreated(
 );
 
 export const aiChat = onCall(async (request) => {
-  const {message, context, model = "deepseek-chat", temperature = 1.3} = request.data;
+  const {
+    message,
+    context,
+    model = "deepseek-chat",
+    temperature = 1.3,
+  } = request.data;
 
   if (!config.deepseek.apiKey) {
     throw new Error("DeepSeek API key not configured");

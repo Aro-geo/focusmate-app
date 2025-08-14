@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, 
   CheckCircle2, 
-  Circle, 
   Play, 
   Pause, 
   Brain, 
@@ -12,22 +11,20 @@ import {
   Smile,
   Meh,
   Frown,
-  Coffee,
-  Target,
-  Clock,
   TrendingUp,
   BookOpen,
   MessageCircle,
   ArrowRight,
   Zap,
-  CalendarDays
+  Clock,
+  Target
 } from 'lucide-react';
 import useResponsive from '../hooks/useResponsive';
 import FocusMateAvatar from './FocusMateAvatar';
 
 const MobileDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { isMobile } = useResponsive();
+  useResponsive();
   const [tasks, setTasks] = useState([
     { id: 1, title: 'Review project proposal', completed: false, priority: 'high' },
     { id: 2, title: 'Update client presentation', completed: true, priority: 'medium' },
@@ -35,7 +32,7 @@ const MobileDashboard: React.FC = () => {
   ]);
   const [newTask, setNewTask] = useState('');
   const [pomodoroActive, setPomodoroActive] = useState(false);
-  const [pomodoroTime, setPomodoroTime] = useState(25 * 60);
+  const [pomodoroTime] = useState(25 * 60);
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
 
   const moods = [

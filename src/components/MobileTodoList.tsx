@@ -1,22 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, 
   CheckCircle2, 
-  Circle, 
   Trash2, 
-  Edit3, 
   Search,
-  Filter,
   Star,
   Clock,
   Flag,
   Calendar,
-  MoreVertical,
-  ArrowUp,
-  ArrowDown,
   Target,
-  X
+  X,
+  Filter
 } from 'lucide-react';
 
 interface Task {

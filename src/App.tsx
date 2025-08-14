@@ -2,8 +2,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import EnhancedDashboard from './pages/EnhancedDashboard';
+
 import Pomodoro from './pages/Pomodoro';
-import EnhancedPomodoro from './pages/EnhancedPomodoro';
 import Journal from './pages/Journal';
 import Stats from './pages/Stats';
 import Profile from './pages/Profile';
@@ -48,7 +48,7 @@ function App() {
                   <Layout>
                     <Routes>
                       <Route path="dashboard" element={<EnhancedDashboard />} />
-                      <Route path="pomodoro" element={<EnhancedPomodoro />} />
+                      <Route path="pomodoro" element={<Pomodoro />} />
                       <Route path="journal" element={<Journal />} />
                       <Route path="stats" element={<Stats />} />
                       <Route path="todos" element={<EnhancedTodoList />} />

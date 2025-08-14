@@ -1,5 +1,5 @@
 import React, { useReducer, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, 
@@ -66,9 +66,9 @@ const EnhancedDashboard: React.FC = () => {
 const EnhancedDashboardDesktop: React.FC = () => {
   const navigate = useNavigate();
   const { darkMode } = useTheme();
-  const { user, firebaseUser, isAuthenticated } = useAuth();
+  const { user, firebaseUser } = useAuth();
   const [tasks, setTasks] = React.useState<any[]>([]);
-  const [sessions, setSessions] = React.useState<any[]>([]);
+  React.useState<any[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const prefersReducedMotion = useReducedMotion();

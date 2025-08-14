@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { 
-  Calendar, 
-  FileText, 
-  Save, 
-  Trash2, 
-  PlusCircle, 
-  Brain, 
+import {
+  Calendar,
+  FileText,
+  Save,
+  Trash2,
+  PlusCircle,
+  Brain,
   Search,
   Download,
   Lightbulb,
@@ -20,6 +20,8 @@ import FloatingAssistant from '../components/FloatingAssistant';
 import SecureFirestoreService, { SecureJournalEntry } from '../services/SecureFirestoreService';
 import JournalAIService from '../services/JournalAIService';
 import JournalAttachmentService from '../services/JournalAttachmentService';
+import { exportService } from '../services/ExportService';
+import { aiJournalInsightsService, AIInsight as AIJournalInsight } from '../services/AIJournalInsightsService';
 import { useAuth } from '../context/AuthContext';
 import { Timestamp } from 'firebase/firestore';
 
@@ -49,18 +51,18 @@ const Journal: React.FC = () => {
   const { darkMode } = useTheme();
   const { user, firebaseUser, isAuthenticated } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Log authentication state to help debug
   useEffect(() => {
-    console.log('Auth state in Journal:', { 
-      userExists: !!user, 
+    console.log('Auth state in Journal:', {
+      userExists: !!user,
       firebaseUserExists: !!firebaseUser,
       isAuthenticated,
       userId: user?.id,
       firebaseUid: firebaseUser?.uid
     });
   }, [user, firebaseUser, isAuthenticated]);
-  
+
 
   // Mood emojis mapping
   const moodEmojis = {
@@ -87,7 +89,7 @@ const Journal: React.FC = () => {
     "What motivated me today?",
     "What distracted me the most?"
   ]);
-  
+
   // Entry templates
   const entryTemplates = [
     {
@@ -135,7 +137,7 @@ const Journal: React.FC = () => {
   const [showEntryTemplates, setShowEntryTemplates] = useState<boolean>(false);
   const [uploadingFile, setUploadingFile] = useState<boolean>(false);
   const [fileError, setFileError] = useState<string | null>(null);
-  
+
   // Streak tracking
   const [streak, setStreak] = useState<JournalStreak>({
     current: 0,
@@ -147,16 +149,20 @@ const Journal: React.FC = () => {
   const [aiMessage, setAiMessage] = useState<string>("Ready to help you reflect on your thoughts and experiences! Ask me about journaling techniques or insights.");
   const [isAiLoading, setIsAiLoading] = useState<boolean>(false);
   const [aiChatInput, setAiChatInput] = useState<string>('');
-  const [aiInsights, setAiInsights] = useState<any[]>([]);
+  const [aiInsights, setAiInsights] = useState<AIJournalInsight[]>([]);
+  const [isGeneratingAIInsights, setIsGeneratingAIInsights] = useState<boolean>(false);
+  const [showAIInsights, setShowAIInsights] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [showExportMenu, setShowExportMenu] = useState<boolean>(false);
 
   // Filtered entries
   const filteredEntries = entries.filter(entry => {
     const matchesSearch = entry.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        (entry.title?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                        (entry.tags && entry.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())));
+      (entry.title?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (entry.tags && entry.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())));
     const matchesMood = selectedMoodFilter === 'all' || entry.mood === selectedMoodFilter;
     const matchesTag = selectedTagFilter === 'all' || (entry.tags && entry.tags.includes(selectedTagFilter));
-    
+
     return matchesSearch && matchesMood && matchesTag;
   });
 
@@ -166,30 +172,22 @@ const Journal: React.FC = () => {
   // Load journal entries and stats
   useEffect(() => {
     if (!firebaseUser || !isAuthenticated) return;
-    
+
     const loadData = async () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         // Get journal entries
         const journalEntries = await SecureFirestoreService.getJournalEntries(firebaseUser.uid);
         setEntries(journalEntries);
-        
+
         // Get journal stats
         const journalStats = await SecureFirestoreService.getJournalStats(firebaseUser.uid);
         setStats(journalStats);
         setStreak(journalStats.streak);
-        
-        // Get AI insights
-        if (journalEntries.length > 0) {
-          const insights = await JournalAIService.analyzeJournalTrends(journalEntries);
-          setAiInsights(insights);
-          
-          // Get personalized topic suggestions
-          const suggestions = await JournalAIService.generateTopicSuggestions(journalEntries);
-          setAutoSuggestions(suggestions);
-        }
+
+        // AI insights will be generated on demand
       } catch (err) {
         console.error('Error loading journal data:', err);
         setError('Failed to load journal entries. Please try again later.');
@@ -197,7 +195,7 @@ const Journal: React.FC = () => {
         setLoading(false);
       }
     };
-    
+
     loadData();
   }, [firebaseUser, isAuthenticated]);
 
@@ -218,11 +216,11 @@ const Journal: React.FC = () => {
       setError('Please write something before saving your entry.');
       return;
     }
-    
+
     try {
       setSubmitting(true);
       setError(null);
-      
+
       // Create the journal entry object
       const newEntry: Partial<SecureJournalEntry> = {
         title: currentTitle.trim() || `Entry ${new Date().toLocaleDateString()}`,
@@ -233,27 +231,27 @@ const Journal: React.FC = () => {
         isPrivate: isPrivateEntry,
         userId: firebaseUser.uid
       };
-      
+
       // Save to database
       const entryId = await SecureFirestoreService.addJournalEntry(newEntry, firebaseUser.uid);
-      
+
       // Analyze sentiment with AI
       const fullEntry = {
         ...newEntry,
         id: entryId
       } as SecureJournalEntry;
-      
+
       await JournalAIService.updateJournalSentiment(fullEntry, firebaseUser.uid);
-      
+
       // Refresh entries
       const journalEntries = await SecureFirestoreService.getJournalEntries(firebaseUser.uid);
       setEntries(journalEntries);
-      
+
       // Update stats
       const journalStats = await SecureFirestoreService.getJournalStats(firebaseUser.uid);
       setStats(journalStats);
       setStreak(journalStats.streak);
-      
+
       // Reset form
       setCurrentEntry('');
       setCurrentTitle('');
@@ -261,7 +259,7 @@ const Journal: React.FC = () => {
       setCurrentTags('');
       setCurrentAttachments([]);
       setIsPrivateEntry(false);
-      
+
       // Show success message
       alert('Journal entry saved successfully!');
     } catch (err) {
@@ -277,18 +275,18 @@ const Journal: React.FC = () => {
     // This is a simplified mock - in real app, use NLP API
     const positiveWords = ['happy', 'great', 'excellent', 'good', 'positive', 'excited', 'productive', 'success'];
     const negativeWords = ['sad', 'bad', 'difficult', 'hard', 'negative', 'frustrated', 'tired', 'fail'];
-    
+
     let score = 0;
     const words = text.toLowerCase().split(/\W+/);
-    
+
     words.forEach(word => {
       if (positiveWords.includes(word)) score += 0.2;
       if (negativeWords.includes(word)) score -= 0.2;
     });
-    
+
     return Math.max(-1, Math.min(1, score)); // Clamp between -1 and 1
   };
-  
+
   const getSentimentAnalysis = (score: number): string => {
     if (score > 0.5) return "Very positive entry! Your writing shows enthusiasm and optimism.";
     if (score > 0.2) return "Positive tone detected. You seem to be in a good mood.";
@@ -296,11 +294,11 @@ const Journal: React.FC = () => {
     if (score > -0.5) return "Slightly negative tone. Consider reflection on what's troubling you.";
     return "Your entry seems quite negative. Consider writing about solutions or seeking support.";
   };
-  
+
   const updateStreak = (entryDate: string) => {
     const today = new Date().toISOString().split('T')[0];
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    
+
     if (entryDate === today) {
       // If last entry was yesterday, increment streak
       if (streak.lastEntryDate === yesterday) {
@@ -310,7 +308,7 @@ const Journal: React.FC = () => {
           longest: Math.max(newCurrent, streak.longest),
           lastEntryDate: today
         });
-      } 
+      }
       // If streak broken but writing today
       else if (streak.lastEntryDate !== today) {
         setStreak({
@@ -337,14 +335,14 @@ const Journal: React.FC = () => {
     if (!window.confirm('Are you sure you want to delete this journal entry? This action cannot be undone.')) {
       return;
     }
-    
+
     try {
       setLoading(true);
       setError(null);
-      
+
       // Get the entry to check for attachments
       const entryToDelete = entries.find(entry => entry.id === id);
-      
+
       // Delete any attachments from storage
       if (entryToDelete?.attachments && entryToDelete.attachments.length > 0) {
         for (const attachmentUrl of entryToDelete.attachments) {
@@ -356,18 +354,18 @@ const Journal: React.FC = () => {
           }
         }
       }
-      
+
       // Delete the entry
       await SecureFirestoreService.deleteJournalEntry(id, firebaseUser.uid);
-      
+
       // Update local state
       setEntries(entries.filter(entry => entry.id !== id));
-      
+
       // Update stats
       const journalStats = await SecureFirestoreService.getJournalStats(firebaseUser.uid);
       setStats(journalStats);
       setStreak(journalStats.streak);
-      
+
     } catch (err) {
       console.error('Error deleting journal entry:', err);
       setError('Failed to delete the journal entry. Please try again.');
@@ -388,19 +386,31 @@ const Journal: React.FC = () => {
       setError('You need to be logged in and have journal entries to generate insights.');
       return;
     }
-    
+
     try {
-      setIsGeneratingInsight(true);
+      setIsGeneratingAIInsights(true);
       setError(null);
-      
-      // Use the AI service to analyze journal trends
-      const insights = await JournalAIService.analyzeJournalTrends(entries);
+
+      // Convert entries to the format expected by AI service
+      const journalEntries = entries.map(entry => ({
+        id: entry.id || `entry-${Date.now()}-${Math.random()}`,
+        title: entry.title || '',
+        content: entry.content,
+        mood: entry.mood,
+        tags: entry.tags || [],
+        createdAt: entry.createdAt instanceof Timestamp ? entry.createdAt.toDate() : new Date(entry.createdAt),
+        updatedAt: entry.updatedAt instanceof Timestamp ? entry.updatedAt.toDate() : new Date(entry.updatedAt)
+      }));
+
+      // Generate comprehensive AI insights
+      const insights = await aiJournalInsightsService.generateInsights(journalEntries);
       setAiInsights(insights);
-      
-      // Display a random insight as the main insight
+      setShowAIInsights(true);
+
+      // Display the highest confidence insight as the main insight
       if (insights.length > 0) {
-        const randomIndex = Math.floor(Math.random() * insights.length);
-        setAiInsight(insights[randomIndex].content);
+        const topInsight = insights[0]; // Already sorted by confidence
+        setAiInsight(topInsight.description);
       } else {
         setAiInsight("Keep journaling! With more entries, I'll be able to provide deeper insights about your patterns and progress.");
       }
@@ -408,59 +418,81 @@ const Journal: React.FC = () => {
       console.error('Error generating insights:', err);
       setError('Failed to generate insights. Please try again later.');
     } finally {
-      setIsGeneratingInsight(false);
+      setIsGeneratingAIInsights(false);
     }
   };
 
-  // Export journal entries
-  const handleExport = async () => {
-    if (!firebaseUser || !isAuthenticated) {
-      console.error('Auth validation failed for export:', {
-        userExists: !!user,
-        firebaseUserExists: !!firebaseUser,
-        isAuthenticated
-      });
-      setError('You must be logged in to export entries. Please try logging in again if this persists.');
+  // Export journal entries to PDF
+  const handleExportPDF = async () => {
+    if (!firebaseUser || !isAuthenticated || entries.length === 0) {
+      setError('You must be logged in and have journal entries to export.');
       return;
     }
-    
+
     try {
-      setLoading(true);
+      setIsExporting(true);
       setError(null);
-      
-      // Get all journal entries
-      const allEntries = await SecureFirestoreService.exportJournalEntries(firebaseUser.uid);
-      
-      // Format entries for export
-      const exportData = allEntries.map(entry => ({
-        title: entry.title,
+
+      // Convert entries to the format expected by export service
+      const journalEntries = entries.map(entry => ({
+        id: entry.id,
+        title: entry.title || `Entry from ${entry.createdAt instanceof Timestamp ? entry.createdAt.toDate().toDateString() : new Date(entry.createdAt).toDateString()}`,
         content: entry.content,
         mood: entry.mood,
-        tags: entry.tags?.join(', ') || '',
-        date: entry.createdAt.toDate().toISOString().split('T')[0],
-        sentiment: entry.sentiment?.score || 'N/A',
-        sentiment_analysis: entry.sentiment?.analysis || 'N/A'
+        tags: entry.tags || [],
+        createdAt: entry.createdAt instanceof Timestamp ? entry.createdAt.toDate() : new Date(entry.createdAt),
+        updatedAt: entry.updatedAt instanceof Timestamp ? entry.updatedAt.toDate() : new Date(entry.updatedAt)
       }));
-      
-      // Convert to JSON
-      const jsonData = JSON.stringify(exportData, null, 2);
-      
-      // Create download link
-      const blob = new Blob([jsonData], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `journal_export_${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      alert('Journal exported successfully!');
+
+      const userProfile = {
+        name: user?.name || firebaseUser.displayName || 'User',
+        email: firebaseUser.email || '',
+        joinDate: new Date(firebaseUser.metadata.creationTime || Date.now())
+      };
+
+      await exportService.exportJournalToPDF(journalEntries, userProfile);
     } catch (err) {
-      console.error('Error exporting journal entries:', err);
-      setError('Failed to export journal entries. Please try again.');
+      console.error('Error exporting to PDF:', err);
+      setError('Failed to export to PDF. Please try again.');
     } finally {
-      setLoading(false);
+      setIsExporting(false);
+    }
+  };
+
+  // Export journal entries to DOCX
+  const handleExportDOCX = async () => {
+    if (!firebaseUser || !isAuthenticated || entries.length === 0) {
+      setError('You must be logged in and have journal entries to export.');
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+      setError(null);
+
+      // Convert entries to the format expected by export service
+      const journalEntries = entries.map(entry => ({
+        id: entry.id,
+        title: entry.title || `Entry from ${entry.createdAt instanceof Timestamp ? entry.createdAt.toDate().toDateString() : new Date(entry.createdAt).toDateString()}`,
+        content: entry.content,
+        mood: entry.mood,
+        tags: entry.tags || [],
+        createdAt: entry.createdAt instanceof Timestamp ? entry.createdAt.toDate() : new Date(entry.createdAt),
+        updatedAt: entry.updatedAt instanceof Timestamp ? entry.updatedAt.toDate() : new Date(entry.updatedAt)
+      }));
+
+      const userProfile = {
+        name: user?.name || firebaseUser.displayName || 'User',
+        email: firebaseUser.email || '',
+        joinDate: new Date(firebaseUser.metadata.creationTime || Date.now())
+      };
+
+      await exportService.exportJournalToDOCX(journalEntries, userProfile);
+    } catch (err) {
+      console.error('Error exporting to DOCX:', err);
+      setError('Failed to export to DOCX. Please try again.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -482,13 +514,13 @@ const Journal: React.FC = () => {
       setError('You must be logged in to add attachments. Please try logging in again if this persists.');
       return;
     }
-    
+
     // Create a file input and trigger it
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
-  
+
   // Handle file selection
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     // More detailed auth check and logging
@@ -502,29 +534,29 @@ const Journal: React.FC = () => {
       setError('You must be logged in to add attachments. Please try logging in again if this persists.');
       return;
     }
-    
+
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     try {
       setUploadingFile(true);
       setFileError(null);
-      
+
       // Check file size (limit to 5MB)
       if (file.size > 5 * 1024 * 1024) {
         setFileError('File is too large. Maximum size is 5MB.');
         return;
       }
-      
+
       console.log('Uploading file with UID:', firebaseUser.uid);
-      
+
       // Upload file to storage
       const downloadUrl = await JournalAttachmentService.uploadImage(file, firebaseUser.uid);
       console.log('File uploaded successfully, URL:', downloadUrl.substring(0, 50) + '...');
-      
+
       // Add URL to attachments
       setCurrentAttachments([...currentAttachments, downloadUrl]);
-      
+
     } catch (err) {
       console.error('Error uploading attachment:', err);
       setFileError(`Failed to upload attachment: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -540,15 +572,15 @@ const Journal: React.FC = () => {
   // AI Assistant functions
   const handleAskAI = async () => {
     if (!aiChatInput.trim()) return;
-    
+
     try {
       setIsAiLoading(true);
       setError(null);
-      
+
       // Store the user's question for reference
       const userQuestion = aiChatInput;
       setAiChatInput('');
-      
+
       // Define possible responses based on keywords in the question
       const responses = {
         journal: [
@@ -572,23 +604,23 @@ const Journal: React.FC = () => {
           "Your journal is a safe space for self-expression. There's no right or wrong way to journal - find what works best for you."
         ]
       };
-      
+
       // Determine which category the question falls into
       let category = 'default';
       if (userQuestion.toLowerCase().includes('journal')) category = 'journal';
       if (userQuestion.toLowerCase().includes('mood')) category = 'mood';
       if (userQuestion.toLowerCase().includes('productiv')) category = 'productivity';
-      
+
       // Get a random response from the appropriate category
       const categoryResponses = responses[category as keyof typeof responses];
       const randomIndex = Math.floor(Math.random() * categoryResponses.length);
-      
+
       // Simulate AI processing time
       setTimeout(() => {
         setAiMessage(categoryResponses[randomIndex]);
         setIsAiLoading(false);
       }, 1000);
-      
+
     } catch (err) {
       console.error('Error with AI assistant:', err);
       setError('Failed to process your request. Please try again.');
@@ -600,7 +632,7 @@ const Journal: React.FC = () => {
     try {
       setIsAiLoading(true);
       setError(null);
-      
+
       const tips = [
         "💡 Tip: Try the 'Morning Pages' technique - write three pages of stream-of-consciousness thoughts each morning.",
         "✨ Insight: End each entry with one thing you're grateful for to boost positive emotions.",
@@ -611,14 +643,14 @@ const Journal: React.FC = () => {
         "🔄 Reflection: Try the 'What? So What? Now What?' framework to deepen your reflections.",
         "📊 Progress: Track key metrics that matter to you (sleep, mood, energy) alongside your entries to spot correlations."
       ];
-      
+
       // Simulate AI processing time
       setTimeout(() => {
         const randomIndex = Math.floor(Math.random() * tips.length);
         setAiMessage(tips[randomIndex]);
         setIsAiLoading(false);
       }, 800);
-      
+
     } catch (err) {
       console.error('Error getting AI tip:', err);
       setError('Failed to retrieve a tip. Please try again.');
@@ -632,70 +664,117 @@ const Journal: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${
-      darkMode 
-        ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900' 
-        : 'bg-gradient-to-br from-blue-50 via-white to-indigo-50'
-    }`}>
+    <div className={`min-h-screen transition-colors duration-300 ${darkMode
+      ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900'
+      : 'bg-gradient-to-br from-blue-50 via-white to-indigo-50'
+      }`}>
       {/* Hidden file input for attachments */}
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        className="hidden" 
-        accept="image/*" 
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        accept="image/*"
         onChange={handleFileChange}
         title="Upload image attachment"
       />
-      
+
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8"
         >
           <div>
-            <h1 className={`text-4xl font-bold mb-2 ${
-              darkMode ? 'text-white' : 'text-gray-900'
-            }`}>
+            <h1 className={`text-4xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'
+              }`}>
               Reflection Journal
             </h1>
-            <p className={`text-lg ${
-              darkMode ? 'text-gray-300' : 'text-gray-600'
-            }`}>
+            <p className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-600'
+              }`}>
               Capture thoughts, track moods, and gain insights
             </p>
           </div>
-          
+
           {/* Top-right actions */}
           <div className="flex items-center space-x-3 mt-4 lg:mt-0">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowCalendarFilter(!showCalendarFilter)}
-              className={`flex items-center px-4 py-2 rounded-xl border transition-all ${
-                darkMode
-                  ? 'bg-gray-800 border-gray-700 text-gray-200 hover:bg-gray-700'
-                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
+              className={`flex items-center px-4 py-2 rounded-xl border transition-all ${darkMode
+                ? 'bg-gray-800 border-gray-700 text-gray-200 hover:bg-gray-700'
+                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
             >
               <Calendar className="w-4 h-4 mr-2" />
               Filter
             </motion.button>
-            
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleExport}
-              className={`flex items-center px-4 py-2 rounded-xl transition-all ${
-                darkMode
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                  : 'bg-blue-500 hover:bg-blue-600 text-white'
-              }`}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </motion.button>
+
+            {/* Export Dropdown */}
+            <div className="relative">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={isExporting || entries.length === 0}
+                className={`flex items-center px-4 py-2 rounded-xl transition-all ${darkMode
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-700 disabled:text-gray-400'
+                  : 'bg-blue-500 hover:bg-blue-600 text-white disabled:bg-gray-300 disabled:text-gray-500'
+                  }`}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                {isExporting ? 'Exporting...' : 'Export'}
+              </motion.button>
+
+              {/* Export Menu */}
+              <AnimatePresence>
+                {showExportMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg border z-50 ${darkMode
+                      ? 'bg-gray-800 border-gray-700'
+                      : 'bg-white border-gray-200'
+                      }`}
+                  >
+                    <button
+                      onClick={() => {
+                        handleExportPDF();
+                        setShowExportMenu(false);
+                      }}
+                      className={`w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${darkMode ? 'text-gray-200' : 'text-gray-700'
+                        }`}
+                    >
+                      <div className="flex items-center">
+                        <FileText className="w-4 h-4 mr-3 text-red-500" />
+                        <div>
+                          <div className="font-medium">Export as PDF</div>
+                          <div className="text-xs opacity-60">Formatted document</div>
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleExportDOCX();
+                        setShowExportMenu(false);
+                      }}
+                      className={`w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${darkMode ? 'text-gray-200' : 'text-gray-700'
+                        }`}
+                    >
+                      <div className="flex items-center">
+                        <FileText className="w-4 h-4 mr-3 text-blue-500" />
+                        <div>
+                          <div className="font-medium">Export as DOCX</div>
+                          <div className="text-xs opacity-60">Editable document</div>
+                        </div>
+                      </div>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </motion.div>
 
@@ -703,72 +782,66 @@ const Journal: React.FC = () => {
           {/* Left Column (8/12) */}
           <div className="lg:col-span-8 space-y-6">
             {/* Main Editor Card */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`rounded-2xl p-6 ${
-                darkMode 
-                  ? 'bg-gray-800/50 border border-gray-700' 
-                  : 'bg-white/70 border border-white/20 shadow-lg backdrop-blur-sm'
-              }`}
+              className={`rounded-2xl p-6 ${darkMode
+                ? 'bg-gray-800/50 border border-gray-700'
+                : 'bg-white/70 border border-white/20 shadow-lg backdrop-blur-sm'
+                }`}
             >
-              <h2 className={`text-2xl font-bold mb-4 ${
-                darkMode ? 'text-white' : 'text-gray-900'
-              }`}>
+              <h2 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'
+                }`}>
                 New Entry
               </h2>
-              
+
               {/* Title input */}
               <input
                 type="text"
                 value={currentTitle}
                 onChange={(e) => setCurrentTitle(e.target.value)}
                 placeholder="Entry title (optional)"
-                className={`w-full mb-4 px-4 py-3 rounded-xl border transition-all ${
-                  darkMode
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500'
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500'
-                } focus:ring-2 focus:ring-blue-500/20 focus:outline-none`}
+                className={`w-full mb-4 px-4 py-3 rounded-xl border transition-all ${darkMode
+                  ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500'
+                  : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500'
+                  } focus:ring-2 focus:ring-blue-500/20 focus:outline-none`}
               />
-              
+
               {/* Templates and Privacy Controls */}
               <div className="flex mb-4 gap-2">
                 <button
                   onClick={() => setShowEntryTemplates(!showEntryTemplates)}
-                  className={`flex items-center px-3 py-2 rounded-lg text-sm ${
-                    darkMode
-                      ? 'bg-indigo-700 hover:bg-indigo-600 text-white'
-                      : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700'
-                  }`}
+                  className={`flex items-center px-3 py-2 rounded-lg text-sm ${darkMode
+                    ? 'bg-indigo-700 hover:bg-indigo-600 text-white'
+                    : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700'
+                    }`}
                 >
                   <FileText size={16} className="mr-2" />
                   Templates
                 </button>
-                
+
                 <button
                   onClick={handleAttachment}
-                  className={`flex items-center px-3 py-2 rounded-lg text-sm ${
-                    darkMode
-                      ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                  }`}
+                  className={`flex items-center px-3 py-2 rounded-lg text-sm ${darkMode
+                    ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                    }`}
                 >
                   <PlusCircle size={16} className="mr-2" />
                   Add Image
                 </button>
-                
+
                 <button
                   onClick={() => setIsPrivateEntry(!isPrivateEntry)}
-                  className={`flex items-center ml-auto px-3 py-2 rounded-lg text-sm ${
-                    isPrivateEntry
-                      ? (darkMode ? 'bg-purple-700 text-white' : 'bg-purple-100 text-purple-700')
-                      : (darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700')
-                  }`}
+                  className={`flex items-center ml-auto px-3 py-2 rounded-lg text-sm ${isPrivateEntry
+                    ? (darkMode ? 'bg-purple-700 text-white' : 'bg-purple-100 text-purple-700')
+                    : (darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700')
+                    }`}
                 >
                   {isPrivateEntry ? 'Private 🔒' : 'Public 🌐'}
                 </button>
               </div>
-              
+
               {/* Template dropdown */}
               <AnimatePresence>
                 {showEntryTemplates && (
@@ -776,49 +849,44 @@ const Journal: React.FC = () => {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className={`mb-4 overflow-hidden rounded-xl ${
-                      darkMode ? 'bg-gray-700' : 'bg-gray-50'
-                    }`}
+                    className={`mb-4 overflow-hidden rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-gray-50'
+                      }`}
                   >
                     <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
                       {entryTemplates.map((template, index) => (
-                        <div 
+                        <div
                           key={index}
                           onClick={() => applyTemplate(template.template)}
-                          className={`cursor-pointer p-3 rounded-lg transition-all ${
-                            darkMode 
-                              ? 'bg-gray-600 hover:bg-gray-500 text-white'
-                              : 'bg-white hover:bg-gray-100 text-gray-800'
-                          }`}
+                          className={`cursor-pointer p-3 rounded-lg transition-all ${darkMode
+                            ? 'bg-gray-600 hover:bg-gray-500 text-white'
+                            : 'bg-white hover:bg-gray-100 text-gray-800'
+                            }`}
                         >
-                          <h3 className={`font-medium ${
-                            darkMode ? 'text-white' : 'text-gray-900'
-                          }`}>{template.name}</h3>
-                          <p className={`text-sm ${
-                            darkMode ? 'text-gray-300' : 'text-gray-600'
-                          }`}>{template.description}</p>
+                          <h3 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'
+                            }`}>{template.name}</h3>
+                          <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'
+                            }`}>{template.description}</p>
                         </div>
                       ))}
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
-              
+
               {/* Image attachments */}
               {currentAttachments.length > 0 && (
                 <div className="mb-4 flex flex-wrap gap-2">
                   {currentAttachments.map((url, index) => (
                     <div key={index} className="relative">
-                      <img 
-                        src={url} 
-                        alt="Attachment" 
+                      <img
+                        src={url}
+                        alt="Attachment"
                         className="w-20 h-20 object-cover rounded-lg border"
                       />
-                      <button 
+                      <button
                         onClick={() => setCurrentAttachments(currentAttachments.filter((_, i) => i !== index))}
-                        className={`absolute -top-2 -right-2 rounded-full p-1 ${
-                          darkMode ? 'bg-red-600 text-white' : 'bg-red-500 text-white'
-                        }`}
+                        className={`absolute -top-2 -right-2 rounded-full p-1 ${darkMode ? 'bg-red-600 text-white' : 'bg-red-500 text-white'
+                          }`}
                         title="Remove attachment"
                       >
                         <X size={14} />
@@ -827,12 +895,11 @@ const Journal: React.FC = () => {
                   ))}
                 </div>
               )}
-              
+
               {/* Mood selector */}
               <div className="mb-4">
-                <label className={`block mb-2 font-medium ${
-                  darkMode ? 'text-gray-200' : 'text-gray-700'
-                }`}>
+                <label className={`block mb-2 font-medium ${darkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
                   How are you feeling?
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -840,23 +907,21 @@ const Journal: React.FC = () => {
                     <button
                       key={mood}
                       onClick={() => setCurrentMood(mood)}
-                      className={`p-2 rounded-lg transition-all ${
-                        currentMood === mood
-                          ? (darkMode ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-800')
-                          : (darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200')
-                      }`}
+                      className={`p-2 rounded-lg transition-all ${currentMood === mood
+                        ? (darkMode ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-800')
+                        : (darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200')
+                        }`}
                     >
                       {emoji} <span className="ml-1 text-sm">{mood}</span>
                     </button>
                   ))}
                 </div>
               </div>
-              
+
               {/* Suggestions */}
               <div className="mb-4">
-                <label className={`block mb-2 font-medium ${
-                  darkMode ? 'text-gray-200' : 'text-gray-700'
-                }`}>
+                <label className={`block mb-2 font-medium ${darkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
                   Prompts & Suggestions
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -864,18 +929,17 @@ const Journal: React.FC = () => {
                     <button
                       key={index}
                       onClick={() => addSuggestionToEntry(suggestion)}
-                      className={`px-3 py-2 text-sm rounded-lg transition-all ${
-                        darkMode
-                          ? 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                          : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
-                      }`}
+                      className={`px-3 py-2 text-sm rounded-lg transition-all ${darkMode
+                        ? 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                        : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                        }`}
                     >
                       {suggestion.length > 25 ? suggestion.substring(0, 25) + '...' : suggestion}
                     </button>
                   ))}
                 </div>
               </div>
-              
+
               {/* Main text area */}
               <div className="mb-4">
                 <textarea
@@ -883,19 +947,17 @@ const Journal: React.FC = () => {
                   onChange={(e) => setCurrentEntry(e.target.value)}
                   placeholder="Write about your day, thoughts, or anything you'd like to reflect on..."
                   rows={8}
-                  className={`w-full px-4 py-3 rounded-xl border transition-all ${
-                    darkMode
-                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500'
-                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500'
-                  } focus:ring-2 focus:ring-blue-500/20 focus:outline-none resize-none`}
+                  className={`w-full px-4 py-3 rounded-xl border transition-all ${darkMode
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500'
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500'
+                    } focus:ring-2 focus:ring-blue-500/20 focus:outline-none resize-none`}
                 ></textarea>
               </div>
-              
+
               {/* Tags */}
               <div className="mb-4">
-                <label className={`block mb-2 font-medium ${
-                  darkMode ? 'text-gray-200' : 'text-gray-700'
-                }`}>
+                <label className={`block mb-2 font-medium ${darkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
                   Tags (comma separated)
                 </label>
                 <input
@@ -903,30 +965,28 @@ const Journal: React.FC = () => {
                   value={currentTags}
                   onChange={(e) => setCurrentTags(e.target.value)}
                   placeholder="work, ideas, goals..."
-                  className={`w-full px-4 py-3 rounded-xl border transition-all ${
-                    darkMode
-                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500'
-                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500'
-                  } focus:ring-2 focus:ring-blue-500/20 focus:outline-none`}
+                  className={`w-full px-4 py-3 rounded-xl border transition-all ${darkMode
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500'
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500'
+                    } focus:ring-2 focus:ring-blue-500/20 focus:outline-none`}
                 />
               </div>
-              
+
               {/* Error message */}
               {error && (
                 <div className="mb-4 p-3 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20">
                   {error}
                 </div>
               )}
-              
+
               {/* Button */}
               <button
                 disabled={submitting || !currentEntry.trim() || uploadingFile}
                 onClick={handleSaveEntry}
-                className={`w-full py-3 rounded-xl flex items-center justify-center transition-all ${
-                  currentEntry.trim() && !submitting && !uploadingFile
-                    ? (darkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white')
-                    : (darkMode ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-500 cursor-not-allowed')
-                }`}
+                className={`w-full py-3 rounded-xl flex items-center justify-center transition-all ${currentEntry.trim() && !submitting && !uploadingFile
+                  ? (darkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white')
+                  : (darkMode ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-500 cursor-not-allowed')
+                  }`}
               >
                 {submitting ? (
                   <>
@@ -944,36 +1004,33 @@ const Journal: React.FC = () => {
                 )}
               </button>
             </motion.div>
-            
+
             {/* AI Insights Card */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className={`rounded-2xl p-6 ${
-                darkMode 
-                  ? 'bg-gray-800/50 border border-gray-700' 
-                  : 'bg-white/70 border border-white/20 shadow-lg backdrop-blur-sm'
-              }`}
+              className={`rounded-2xl p-6 ${darkMode
+                ? 'bg-gray-800/50 border border-gray-700'
+                : 'bg-white/70 border border-white/20 shadow-lg backdrop-blur-sm'
+                }`}
             >
               <div className="flex items-center justify-between mb-4">
-                <h2 className={`text-2xl font-bold ${
-                  darkMode ? 'text-white' : 'text-gray-900'
-                }`}>
-                  <Brain className="inline-block mr-2 text-purple-500" /> 
+                <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'
+                  }`}>
+                  <Brain className="inline-block mr-2 text-purple-500" />
                   AI Insights
                 </h2>
-                
+
                 <button
                   onClick={handleGenerateInsight}
-                  disabled={isGeneratingInsight}
-                  className={`flex items-center px-3 py-2 rounded-lg text-sm transition-all ${
-                    darkMode
-                      ? 'bg-purple-700 hover:bg-purple-600 text-white'
-                      : 'bg-purple-500 hover:bg-purple-600 text-white'
-                  }`}
+                  disabled={isGeneratingAIInsights || entries.length === 0}
+                  className={`flex items-center px-3 py-2 rounded-lg text-sm transition-all ${darkMode
+                    ? 'bg-purple-700 hover:bg-purple-600 text-white disabled:bg-gray-700 disabled:text-gray-400'
+                    : 'bg-purple-500 hover:bg-purple-600 text-white disabled:bg-gray-300 disabled:text-gray-500'
+                    }`}
                 >
-                  {isGeneratingInsight ? (
+                  {isGeneratingAIInsights ? (
                     <>
                       <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -983,80 +1040,149 @@ const Journal: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      <Lightbulb className="w-4 h-4 mr-2" />
-                      Generate Insight
+                      <Brain className="w-4 h-4 mr-2" />
+                      Generate AI Insights
                     </>
                   )}
                 </button>
               </div>
-              
+
               {aiInsight ? (
-                <div className={`p-4 rounded-xl ${
-                  darkMode ? 'bg-purple-900/20' : 'bg-purple-50'
-                } border ${
-                  darkMode ? 'border-purple-900/30' : 'border-purple-100'
-                }`}>
-                  <div className={`flex mb-2 ${
-                    darkMode ? 'text-purple-300' : 'text-purple-500'
+                <div className={`p-4 rounded-xl ${darkMode ? 'bg-purple-900/20' : 'bg-purple-50'
+                  } border ${darkMode ? 'border-purple-900/30' : 'border-purple-100'
                   }`}>
+                  <div className={`flex mb-2 ${darkMode ? 'text-purple-300' : 'text-purple-500'
+                    }`}>
                     <Lightbulb className="w-5 h-5 mr-2 flex-shrink-0" />
-                    <h3 className={`font-medium ${
-                      darkMode ? 'text-purple-300' : 'text-purple-800'
-                    }`}>Journal Insight</h3>
+                    <h3 className={`font-medium ${darkMode ? 'text-purple-300' : 'text-purple-800'
+                      }`}>Journal Insight</h3>
                   </div>
-                  <p className={`${
-                    darkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <p className={`${darkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
                     {aiInsight}
                   </p>
                 </div>
               ) : (
-                <div className={`p-4 rounded-xl ${
-                  darkMode ? 'bg-gray-700' : 'bg-gray-50'
-                } border ${
-                  darkMode ? 'border-gray-600' : 'border-gray-200'
-                }`}>
+                <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-gray-50'
+                  } border ${darkMode ? 'border-gray-600' : 'border-gray-200'
+                  }`}>
                   <div className="flex justify-center items-center py-4">
-                    <p className={`text-center ${
-                      darkMode ? 'text-gray-400' : 'text-gray-500'
-                    }`}>
-                      {entries.length === 0 
-                        ? "Start journaling to receive AI-powered insights about your entries." 
+                    <p className={`text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'
+                      }`}>
+                      {entries.length === 0
+                        ? "Start journaling to receive AI-powered insights about your entries."
                         : "Click 'Generate Insight' to get AI analysis of your journal entries."}
                     </p>
                   </div>
                 </div>
               )}
+
+              {/* Comprehensive AI Insights */}
+              <AnimatePresence>
+                {showAIInsights && aiInsights.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-4 space-y-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <h3 className={`font-semibold ${darkMode ? 'text-purple-300' : 'text-purple-800'
+                        }`}>
+                        Detailed Insights ({aiInsights.length})
+                      </h3>
+                      <button
+                        onClick={() => setShowAIInsights(false)}
+                        className={`p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 ${darkMode ? 'text-gray-400' : 'text-gray-500'
+                          }`}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {aiInsights.map((insight, index) => (
+                        <motion.div
+                          key={insight.id}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          className={`p-3 rounded-lg border ${darkMode
+                            ? 'bg-gray-800/50 border-gray-700'
+                            : 'bg-white/50 border-gray-200'
+                            }`}
+                        >
+                          <div className="flex items-start space-x-2">
+                            <div className={`p-1 rounded-full ${insight.type === 'emotion' ? 'bg-pink-100 dark:bg-pink-900/30' :
+                              insight.type === 'pattern' ? 'bg-blue-100 dark:bg-blue-900/30' :
+                                insight.type === 'growth' ? 'bg-green-100 dark:bg-green-900/30' :
+                                  insight.type === 'suggestion' ? 'bg-yellow-100 dark:bg-yellow-900/30' :
+                                    'bg-gray-100 dark:bg-gray-700'
+                              }`}>
+                              {insight.type === 'emotion' && <span className="text-pink-600 dark:text-pink-400">💭</span>}
+                              {insight.type === 'pattern' && <span className="text-blue-600 dark:text-blue-400">🔍</span>}
+                              {insight.type === 'growth' && <span className="text-green-600 dark:text-green-400">🌱</span>}
+                              {insight.type === 'suggestion' && <span className="text-yellow-600 dark:text-yellow-400">💡</span>}
+                              {insight.type === 'concern' && <span className="text-red-600 dark:text-red-400">⚠️</span>}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between mb-1">
+                                <h4 className={`font-medium text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'
+                                  }`}>
+                                  {insight.title}
+                                </h4>
+                                <span className={`text-xs px-2 py-1 rounded-full ${insight.confidence > 0.8 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                  insight.confidence > 0.6 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                    'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
+                                  }`}>
+                                  {Math.round(insight.confidence * 100)}%
+                                </span>
+                              </div>
+                              <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'
+                                }`}>
+                                {insight.description}
+                              </p>
+                              {insight.actionable && (
+                                <div className={`mt-2 p-2 rounded text-xs ${darkMode ? 'bg-indigo-900/30 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
+                                  }`}>
+                                  <strong>Action:</strong> {insight.actionable}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           </div>
 
           {/* Right Column (4/12) */}
           <div className="lg:col-span-4 space-y-6">
             {/* Filters Card */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              className={`rounded-2xl p-6 ${
-                darkMode 
-                  ? 'bg-gray-800/50 border border-gray-700' 
-                  : 'bg-white/70 border border-white/20 shadow-lg backdrop-blur-sm'
-              }`}
+              className={`rounded-2xl p-6 ${darkMode
+                ? 'bg-gray-800/50 border border-gray-700'
+                : 'bg-white/70 border border-white/20 shadow-lg backdrop-blur-sm'
+                }`}
             >
               {/* Search Bar */}
               <div className="relative mb-4">
-                <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
-                  darkMode ? 'text-gray-400' : 'text-gray-500'
-                }`} />
+                <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'
+                  }`} />
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search entries, tags, or content..."
-                  className={`w-full pl-10 pr-4 py-3 rounded-xl border transition-all ${
-                    darkMode
-                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500'
-                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500'
-                  } focus:ring-2 focus:ring-blue-500/20 focus:outline-none`}
+                  className={`w-full pl-10 pr-4 py-3 rounded-xl border transition-all ${darkMode
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500'
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500'
+                    } focus:ring-2 focus:ring-blue-500/20 focus:outline-none`}
                 />
               </div>
 
@@ -1067,11 +1193,10 @@ const Journal: React.FC = () => {
                   value={selectedMoodFilter}
                   onChange={(e) => setSelectedMoodFilter(e.target.value)}
                   title="Filter by mood"
-                  className={`px-3 py-2 rounded-lg border text-sm ${
-                    darkMode
-                      ? 'bg-gray-700 border-gray-600 text-white'
-                      : 'bg-white border-gray-300 text-gray-900'
-                  }`}
+                  className={`px-3 py-2 rounded-lg border text-sm ${darkMode
+                    ? 'bg-gray-700 border-gray-600 text-white'
+                    : 'bg-white border-gray-300 text-gray-900'
+                    }`}
                 >
                   <option value="all">All Moods</option>
                   {Object.keys(moodEmojis).map(mood => (
@@ -1086,11 +1211,10 @@ const Journal: React.FC = () => {
                   value={selectedTagFilter}
                   onChange={(e) => setSelectedTagFilter(e.target.value)}
                   title="Filter by tag"
-                  className={`px-3 py-2 rounded-lg border text-sm ${
-                    darkMode
-                      ? 'bg-gray-700 border-gray-600 text-white'
-                      : 'bg-white border-gray-300 text-gray-900'
-                  }`}
+                  className={`px-3 py-2 rounded-lg border text-sm ${darkMode
+                    ? 'bg-gray-700 border-gray-600 text-white'
+                    : 'bg-white border-gray-300 text-gray-900'
+                    }`}
                 >
                   <option value="all">All Tags</option>
                   {allTags.map((tag: string) => (
@@ -1106,11 +1230,10 @@ const Journal: React.FC = () => {
                       setSelectedMoodFilter('all');
                       setSelectedTagFilter('all');
                     }}
-                    className={`flex items-center px-3 py-2 rounded-lg text-sm transition-all ${
-                      darkMode
-                        ? 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                        : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
-                    }`}
+                    className={`flex items-center px-3 py-2 rounded-lg text-sm transition-all ${darkMode
+                      ? 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                      }`}
                   >
                     <X className="w-4 h-4 mr-1" />
                     Clear
@@ -1120,76 +1243,65 @@ const Journal: React.FC = () => {
             </motion.div>
 
             {/* Streak Stats */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 }}
-              className={`rounded-2xl p-6 ${
-                darkMode 
-                  ? 'bg-gray-800/50 border border-gray-700' 
-                  : 'bg-white/70 border border-white/20 shadow-lg backdrop-blur-sm'
-              }`}
+              className={`rounded-2xl p-6 ${darkMode
+                ? 'bg-gray-800/50 border border-gray-700'
+                : 'bg-white/70 border border-white/20 shadow-lg backdrop-blur-sm'
+                }`}
             >
               <div className="flex items-center justify-between mb-4">
-                <h2 className={`text-2xl font-bold ${
-                  darkMode ? 'text-white' : 'text-gray-900'
-                }`}>
+                <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'
+                  }`}>
                   Journal Streak
                 </h2>
-                
-                <div className={`flex items-center px-3 py-1 rounded-full ${
-                  darkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-100 text-blue-700'
-                }`}>
+
+                <div className={`flex items-center px-3 py-1 rounded-full ${darkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-100 text-blue-700'
+                  }`}>
                   <span className="text-sm font-medium">{streak.current} day{streak.current !== 1 ? 's' : ''}</span>
                 </div>
               </div>
-              
-              <div className={`p-4 rounded-xl mb-4 ${
-                darkMode ? 'bg-gray-700' : 'bg-gray-50'
-              }`}>
+
+              <div className={`p-4 rounded-xl mb-4 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'
+                }`}>
                 <div className="flex justify-between mb-2">
-                  <span className={`text-sm ${
-                    darkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>Current Streak</span>
-                  <span className={`font-semibold ${
-                    darkMode ? 'text-white' : 'text-gray-900'
-                  }`}>{streak.current} day{streak.current !== 1 ? 's' : ''}</span>
+                  <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'
+                    }`}>Current Streak</span>
+                  <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'
+                    }`}>{streak.current} day{streak.current !== 1 ? 's' : ''}</span>
                 </div>
-                
+
                 <div className="flex justify-between">
-                  <span className={`text-sm ${
-                    darkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>Longest Streak</span>
-                  <span className={`font-semibold ${
-                    darkMode ? 'text-white' : 'text-gray-900'
-                  }`}>{streak.longest} day{streak.longest !== 1 ? 's' : ''}</span>
+                  <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'
+                    }`}>Longest Streak</span>
+                  <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'
+                    }`}>{streak.longest} day{streak.longest !== 1 ? 's' : ''}</span>
                 </div>
               </div>
-              
-              <p className={`text-sm ${
-                darkMode ? 'text-gray-400' : 'text-gray-500'
-              }`}>
+
+              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'
+                }`}>
                 Write daily to build your streak and develop a consistent journaling habit!
               </p>
             </motion.div>
-            
+
             {/* Past Entries */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
-              className={`rounded-2xl p-6 ${
-                darkMode 
-                  ? 'bg-gray-800/50 border border-gray-700' 
-                  : 'bg-white/70 border border-white/20 shadow-lg backdrop-blur-sm'
-              }`}
+              className={`rounded-2xl p-6 ${darkMode
+                ? 'bg-gray-800/50 border border-gray-700'
+                : 'bg-white/70 border border-white/20 shadow-lg backdrop-blur-sm'
+                }`}
             >
-              <h2 className={`text-2xl font-bold mb-4 ${
-                darkMode ? 'text-white' : 'text-gray-900'
-              }`}>
+              <h2 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'
+                }`}>
                 Past Entries
               </h2>
-              
+
               {loading ? (
                 <div className="flex justify-center py-8">
                   <svg className="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1206,90 +1318,81 @@ const Journal: React.FC = () => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, height: 0 }}
-                        className={`p-4 rounded-xl ${
-                          darkMode
-                            ? 'bg-gray-700 hover:bg-gray-650'
-                            : 'bg-white hover:bg-gray-50'
-                        } border ${
-                          darkMode ? 'border-gray-600' : 'border-gray-200'
-                        } transition-all`}
+                        className={`p-4 rounded-xl ${darkMode
+                          ? 'bg-gray-700 hover:bg-gray-650'
+                          : 'bg-white hover:bg-gray-50'
+                          } border ${darkMode ? 'border-gray-600' : 'border-gray-200'
+                          } transition-all`}
                       >
                         <div className="flex justify-between items-start mb-2">
-                          <h3 className={`font-medium ${
-                            darkMode ? 'text-white' : 'text-gray-900'
-                          }`}>
+                          <h3 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'
+                            }`}>
                             {entry.title}
                           </h3>
                           <div className="flex items-center">
                             <span className="mr-2">{moodEmojis[entry.mood as keyof typeof moodEmojis]}</span>
                             <button
                               onClick={() => entry.id && handleDeleteEntry(entry.id)}
-                              className={`p-1 rounded-lg text-sm transition-all ${
-                                darkMode
-                                  ? 'hover:bg-red-500/20 text-red-400 hover:text-red-300'
-                                  : 'hover:bg-red-100 text-red-500'
-                              }`}
+                              className={`p-1 rounded-lg text-sm transition-all ${darkMode
+                                ? 'hover:bg-red-500/20 text-red-400 hover:text-red-300'
+                                : 'hover:bg-red-100 text-red-500'
+                                }`}
                               title="Delete entry"
                             >
                               <Trash2 size={16} />
                             </button>
                           </div>
                         </div>
-                        
-                        <p className={`mb-4 leading-relaxed ${
-                          darkMode ? 'text-gray-300' : 'text-gray-700'
-                        }`}>
+
+                        <p className={`mb-4 leading-relaxed ${darkMode ? 'text-gray-300' : 'text-gray-700'
+                          }`}>
                           {entry.content}
                         </p>
-                        
+
                         {/* Attachments */}
                         {entry.attachments && entry.attachments.length > 0 && (
                           <div className="mb-3 flex flex-wrap gap-2">
                             {entry.attachments.map((url, imgIndex) => (
-                              <img 
-                                key={imgIndex} 
-                                src={url} 
-                                alt="Attachment" 
+                              <img
+                                key={imgIndex}
+                                src={url}
+                                alt="Attachment"
                                 className="w-16 h-16 object-cover rounded-lg border"
                               />
                             ))}
                           </div>
                         )}
-                        
+
                         {/* Tags */}
                         {entry.tags && entry.tags.length > 0 && (
                           <div className="mb-3 flex flex-wrap gap-1">
                             {entry.tags.map((tag, tagIndex) => (
-                              <span 
+                              <span
                                 key={tagIndex}
-                                className={`text-xs px-2 py-1 rounded-full ${
-                                  darkMode 
-                                    ? 'bg-gray-600 text-gray-300' 
-                                    : 'bg-gray-100 text-gray-700'
-                                }`}
+                                className={`text-xs px-2 py-1 rounded-full ${darkMode
+                                  ? 'bg-gray-600 text-gray-300'
+                                  : 'bg-gray-100 text-gray-700'
+                                  }`}
                               >
                                 #{tag}
                               </span>
                             ))}
                           </div>
                         )}
-                        
+
                         {/* Sentiment Analysis */}
                         {entry.sentiment && entry.sentiment.analysis && (
-                          <div className={`text-xs pt-2 border-t ${
-                            darkMode ? 'border-gray-600 text-gray-400' : 'border-gray-200 text-gray-500'
-                          }`}>
+                          <div className={`text-xs pt-2 border-t ${darkMode ? 'border-gray-600 text-gray-400' : 'border-gray-200 text-gray-500'
+                            }`}>
                             <div className="flex items-center">
-                              <span className={`inline-block w-2 h-2 rounded-full mr-2 ${
-                                entry.sentiment.score > 0.2
-                                  ? 'bg-green-500'
-                                  : entry.sentiment.score < -0.2
-                                    ? 'bg-red-500'
-                                    : 'bg-yellow-500'
-                              }`}></span>
-                              <span className={`text-xs ${
-                                darkMode ? 'text-gray-400' : 'text-gray-600'
-                              }`}>
+                              <span className={`inline-block w-2 h-2 rounded-full mr-2 ${entry.sentiment.score > 0.2
+                                ? 'bg-green-500'
+                                : entry.sentiment.score < -0.2
+                                  ? 'bg-red-500'
+                                  : 'bg-yellow-500'
+                                }`}></span>
+                              <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'
+                                }`}>
                                 {entry.sentiment.analysis}
                               </span>
                             </div>
@@ -1300,18 +1403,15 @@ const Journal: React.FC = () => {
                   </AnimatePresence>
 
                   {filteredEntries.length === 0 && (
-                    <div className={`p-6 rounded-xl text-center ${
-                      darkMode ? 'bg-gray-700' : 'bg-gray-50'
-                    }`}>
-                      <p className={`mb-2 font-medium ${
-                        darkMode ? 'text-gray-300' : 'text-gray-600'
+                    <div className={`p-6 rounded-xl text-center ${darkMode ? 'bg-gray-700' : 'bg-gray-50'
                       }`}>
+                      <p className={`mb-2 font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'
+                        }`}>
                         No entries found
                       </p>
-                      <p className={`text-sm ${
-                        darkMode ? 'text-gray-400' : 'text-gray-500'
-                      }`}>
-                        {entries.length === 0 
+                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'
+                        }`}>
+                        {entries.length === 0
                           ? "Start journaling to see your entries here!"
                           : "Try adjusting your filters to see more entries."}
                       </p>
@@ -1323,7 +1423,7 @@ const Journal: React.FC = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Floating AI Assistant */}
       <FloatingAssistant
         isAiLoading={isAiLoading}

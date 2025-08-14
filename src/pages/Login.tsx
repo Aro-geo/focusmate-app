@@ -53,28 +53,28 @@ const Login: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
     setIsLoading(true);
     setErrors({}); // Clear previous errors
-    
+
     try {
       const success = await login(formData.email, formData.password);
-      
+
       if (success) {
-        console.log('Login successful, navigating to dashboard...');
+        // Login successful, navigating to dashboard
         navigate('/app/dashboard');
       } else {
-        setErrors({ 
+        setErrors({
           general: 'Invalid email or password. Please try again.'
         });
       }
     } catch (error: any) {
       console.error('Login error:', error);
-      setErrors({ 
+      setErrors({
         general: error.message || 'An error occurred during login. Please try again.'
       });
     } finally {
@@ -83,7 +83,7 @@ const Login: React.FC = () => {
   };
 
   return (
-    <motion.div 
+    <motion.div
       className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-800 dark:from-gray-900 dark:via-gray-800 dark:to-black flex items-center justify-center p-4"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -92,34 +92,34 @@ const Login: React.FC = () => {
       {/* Background Pattern */}
       <div className="absolute inset-0 bg-black opacity-20 dark:opacity-40"></div>
       <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.15)_1px,transparent_0)] bg-[length:20px_20px]"></div>
-      
+
       {/* Login Card */}
-      <motion.div 
+      <motion.div
         className="relative z-10 w-full max-w-md"
         initial={{ y: 50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.2 }}
       >
-        <motion.div 
+        <motion.div
           className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/20 dark:border-gray-700/50"
           whileHover={{ y: -5 }}
           transition={{ duration: 0.3 }}
         >
           {/* Logo and Header */}
-          <motion.div 
+          <motion.div
             className="text-center mb-8"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.4 }}
           >
-            <motion.div 
+            <motion.div
               className="inline-flex items-center justify-center w-16 h-16 mb-4"
               whileHover={{ scale: 1.1, rotate: 5 }}
               transition={{ duration: 0.3 }}
             >
               <FocusMateAvatar size="xl" animated />
             </motion.div>
-            <motion.h1 
+            <motion.h1
               className="text-3xl font-bold text-gray-900 dark:text-white mb-2"
               initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -127,7 +127,7 @@ const Login: React.FC = () => {
             >
               Welcome Back
             </motion.h1>
-            <motion.p 
+            <motion.p
               className="text-gray-600 dark:text-gray-400"
               initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -138,8 +138,8 @@ const Login: React.FC = () => {
           </motion.div>
 
           {/* Login Form */}
-          <motion.form 
-            onSubmit={handleSubmit} 
+          <motion.form
+            onSubmit={handleSubmit}
             className="space-y-6"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -147,7 +147,7 @@ const Login: React.FC = () => {
           >
             {/* General Error */}
             {errors.general && (
-              <motion.div 
+              <motion.div
                 className="bg-red-50 dark:bg-red-900/50 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm"
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -166,7 +166,7 @@ const Login: React.FC = () => {
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Email Address
               </label>
-              <motion.div 
+              <motion.div
                 className="relative"
                 whileFocus={{ scale: 1.02 }}
                 transition={{ duration: 0.2 }}
@@ -182,14 +182,13 @@ const Login: React.FC = () => {
                   required
                   value={formData.email}
                   onChange={handleInputChange}
-                  className={`block w-full pl-10 pr-3 py-3 border ${
-                    errors.email ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
-                  } rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200`}
+                  className={`block w-full pl-10 pr-3 py-3 border ${errors.email ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
+                    } rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200`}
                   placeholder="Enter your email"
                 />
               </motion.div>
               {errors.email && (
-                <motion.p 
+                <motion.p
                   className="mt-1 text-sm text-red-600 dark:text-red-400"
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -209,7 +208,7 @@ const Login: React.FC = () => {
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Password
               </label>
-              <motion.div 
+              <motion.div
                 className="relative"
                 whileFocus={{ scale: 1.02 }}
                 transition={{ duration: 0.2 }}
@@ -225,9 +224,8 @@ const Login: React.FC = () => {
                   required
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={`block w-full pl-10 pr-12 py-3 border ${
-                    errors.password ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
-                  } rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200`}
+                  className={`block w-full pl-10 pr-12 py-3 border ${errors.password ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
+                    } rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200`}
                   placeholder="Enter your password"
                 />
                 <motion.button
@@ -245,7 +243,7 @@ const Login: React.FC = () => {
                 </motion.button>
               </motion.div>
               {errors.password && (
-                <motion.p 
+                <motion.p
                   className="mt-1 text-sm text-red-600 dark:text-red-400"
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -257,7 +255,7 @@ const Login: React.FC = () => {
             </motion.div>
 
             {/* Remember Me & Forgot Password */}
-            <motion.div 
+            <motion.div
               className="flex items-center justify-between"
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
@@ -302,9 +300,8 @@ const Login: React.FC = () => {
             <motion.button
               type="submit"
               disabled={isLoading}
-              className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 ${
-                isLoading ? 'opacity-75 cursor-not-allowed' : ''
-              }`}
+              className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 ${isLoading ? 'opacity-75 cursor-not-allowed' : ''
+                }`}
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 1.1 }}
@@ -326,7 +323,7 @@ const Login: React.FC = () => {
           </motion.form>
 
           {/* Google Sign In */}
-          <motion.div 
+          <motion.div
             className="mt-6"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -364,17 +361,17 @@ const Login: React.FC = () => {
               whileTap={{ scale: 0.98 }}
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
               </svg>
               Continue with Google
             </motion.button>
           </motion.div>
 
           {/* Sign Up Link */}
-          <motion.div 
+          <motion.div
             className="mt-6 text-center"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -395,7 +392,7 @@ const Login: React.FC = () => {
         </motion.div>
 
         {/* Footer */}
-        <motion.div 
+        <motion.div
           className="text-center mt-8"
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}

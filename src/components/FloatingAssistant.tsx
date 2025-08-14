@@ -4,9 +4,7 @@ import {
   Brain, 
   MessageCircle, 
   Lightbulb, 
-  Minimize2, 
-  Maximize2, 
-  X,
+  Minimize2,
   Loader,
   Send
 } from 'lucide-react';

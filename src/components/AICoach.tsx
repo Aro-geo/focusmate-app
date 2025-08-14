@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, ChevronRight, X, MessageSquare, Brain } from 'lucide-react';
+import { Zap, X, MessageSquare, Brain } from 'lucide-react';
 import { aiFocusCoachService, FocusInsight } from '../services/AIFocusCoachService';
 import { useAuth } from '../context/AuthContext';
 

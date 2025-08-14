@@ -10,7 +10,9 @@ import useResponsive from '../hooks/useResponsive';
 import DatabasePomodoroService from '../services/DatabasePomodoroService';
 import { useAuth } from '../context/AuthContext';
 import AICoach from '../components/AICoach';
+import EnhancedAICoach from '../components/EnhancedAICoach';
 import { aiFocusCoachService } from '../services/AIFocusCoachService';
+import { enhancedAIFocusCoachService } from '../services/EnhancedAIFocusCoachService';
 import '../styles/EnhancedPomodoro.css';
 
 // Types
@@ -46,7 +48,7 @@ interface Session {
 const EnhancedPomodoro: React.FC = () => {
   const { darkMode } = useTheme();
   const { isMobile } = useResponsive();
-  
+
   // Use mobile-optimized component for mobile devices
   if (isMobile) {
     return <MobilePomodoro />;
@@ -69,7 +71,7 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
     soundEnabled: true,
     dailyGoal: 8
   });
-  
+
   // Timer State
   const [timeRemaining, setTimeRemaining] = useState<number>(settings.workDuration * 60);
   const [isActive, setIsActive] = useState<boolean>(false);
@@ -80,7 +82,7 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
   const [cycles, setCycles] = useState<number>(0);
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
-  
+
   // Task Management
   const [selectedTask, setSelectedTask] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([
@@ -90,25 +92,25 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
     { id: 4, text: "Code review" }
   ]);
   const [customTask, setCustomTask] = useState<string>("");
-  
+
   // Session Data
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [sessionHistory, setSessionHistory] = useState<Session[]>([]);
   const [currentStreak, setCurrentStreak] = useState<number>(0);
   const [longestStreak, setLongestStreak] = useState<number>(0);
-  
+
   // UI Controls
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [showSessionHistory, setShowSessionHistory] = useState<boolean>(false);
   const [showDistractionModal, setShowDistractionModal] = useState<boolean>(false);
   const [showNotesModal, setShowNotesModal] = useState<boolean>(false);
-  const [selectedSessionNotes, setSelectedSessionNotes] = useState<{notes: string | null, task: string | null} | null>(null);
-  
+  const [selectedSessionNotes, setSelectedSessionNotes] = useState<{ notes: string | null, task: string | null } | null>(null);
+
   // Distractions & Notes
   const [distractions, setDistractions] = useState<Distraction[]>([]);
-  const [currentDistraction, setCurrentDistraction] = useState<{type: string; notes: string}>({ type: '', notes: '' });
+  const [currentDistraction, setCurrentDistraction] = useState<{ type: string; notes: string }>({ type: '', notes: '' });
   const [sessionNotes, setSessionNotes] = useState<string>("");
-  
+
   // Performance Stats
   const [sessionStats, setSessionStats] = useState<{
     today: number;
@@ -121,12 +123,12 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
     month: 0,
     total: 0
   });
-  
+
   // AI Assistant state
   const [aiMessage, setAiMessage] = useState<string>("Ready to focus? Select a task and let's get started with a productive Pomodoro session!");
   const [isAiLoading, setIsAiLoading] = useState<boolean>(false);
   const [aiChatInput, setAiChatInput] = useState<string>('');
-  
+
   // Refs
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const { user } = useAuth();
@@ -188,9 +190,9 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
             distractions: [],
             timestamp: session.startTime.getTime()
           }));
-          
+
           setSessionHistory(formattedSessions);
-          
+
           // Calculate stats
           calculateStats(formattedSessions);
         }
@@ -198,7 +200,7 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
         console.error('Error loading session history:', error);
       }
     };
-    
+
     loadSessionHistory();
   }, []);
 
@@ -213,9 +215,9 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
           console.error('Error loading tasks:', error);
         }
       };
-      
+
       loadTasks();
-      
+
       // Initialize AI Focus Coach
       aiFocusCoachService.loadUserData(user.id);
     }
@@ -228,11 +230,11 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
     weekAgo.setDate(weekAgo.getDate() - 7);
     const monthAgo = new Date(today);
     monthAgo.setMonth(monthAgo.getMonth() - 1);
-    
+
     const todaySessions = sessions.filter(s => new Date(s.startTime) >= today);
     const weekSessions = sessions.filter(s => new Date(s.startTime) >= weekAgo);
     const monthSessions = sessions.filter(s => new Date(s.startTime) >= monthAgo);
-    
+
     setSessionStats({
       today: todaySessions.length,
       week: weekSessions.length,
@@ -246,16 +248,16 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
       setIsActive(true);
       setIsPaused(false);
       setSessionStartTime(new Date());
-      
+
       // Create current session
       if (!currentSession) {
         setCurrentSession({
           task: selectedTask,
           startTime: new Date(),
           endTime: null,
-          duration: mode === 'work' ? settings.workDuration : 
-                    mode === 'shortBreak' ? settings.shortBreakDuration : 
-                    settings.longBreakDuration,
+          duration: mode === 'work' ? settings.workDuration :
+            mode === 'shortBreak' ? settings.shortBreakDuration :
+              settings.longBreakDuration,
           mode,
           mood: null,
           feedback: null,
@@ -265,7 +267,7 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
           timestamp: Date.now()
         });
       }
-      
+
       // Get AI feedback
       if (mode === 'work') {
         generateAIMessage('session-start');
@@ -284,28 +286,28 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
 
   const resetTimer = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    
+
     setIsActive(false);
     setIsPaused(false);
-    
+
     // Reset time based on current mode
-    const duration = mode === 'work' ? settings.workDuration : 
-                   mode === 'shortBreak' ? settings.shortBreakDuration : 
-                   settings.longBreakDuration;
+    const duration = mode === 'work' ? settings.workDuration :
+      mode === 'shortBreak' ? settings.shortBreakDuration :
+        settings.longBreakDuration;
     setTimeRemaining(duration * 60);
-    
+
     // Reset current session
     setCurrentSession(null);
     setSessionStartTime(null);
     setDistractions([]);
-    
+
     generateAIMessage('reset');
   };
 
   const skipToNextMode = () => {
     let nextMode: PomodoroMode;
     let nextDuration: number;
-    
+
     if (mode === 'work') {
       // If we've completed a full set of cycles, take a long break
       if ((cycles + 1) % settings.longBreakInterval === 0) {
@@ -315,7 +317,7 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
         nextMode = 'shortBreak';
         nextDuration = settings.shortBreakDuration;
       }
-      
+
       // Increment completed sessions and cycles
       if (isActive) {
         setCompletedSessions(prev => prev + 1);
@@ -325,22 +327,22 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
       nextMode = 'work';
       nextDuration = settings.workDuration;
     }
-    
+
     setMode(nextMode);
     setTimeRemaining(nextDuration * 60);
-    
+
     if (isActive) {
       completeSession();
     }
-    
+
     // Auto-start next session if setting is enabled
-    if ((nextMode === 'work' && settings.autoStartPomodoros) || 
-        (nextMode !== 'work' && settings.autoStartBreaks)) {
+    if ((nextMode === 'work' && settings.autoStartPomodoros) ||
+      (nextMode !== 'work' && settings.autoStartBreaks)) {
       setTimeout(() => {
         setIsActive(true);
         setIsPaused(false);
         setSessionStartTime(new Date());
-        
+
         // Create new session for work mode
         if (nextMode === 'work') {
           setCurrentSession({
@@ -363,15 +365,15 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
       setIsPaused(false);
       setCurrentSession(null);
     }
-    
+
     generateAIMessage(nextMode === 'work' ? 'work-start' : 'break-start');
   };
 
   const completeSession = async () => {
     if (!currentSession || !isActive) return;
-    
+
     if (intervalRef.current) clearInterval(intervalRef.current);
-    
+
     // Update current session
     const endTime = new Date();
     const sessionData = {
@@ -379,9 +381,9 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
       endTime,
       completed: true
     };
-    
+
     setCurrentSession(sessionData);
-    
+
     // Track completed session in AI Focus Coach
     if (mode === 'work') {
       aiFocusCoachService.trackCompletedSession({
@@ -390,13 +392,22 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
         notes: sessionNotes,
         taskName: currentSession.task || undefined
       });
+
+      // Also update the enhanced AI coach with session data
+      await enhancedAIFocusCoachService.updateUserProfile({
+        completed: true,
+        distractions: distractionTypes,
+        timeOfDay: getTimeOfDay(),
+        duration: currentSession.duration,
+        taskType: currentSession.task || undefined
+      });
     }
-    
+
     // Save session to history if it's a work session
     if (mode === 'work') {
       // Update total focus time
       setTotalFocusTime(prev => prev + currentSession.duration);
-      
+
       // Open feedback modal for work sessions
       if (!settings.autoStartBreaks) {
         // In a full implementation, we would show a modal for feedback
@@ -419,10 +430,10 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
 
   const generateAIMessage = async (context: string) => {
     setIsAiLoading(true);
-    
+
     try {
       let message: string;
-      
+
       // Get message from AI Focus Coach
       switch (context) {
         case 'session-start':
@@ -443,7 +454,7 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
         default:
           message = aiFocusCoachService.generateCoachMessage('encouragement');
       }
-      
+
       setAiMessage(message);
     } catch (error) {
       console.error('Error generating AI message:', error);
@@ -455,24 +466,32 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
 
   const handleAddDistraction = (distractionType: string) => {
     if (!currentSession) return;
-    
+
     const newDistraction: Distraction = {
       type: distractionType,
       notes: currentDistraction.notes,
       timestamp: Date.now()
     };
-    
+
     setDistractions(prev => [...prev, newDistraction]);
-    
+
     // Track distraction in AI Focus Coach
     aiFocusCoachService.trackDistraction(distractionType);
-    
+
+    // Also update enhanced AI coach
+    enhancedAIFocusCoachService.updateUserProfile({
+      completed: false,
+      distractions: [distractionType],
+      timeOfDay: getTimeOfDay(),
+      duration: 0
+    });
+
     // Reset current distraction
     setCurrentDistraction({ type: '', notes: '' });
-    
+
     // Close modal
     setShowDistractionModal(false);
-    
+
     // Resume timer if paused
     if (isPaused) {
       setIsPaused(false);
@@ -489,13 +508,13 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
         pauseTimer();
       }
     }
-    
+
     // Ctrl+Left = reset
     if (e.code === 'ArrowLeft' && e.ctrlKey) {
       e.preventDefault();
       resetTimer();
     }
-    
+
     // Ctrl+Right = skip
     if (e.code === 'ArrowRight' && e.ctrlKey) {
       e.preventDefault();
@@ -505,9 +524,9 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
 
   const handleAdjustTimer = (newDuration: number) => {
     if (isActive) return; // Don't adjust during active session
-    
+
     const currentMode = mode;
-    
+
     if (currentMode === 'work') {
       setSettings(prev => ({ ...prev, workDuration: newDuration }));
     } else if (currentMode === 'shortBreak') {
@@ -515,14 +534,14 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
     } else {
       setSettings(prev => ({ ...prev, longBreakDuration: newDuration }));
     }
-    
+
     setTimeRemaining(newDuration * 60);
-    
+
     // Save settings
     localStorage.setItem('pomodoroSettings', JSON.stringify({
       ...settings,
-      [currentMode === 'work' ? 'workDuration' : 
-       currentMode === 'shortBreak' ? 'shortBreakDuration' : 'longBreakDuration']: newDuration
+      [currentMode === 'work' ? 'workDuration' :
+        currentMode === 'shortBreak' ? 'shortBreakDuration' : 'longBreakDuration']: newDuration
     }));
   };
 
@@ -531,8 +550,8 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
     const sessionDate = new Date(session.startTime);
     const today = new Date();
     return sessionDate.getDate() === today.getDate() &&
-           sessionDate.getMonth() === today.getMonth() &&
-           sessionDate.getFullYear() === today.getFullYear();
+      sessionDate.getMonth() === today.getMonth() &&
+      sessionDate.getFullYear() === today.getFullYear();
   }).length;
 
   // Get current mode duration for AI Coach
@@ -545,8 +564,16 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
   // Extract distraction types for AI Coach
   const distractionTypes = distractions.map(d => d.type);
 
+  // Helper function to get time of day
+  const getTimeOfDay = (): string => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'morning';
+    if (hour < 17) return 'afternoon';
+    return 'evening';
+  };
+
   return (
-    <div 
+    <div
       className={`flex flex-col h-full p-4 ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-800'}`}
       onKeyDown={handleKeyboardControl}
       tabIndex={0}
@@ -560,7 +587,7 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                 <LucideIcons.Timer className="h-5 w-5" />
                 <h2 className="text-xl font-bold">Enhanced Pomodoro Timer</h2>
               </div>
-              <button 
+              <button
                 onClick={() => setShowSettings(!showSettings)}
                 className={`p-2 rounded-full ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'}`}
                 aria-label="Settings"
@@ -568,92 +595,87 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                 <LucideIcons.Settings className="h-5 w-5" />
               </button>
             </div>
-            
+
             {/* Mode Selector */}
             <div className="flex justify-center mb-6">
               <div className={`grid grid-cols-3 rounded-lg overflow-hidden ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
-                <button 
+                <button
                   onClick={() => {
                     if (!isActive) {
                       setMode('work');
                       setTimeRemaining(settings.workDuration * 60);
                     }
                   }}
-                  className={`px-4 py-2 text-center ${
-                    mode === 'work' 
-                      ? darkMode 
-                        ? 'bg-indigo-600 text-white' 
+                  className={`px-4 py-2 text-center ${mode === 'work'
+                      ? darkMode
+                        ? 'bg-indigo-600 text-white'
                         : 'bg-indigo-500 text-white'
                       : ''
-                  }`}
+                    }`}
                 >
                   Pomodoro
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     if (!isActive) {
                       setMode('shortBreak');
                       setTimeRemaining(settings.shortBreakDuration * 60);
                     }
                   }}
-                  className={`px-4 py-2 text-center ${
-                    mode === 'shortBreak' 
-                      ? darkMode 
-                        ? 'bg-green-600 text-white' 
+                  className={`px-4 py-2 text-center ${mode === 'shortBreak'
+                      ? darkMode
+                        ? 'bg-green-600 text-white'
                         : 'bg-green-500 text-white'
                       : ''
-                  }`}
+                    }`}
                 >
                   Short Break
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     if (!isActive) {
                       setMode('longBreak');
                       setTimeRemaining(settings.longBreakDuration * 60);
                     }
                   }}
-                  className={`px-4 py-2 text-center ${
-                    mode === 'longBreak' 
-                      ? darkMode 
-                        ? 'bg-blue-600 text-white' 
+                  className={`px-4 py-2 text-center ${mode === 'longBreak'
+                      ? darkMode
+                        ? 'bg-blue-600 text-white'
                         : 'bg-blue-500 text-white'
                       : ''
-                  }`}
+                    }`}
                 >
                   Long Break
                 </button>
               </div>
             </div>
-            
+
             {/* Timer Display */}
             <div className="text-center mb-8">
-              <div className={`font-mono text-6xl font-bold mb-4 ${
-                mode === 'work' 
-                  ? 'text-indigo-500' 
-                  : mode === 'shortBreak' 
-                    ? 'text-green-500' 
+              <div className={`font-mono text-6xl font-bold mb-4 ${mode === 'work'
+                  ? 'text-indigo-500'
+                  : mode === 'shortBreak'
+                    ? 'text-green-500'
                     : 'text-blue-500'
-              }`}>
+                }`}>
                 {formatTime(timeRemaining)}
               </div>
-              
+
               {/* Task Display */}
               {selectedTask && (
                 <div className="text-lg mb-4 opacity-75">
                   Current Task: <span className="font-medium">{selectedTask}</span>
                 </div>
               )}
-              
+
               {/* Controls */}
               <div className="flex justify-center space-x-4">
                 {/* Start/Pause Button */}
                 {(!isActive || isPaused) ? (
                   <button
                     onClick={startTimer}
-                    className={`flex items-center justify-center p-3 rounded-full ${
-                      darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-500 hover:bg-indigo-600'
-                    } text-white shadow`}
+                    className={`flex items-center justify-center p-3 rounded-full ${darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-500 hover:bg-indigo-600'
+                      } text-white shadow`}
                     aria-label="Start timer"
                   >
                     <LucideIcons.Play className="h-6 w-6" />
@@ -661,50 +683,46 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                 ) : (
                   <button
                     onClick={pauseTimer}
-                    className={`flex items-center justify-center p-3 rounded-full ${
-                      darkMode ? 'bg-amber-600 hover:bg-amber-700' : 'bg-amber-500 hover:bg-amber-600'
-                    } text-white shadow`}
+                    className={`flex items-center justify-center p-3 rounded-full ${darkMode ? 'bg-amber-600 hover:bg-amber-700' : 'bg-amber-500 hover:bg-amber-600'
+                      } text-white shadow`}
                     aria-label="Pause timer"
                   >
                     <LucideIcons.Pause className="h-6 w-6" />
                   </button>
                 )}
-                
+
                 {/* Reset Button */}
                 <button
                   onClick={resetTimer}
-                  className={`flex items-center justify-center p-3 rounded-full ${
-                    darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-300 hover:bg-gray-400'
-                  } shadow`}
+                  className={`flex items-center justify-center p-3 rounded-full ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-300 hover:bg-gray-400'
+                    } shadow`}
                   disabled={!isActive && timeRemaining === (
-                    mode === 'work' 
-                      ? settings.workDuration 
-                      : mode === 'shortBreak' 
-                        ? settings.shortBreakDuration 
+                    mode === 'work'
+                      ? settings.workDuration
+                      : mode === 'shortBreak'
+                        ? settings.shortBreakDuration
                         : settings.longBreakDuration
                   ) * 60}
                   aria-label="Reset timer"
                 >
                   <LucideIcons.RotateCcw className="h-6 w-6" />
                 </button>
-                
+
                 {/* Skip Button */}
                 <button
                   onClick={skipToNextMode}
-                  className={`flex items-center justify-center p-3 rounded-full ${
-                    darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-300 hover:bg-gray-400'
-                  } shadow`}
+                  className={`flex items-center justify-center p-3 rounded-full ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-300 hover:bg-gray-400'
+                    } shadow`}
                   aria-label="Skip to next session"
                 >
                   <LucideIcons.SkipForward className="h-6 w-6" />
                 </button>
-                
+
                 {/* Sound Toggle */}
                 <button
                   onClick={() => setSoundEnabled(!soundEnabled)}
-                  className={`flex items-center justify-center p-3 rounded-full ${
-                    darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-300 hover:bg-gray-400'
-                  } shadow`}
+                  className={`flex items-center justify-center p-3 rounded-full ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-300 hover:bg-gray-400'
+                    } shadow`}
                   aria-label={soundEnabled ? "Mute sound" : "Enable sound"}
                 >
                   {soundEnabled ? (
@@ -715,18 +733,17 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                 </button>
               </div>
             </div>
-            
+
             {/* Session Counter */}
             <div className="flex justify-center items-center mb-4">
               <div className="flex items-center space-x-1">
                 {[...Array(settings.longBreakInterval)].map((_, index) => (
-                  <div 
+                  <div
                     key={index}
-                    className={`w-3 h-3 rounded-full ${
-                      index < (cycles % settings.longBreakInterval)
+                    className={`w-3 h-3 rounded-full ${index < (cycles % settings.longBreakInterval)
                         ? 'bg-indigo-500'
                         : darkMode ? 'bg-gray-700' : 'bg-gray-300'
-                    }`}
+                      }`}
                     aria-hidden="true"
                   />
                 ))}
@@ -735,7 +752,7 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                 {cycles % settings.longBreakInterval} / {settings.longBreakInterval} sessions
               </div>
             </div>
-            
+
             {/* Settings Panel */}
             <AnimatePresence>
               {showSettings && (
@@ -760,15 +777,14 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                           onChange={(e) => {
                             const value = parseInt(e.target.value);
                             if (isNaN(value) || value < 1) return;
-                            
+
                             setSettings(prev => ({ ...prev, workDuration: value }));
                             if (mode === 'work' && !isActive) {
                               setTimeRemaining(value * 60);
                             }
                           }}
-                          className={`w-full px-3 py-2 rounded ${
-                            darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'
-                          }`}
+                          className={`w-full px-3 py-2 rounded ${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'
+                            }`}
                           aria-label="Set pomodoro duration in minutes"
                         />
                       </div>
@@ -784,15 +800,14 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                           onChange={(e) => {
                             const value = parseInt(e.target.value);
                             if (isNaN(value) || value < 1) return;
-                            
+
                             setSettings(prev => ({ ...prev, shortBreakDuration: value }));
                             if (mode === 'shortBreak' && !isActive) {
                               setTimeRemaining(value * 60);
                             }
                           }}
-                          className={`w-full px-3 py-2 rounded ${
-                            darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'
-                          }`}
+                          className={`w-full px-3 py-2 rounded ${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'
+                            }`}
                           aria-label="Set short break duration in minutes"
                         />
                       </div>
@@ -808,15 +823,14 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                           onChange={(e) => {
                             const value = parseInt(e.target.value);
                             if (isNaN(value) || value < 1) return;
-                            
+
                             setSettings(prev => ({ ...prev, longBreakDuration: value }));
                             if (mode === 'longBreak' && !isActive) {
                               setTimeRemaining(value * 60);
                             }
                           }}
-                          className={`w-full px-3 py-2 rounded ${
-                            darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'
-                          }`}
+                          className={`w-full px-3 py-2 rounded ${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'
+                            }`}
                           aria-label="Set long break duration in minutes"
                         />
                       </div>
@@ -832,12 +846,11 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                           onChange={(e) => {
                             const value = parseInt(e.target.value);
                             if (isNaN(value) || value < 1) return;
-                            
+
                             setSettings(prev => ({ ...prev, longBreakInterval: value }));
                           }}
-                          className={`w-full px-3 py-2 rounded ${
-                            darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'
-                          }`}
+                          className={`w-full px-3 py-2 rounded ${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'
+                            }`}
                           aria-label="Set number of pomodoros before a long break"
                         />
                       </div>
@@ -853,12 +866,11 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                           onChange={(e) => {
                             const value = parseInt(e.target.value);
                             if (isNaN(value) || value < 1) return;
-                            
+
                             setSettings(prev => ({ ...prev, dailyGoal: value }));
                           }}
-                          className={`w-full px-3 py-2 rounded ${
-                            darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'
-                          }`}
+                          className={`w-full px-3 py-2 rounded ${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'
+                            }`}
                           aria-label="Set daily goal in number of pomodoros"
                         />
                       </div>
@@ -891,9 +903,8 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                           localStorage.setItem('pomodoroSettings', JSON.stringify(settings));
                           setShowSettings(false);
                         }}
-                        className={`px-4 py-2 rounded ${
-                          darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-500 hover:bg-indigo-600'
-                        } text-white`}
+                        className={`px-4 py-2 rounded ${darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-500 hover:bg-indigo-600'
+                          } text-white`}
                         aria-label="Save settings"
                       >
                         Save Settings
@@ -904,7 +915,7 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
               )}
             </AnimatePresence>
           </div>
-          
+
           {/* Task Selection */}
           <div className={`rounded-lg p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-lg mb-4`}>
             <div className="flex justify-between items-center mb-4">
@@ -924,25 +935,23 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                   }
                 }}
                 disabled={!customTask.trim()}
-                className={`p-2 rounded-full ${
-                  customTask.trim() ? (darkMode ? 'bg-green-600 hover:bg-green-700' : 'bg-green-500 hover:bg-green-600') : 
-                  (darkMode ? 'bg-gray-700 cursor-not-allowed' : 'bg-gray-300 cursor-not-allowed')
-                } text-white`}
+                className={`p-2 rounded-full ${customTask.trim() ? (darkMode ? 'bg-green-600 hover:bg-green-700' : 'bg-green-500 hover:bg-green-600') :
+                    (darkMode ? 'bg-gray-700 cursor-not-allowed' : 'bg-gray-300 cursor-not-allowed')
+                  } text-white`}
                 aria-label="Add new task"
               >
                 <LucideIcons.Plus className="h-4 w-4" />
               </button>
             </div>
-            
+
             <div className="mb-4">
               <input
                 type="text"
                 value={customTask}
                 onChange={(e) => setCustomTask(e.target.value)}
                 placeholder="Add a new task..."
-                className={`w-full px-3 py-2 rounded ${
-                  darkMode ? 'bg-gray-700 text-white placeholder-gray-400' : 'bg-gray-100 text-gray-800 placeholder-gray-500'
-                }`}
+                className={`w-full px-3 py-2 rounded ${darkMode ? 'bg-gray-700 text-white placeholder-gray-400' : 'bg-gray-100 text-gray-800 placeholder-gray-500'
+                  }`}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && customTask.trim()) {
                     const newTask = {
@@ -956,20 +965,19 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                 aria-label="Enter a new task"
               />
             </div>
-            
+
             <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
               {tasks.map(task => (
-                <div 
-                  key={task.id} 
-                  className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${
-                    selectedTask === task.text
-                      ? darkMode 
-                        ? 'bg-indigo-600 text-white' 
+                <div
+                  key={task.id}
+                  className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${selectedTask === task.text
+                      ? darkMode
+                        ? 'bg-indigo-600 text-white'
                         : 'bg-indigo-100 text-indigo-800'
-                      : darkMode 
-                        ? 'bg-gray-700 hover:bg-gray-600' 
+                      : darkMode
+                        ? 'bg-gray-700 hover:bg-gray-600'
                         : 'bg-gray-100 hover:bg-gray-200'
-                  }`}
+                    }`}
                   onClick={() => setSelectedTask(task.text)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -986,7 +994,7 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                   )}
                 </div>
               ))}
-              
+
               {tasks.length === 0 && (
                 <div className={`p-3 text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                   No tasks added yet. Add a task to get started.
@@ -994,14 +1002,14 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
               )}
             </div>
           </div>
-          
+
           {/* Stats Section */}
           <div className={`rounded-lg p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-lg`}>
             <div className="flex items-center gap-2 mb-4">
               <LucideIcons.Zap className="h-5 w-5" />
               <h3 className="text-lg font-semibold">Your Progress</h3>
             </div>
-            
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
               <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
                 <div className="text-sm opacity-75">Today</div>
@@ -1020,7 +1028,7 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                 <div className="text-2xl font-bold">{sessionStats.total}</div>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2 mb-2">
               <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                 Current Streak: <span className="font-semibold">{currentStreak}</span> days
@@ -1029,7 +1037,7 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                 Longest Streak: <span className="font-semibold">{longestStreak}</span> days
               </div>
             </div>
-            
+
             <div className="mt-4">
               <div className="flex justify-between items-center mb-2">
                 <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
@@ -1040,7 +1048,7 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                 </div>
               </div>
               <div className={`w-full h-2 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
-                                  <div 
+                <div
                   className={`progress-bar h-2 rounded-full`}
                   style={{ width: `${Math.min(100, (completedSessions / settings.dailyGoal) * 100)}%` }}
                   role="progressbar"
@@ -1050,24 +1058,26 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
             </div>
           </div>
         </div>
-        
+
         {/* Right Sidebar with AI Coach */}
         <div className="w-1/3 flex flex-col gap-4">
-          <AICoach
+          <EnhancedAICoach
             isActive={isActive}
             isPaused={isPaused}
             mode={mode}
             duration={getCurrentDuration()}
+            timeRemaining={timeRemaining}
             cycles={cycles}
             todayPomodoros={todayPomodoros}
             distractions={distractionTypes}
+            currentTask={selectedTask || undefined}
             onAddDistraction={handleAddDistraction}
             onAdjustTimer={handleAdjustTimer}
             onStartSession={startTimer}
             darkMode={darkMode}
             className="flex-1"
           />
-          
+
           {/* Session History */}
           <div className={`rounded-lg p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-lg`}>
             <div className="flex justify-between items-center mb-4">
@@ -1075,14 +1085,14 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                 <LucideIcons.History className="h-5 w-5" />
                 <h3 className="text-lg font-semibold">Recent Sessions</h3>
               </div>
-              <button 
+              <button
                 onClick={() => setShowSessionHistory(!showSessionHistory)}
                 className={`text-sm ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}
               >
                 {showSessionHistory ? 'Hide' : 'View All'}
               </button>
             </div>
-            
+
             <AnimatePresence>
               {showSessionHistory ? (
                 <motion.div
@@ -1096,8 +1106,8 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                     {sessionHistory.length > 0 ? (
                       <div className="space-y-3">
                         {sessionHistory.slice(0, 10).map((session, index) => (
-                          <div 
-                            key={session.id || index} 
+                          <div
+                            key={session.id || index}
                             className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}
                           >
                             <div className="flex justify-between items-start">
@@ -1106,25 +1116,24 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                                   {session.task || 'Unnamed Session'}
                                 </div>
                                 <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                                  {new Date(session.startTime).toLocaleString(undefined, { 
-                                    month: 'short', 
-                                    day: 'numeric', 
-                                    hour: '2-digit', 
-                                    minute: '2-digit' 
+                                  {new Date(session.startTime).toLocaleString(undefined, {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
                                   })}
                                 </div>
                               </div>
-                              <div className={`text-sm font-medium ${
-                                session.mode === 'work' 
-                                  ? 'text-indigo-500' 
-                                  : session.mode === 'shortBreak' 
-                                    ? 'text-green-500' 
+                              <div className={`text-sm font-medium ${session.mode === 'work'
+                                  ? 'text-indigo-500'
+                                  : session.mode === 'shortBreak'
+                                    ? 'text-green-500'
                                     : 'text-blue-500'
-                              }`}>
+                                }`}>
                                 {session.duration} min
                               </div>
                             </div>
-                            
+
                             {(session.notes || (session.distractions && session.distractions.length > 0)) && (
                               <button
                                 onClick={() => {
@@ -1153,8 +1162,8 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
               ) : (
                 <div className="space-y-3">
                   {sessionHistory.slice(0, 3).map((session, index) => (
-                    <div 
-                      key={session.id || index} 
+                    <div
+                      key={session.id || index}
                       className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}
                     >
                       <div className="flex justify-between items-center">
@@ -1163,27 +1172,26 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                             {session.task || 'Unnamed Session'}
                           </div>
                           <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                            {new Date(session.startTime).toLocaleString(undefined, { 
-                              month: 'short', 
-                              day: 'numeric', 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
+                            {new Date(session.startTime).toLocaleString(undefined, {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
                             })}
                           </div>
                         </div>
-                        <div className={`text-sm font-medium ${
-                          session.mode === 'work' 
-                            ? 'text-indigo-500' 
-                            : session.mode === 'shortBreak' 
-                              ? 'text-green-500' 
+                        <div className={`text-sm font-medium ${session.mode === 'work'
+                            ? 'text-indigo-500'
+                            : session.mode === 'shortBreak'
+                              ? 'text-green-500'
                               : 'text-blue-500'
-                        }`}>
+                          }`}>
                           {session.duration} min
                         </div>
                       </div>
                     </div>
                   ))}
-                  
+
                   {sessionHistory.length === 0 && (
                     <div className={`p-3 text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                       No session history yet. Complete a session to see it here.
@@ -1195,7 +1203,7 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
           </div>
         </div>
       </div>
-      
+
       {/* Modals */}
       {/* Distraction Modal */}
       <AnimatePresence>
@@ -1214,7 +1222,7 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
             >
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold">Log a Distraction</h3>
-                <button 
+                <button
                   onClick={() => setShowDistractionModal(false)}
                   className={`p-1 rounded-full ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'}`}
                   aria-label="Close dialog"
@@ -1222,7 +1230,7 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                   <LucideIcons.X className="h-5 w-5" />
                 </button>
               </div>
-              
+
               <div className="mb-4">
                 <label className="block mb-2 text-sm font-medium">
                   What distracted you?
@@ -1232,50 +1240,46 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                     <button
                       key={type}
                       onClick={() => setCurrentDistraction(prev => ({ ...prev, type }))}
-                      className={`p-2 rounded text-sm ${
-                        currentDistraction.type === type
+                      className={`p-2 rounded text-sm ${currentDistraction.type === type
                           ? darkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-800'
                           : darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'
-                      }`}
+                        }`}
                     >
                       {type}
                     </button>
                   ))}
                 </div>
-                
+
                 <input
                   type="text"
                   placeholder="Or type your own..."
-                  value={currentDistraction.type !== '' && !['Social Media', 'Notification', 'Colleague', 'Thoughts', 'Hunger', 'Noise'].includes(currentDistraction.type) 
-                    ? currentDistraction.type 
+                  value={currentDistraction.type !== '' && !['Social Media', 'Notification', 'Colleague', 'Thoughts', 'Hunger', 'Noise'].includes(currentDistraction.type)
+                    ? currentDistraction.type
                     : ''}
                   onChange={(e) => setCurrentDistraction(prev => ({ ...prev, type: e.target.value }))}
-                  className={`w-full px-3 py-2 rounded mb-4 ${
-                    darkMode ? 'bg-gray-700 text-white placeholder-gray-400' : 'bg-gray-100 text-gray-800 placeholder-gray-500'
-                  }`}
+                  className={`w-full px-3 py-2 rounded mb-4 ${darkMode ? 'bg-gray-700 text-white placeholder-gray-400' : 'bg-gray-100 text-gray-800 placeholder-gray-500'
+                    }`}
                   aria-label="Enter a custom distraction type"
                 />
-                
+
                 <label className="block mb-2 text-sm font-medium">
                   Additional notes (optional)
                 </label>
                 <textarea
                   value={currentDistraction.notes}
                   onChange={(e) => setCurrentDistraction(prev => ({ ...prev, notes: e.target.value }))}
-                  className={`w-full px-3 py-2 rounded h-24 resize-none ${
-                    darkMode ? 'bg-gray-700 text-white placeholder-gray-400' : 'bg-gray-100 text-gray-800 placeholder-gray-500'
-                  }`}
+                  className={`w-full px-3 py-2 rounded h-24 resize-none ${darkMode ? 'bg-gray-700 text-white placeholder-gray-400' : 'bg-gray-100 text-gray-800 placeholder-gray-500'
+                    }`}
                   placeholder="What happened? How might you prevent this in the future?"
                   aria-label="Additional notes about the distraction"
                 />
               </div>
-              
+
               <div className="flex justify-end">
                 <button
                   onClick={() => setShowDistractionModal(false)}
-                  className={`px-4 py-2 rounded mr-2 ${
-                    darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'
-                  }`}
+                  className={`px-4 py-2 rounded mr-2 ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'
+                    }`}
                   aria-label="Cancel"
                 >
                   Cancel
@@ -1283,11 +1287,10 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                 <button
                   onClick={() => handleAddDistraction(currentDistraction.type || 'Other')}
                   disabled={!currentDistraction.type}
-                  className={`px-4 py-2 rounded ${
-                    currentDistraction.type
+                  className={`px-4 py-2 rounded ${currentDistraction.type
                       ? darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-500 hover:bg-indigo-600'
                       : darkMode ? 'bg-gray-700 cursor-not-allowed' : 'bg-gray-300 cursor-not-allowed'
-                  } text-white`}
+                    } text-white`}
                   aria-label="Log distraction"
                 >
                   Log Distraction
@@ -1297,7 +1300,7 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
           </motion.div>
         )}
       </AnimatePresence>
-      
+
       {/* Notes Modal */}
       <AnimatePresence>
         {showNotesModal && selectedSessionNotes && (
@@ -1315,7 +1318,7 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
             >
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold">Session Notes</h3>
-                <button 
+                <button
                   onClick={() => setShowNotesModal(false)}
                   className={`p-1 rounded-full ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'}`}
                   aria-label="Close dialog"
@@ -1323,10 +1326,10 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                   <LucideIcons.X className="h-5 w-5" />
                 </button>
               </div>
-              
+
               <div className="mb-4">
                 <div className="font-medium mb-2">{selectedSessionNotes.task || 'Unnamed Session'}</div>
-                
+
                 <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} mb-4`}>
                   {selectedSessionNotes.notes ? (
                     <p className="whitespace-pre-wrap">{selectedSessionNotes.notes}</p>
@@ -1335,13 +1338,12 @@ const EnhancedPomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) 
                   )}
                 </div>
               </div>
-              
+
               <div className="flex justify-end">
                 <button
                   onClick={() => setShowNotesModal(false)}
-                  className={`px-4 py-2 rounded ${
-                    darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-500 hover:bg-indigo-600'
-                  } text-white`}
+                  className={`px-4 py-2 rounded ${darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-500 hover:bg-indigo-600'
+                    } text-white`}
                   aria-label="Close"
                 >
                   Close

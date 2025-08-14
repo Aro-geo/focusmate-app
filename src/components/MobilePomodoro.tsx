@@ -8,7 +8,6 @@ import {
   Settings, 
   Coffee,
   Brain,
-  Timer,
   Target,
   Trophy,
   TrendingUp,

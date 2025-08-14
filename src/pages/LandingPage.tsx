@@ -2,10 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Brain, 
- 
- 
   Shield, 
- 
   Target, 
   BarChart3, 
   Users, 
@@ -14,14 +11,22 @@ import {
   Sparkles,
   Timer,
   BookOpen,
-  TrendingUp
+  TrendingUp,
+  Smartphone,
+  Monitor,
+  Zap,
+  CheckCircle,
+  MessageCircle,
+  Award
 } from 'lucide-react';
-// import { Link } from 'react-router-dom';
 import FloatingAuthModal from '../components/FloatingAuthModal';
 import { FocusMateAvatar } from '../components/FocusMateAvatar';
+import Navigation from '../components/Navigation';
+import { useTheme } from '../context/ThemeContext';
 
 const LandingPage: React.FC = () => {
   const [authModal, setAuthModal] = useState<{ isOpen: boolean; mode: 'signin' | 'signup' }>({ isOpen: false, mode: 'signin' });
+  const { darkMode } = useTheme();
   
   // Check if user was redirected after logout
   React.useEffect(() => {
@@ -93,8 +98,14 @@ const LandingPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
+      {/* Navigation */}
+      <Navigation 
+        onSignIn={() => setAuthModal({ isOpen: true, mode: 'signin' })}
+        onGetStarted={() => setAuthModal({ isOpen: true, mode: 'signup' })}
+        darkMode={darkMode}
+      />
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900/20">
+      <section className="relative overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900/20 pt-16">
         <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
           <motion.div
@@ -154,7 +165,7 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-24 bg-gray-50 dark:bg-gray-800">
+      <section id="features" className="py-24 bg-gray-50 dark:bg-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -193,6 +204,145 @@ const LandingPage: React.FC = () => {
               </motion.div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Mobile App Section */}
+      <section id="how-it-works" className="py-24 bg-white dark:bg-gray-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+            className="text-center mb-16"
+          >
+            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Available Everywhere You Work
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+              Access FocusMate AI on all your devices. Seamlessly sync your progress across web, mobile, and desktop.
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16">
+            {/* Web App */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              viewport={{ once: true }}
+              className="text-center p-8 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-800 dark:to-gray-700 rounded-2xl"
+            >
+              <div className="w-16 h-16 bg-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <Monitor className="h-8 w-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                Web Application
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-6">
+                Full-featured experience in your browser. No downloads required.
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <span className="px-3 py-1 bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full text-sm">Chrome</span>
+                <span className="px-3 py-1 bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full text-sm">Safari</span>
+                <span className="px-3 py-1 bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full text-sm">Firefox</span>
+              </div>
+            </motion.div>
+
+            {/* Mobile App */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              viewport={{ once: true }}
+              className="text-center p-8 bg-gradient-to-br from-green-50 to-blue-50 dark:from-gray-800 dark:to-gray-700 rounded-2xl"
+            >
+              <div className="w-16 h-16 bg-green-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <Smartphone className="h-8 w-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                Mobile Apps
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-6">
+                Native iOS and Android apps for productivity on the go.
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <span className="px-3 py-1 bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full text-sm">iOS</span>
+                <span className="px-3 py-1 bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full text-sm">Android</span>
+                <span className="px-3 py-1 bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full text-sm">PWA</span>
+              </div>
+            </motion.div>
+
+            {/* Sync Features */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              viewport={{ once: true }}
+              className="text-center p-8 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-gray-800 dark:to-gray-700 rounded-2xl"
+            >
+              <div className="w-16 h-16 bg-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <Zap className="h-8 w-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                Real-time Sync
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-6">
+                Your data syncs instantly across all devices. Start on mobile, finish on desktop.
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <span className="px-3 py-1 bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full text-sm">Cloud Sync</span>
+                <span className="px-3 py-1 bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full text-sm">Offline Mode</span>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Mobile-First Features */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.3 }}
+            viewport={{ once: true }}
+            className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-3xl p-8 md:p-12 text-white"
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+              <div>
+                <h3 className="text-3xl font-bold mb-6">
+                  Optimized for Mobile Productivity
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <CheckCircle className="h-6 w-6 text-green-300" />
+                    <span className="text-lg">Touch-optimized interface</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <CheckCircle className="h-6 w-6 text-green-300" />
+                    <span className="text-lg">Voice commands and dictation</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <CheckCircle className="h-6 w-6 text-green-300" />
+                    <span className="text-lg">Smart notifications</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <CheckCircle className="h-6 w-6 text-green-300" />
+                    <span className="text-lg">Offline functionality</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <CheckCircle className="h-6 w-6 text-green-300" />
+                    <span className="text-lg">Battery-optimized AI</span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="inline-block p-4 bg-white/10 rounded-2xl backdrop-blur-sm">
+                  <Brain className="h-24 w-24 text-white mx-auto mb-4" />
+                  <p className="text-xl font-semibold">AI That Works Anywhere</p>
+                  <p className="text-white/80 mt-2">Intelligent coaching adapts to your device and context</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </div>
       </section>
 
@@ -247,6 +397,220 @@ const LandingPage: React.FC = () => {
       </section>
 
 
+
+      {/* Pricing Section */}
+      <section id="pricing" className="py-24 bg-gray-50 dark:bg-gray-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+            className="text-center mb-16"
+          >
+            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Simple, Transparent Pricing
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-300">
+              Choose the plan that fits your productivity needs
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Free Plan */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              viewport={{ once: true }}
+              className="bg-white dark:bg-gray-900 p-8 rounded-2xl border border-gray-200 dark:border-gray-700"
+            >
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Free</h3>
+              <div className="mb-6">
+                <span className="text-4xl font-bold text-gray-900 dark:text-white">$0</span>
+                <span className="text-gray-600 dark:text-gray-400">/month</span>
+              </div>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <span className="text-gray-700 dark:text-gray-300">Basic Pomodoro Timer</span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <span className="text-gray-700 dark:text-gray-300">Simple Task Management</span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <span className="text-gray-700 dark:text-gray-300">Basic Analytics</span>
+                </li>
+              </ul>
+              <button className="w-full py-3 px-6 border border-indigo-500 text-indigo-500 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors duration-200">
+                Get Started Free
+              </button>
+            </motion.div>
+
+            {/* Pro Plan */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              viewport={{ once: true }}
+              className="bg-indigo-500 p-8 rounded-2xl text-white relative transform scale-105"
+            >
+              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                <span className="bg-yellow-400 text-yellow-900 px-4 py-1 rounded-full text-sm font-semibold">
+                  Most Popular
+                </span>
+              </div>
+              <h3 className="text-2xl font-bold mb-4">Pro</h3>
+              <div className="mb-6">
+                <span className="text-4xl font-bold">$9</span>
+                <span className="text-indigo-200">/month</span>
+              </div>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="h-5 w-5 text-green-300" />
+                  <span>Everything in Free</span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="h-5 w-5 text-green-300" />
+                  <span>AI Focus Coach</span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="h-5 w-5 text-green-300" />
+                  <span>Advanced Analytics</span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="h-5 w-5 text-green-300" />
+                  <span>Smart Insights</span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="h-5 w-5 text-green-300" />
+                  <span>Priority Support</span>
+                </li>
+              </ul>
+              <button className="w-full py-3 px-6 bg-white text-indigo-500 rounded-lg hover:bg-gray-100 transition-colors duration-200 font-semibold">
+                Start Pro Trial
+              </button>
+            </motion.div>
+
+            {/* Team Plan */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              viewport={{ once: true }}
+              className="bg-white dark:bg-gray-900 p-8 rounded-2xl border border-gray-200 dark:border-gray-700"
+            >
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Team</h3>
+              <div className="mb-6">
+                <span className="text-4xl font-bold text-gray-900 dark:text-white">$19</span>
+                <span className="text-gray-600 dark:text-gray-400">/month</span>
+              </div>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <span className="text-gray-700 dark:text-gray-300">Everything in Pro</span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <span className="text-gray-700 dark:text-gray-300">Team Collaboration</span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <span className="text-gray-700 dark:text-gray-300">Team Analytics</span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <span className="text-gray-700 dark:text-gray-300">Admin Dashboard</span>
+                </li>
+              </ul>
+              <button className="w-full py-3 px-6 border border-indigo-500 text-indigo-500 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors duration-200">
+                Contact Sales
+              </button>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Contact Section */}
+      <section id="contact" className="py-24 bg-white dark:bg-gray-900">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+            className="text-center mb-16"
+          >
+            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Get in Touch
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-300">
+              Have questions? We'd love to hear from you.
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              viewport={{ once: true }}
+              className="text-center p-6 bg-gray-50 dark:bg-gray-800 rounded-xl"
+            >
+              <MessageCircle className="h-12 w-12 text-indigo-500 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                Chat Support
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                Get instant help from our support team
+              </p>
+              <button className="text-indigo-500 hover:text-indigo-600 font-medium">
+                Start Chat
+              </button>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              viewport={{ once: true }}
+              className="text-center p-6 bg-gray-50 dark:bg-gray-800 rounded-xl"
+            >
+              <Brain className="h-12 w-12 text-indigo-500 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                Product Demo
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                See FocusMate AI in action
+              </p>
+              <button className="text-indigo-500 hover:text-indigo-600 font-medium">
+                Book Demo
+              </button>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              viewport={{ once: true }}
+              className="text-center p-6 bg-gray-50 dark:bg-gray-800 rounded-xl"
+            >
+              <Award className="h-12 w-12 text-indigo-500 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                Enterprise
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                Custom solutions for large teams
+              </p>
+              <button className="text-indigo-500 hover:text-indigo-600 font-medium">
+                Contact Sales
+              </button>
+            </motion.div>
+          </div>
+        </div>
+      </section>
 
       {/* CTA Section */}
       <section className="py-24 bg-indigo-600 dark:bg-indigo-800">

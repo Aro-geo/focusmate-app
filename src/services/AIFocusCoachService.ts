@@ -47,7 +47,7 @@ class AIFocusCoachService {
       // Calculate analytics
       this.calculateAnalytics();
     } catch (error) {
-      console.error('Error loading focus coach data:', error);
+      // Error loading focus coach data
       this.sessionHistory = []; // Initialize with empty array on error
     }
   }
@@ -94,7 +94,7 @@ class AIFocusCoachService {
     today.setHours(0, 0, 0, 0);
     
     let currentStreak = 0;
-    let date = new Date(today);
+    const date = new Date(today);
     
     while (true) {
       // Check if there's a completed session for this date
@@ -153,7 +153,7 @@ class AIFocusCoachService {
   }): void {
     // In a real implementation, this would update user data
     // For now, we'll just log it
-    console.log('Completed session:', sessionData);
+    // Session completed successfully
     
     // Update analytics
     const { duration } = sessionData;

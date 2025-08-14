@@ -75,7 +75,7 @@ const SettingsPage: React.FC = () => {
 
   const handleSave = () => {
     // In a real app, this would save to backend
-    console.log('Settings saved');
+    // Settings saved
   };
 
   const handleBack = () => {

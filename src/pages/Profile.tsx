@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Edit, Save, Award, Sparkles, LogOut } from 'lucide-react';
+import { Bell, Edit, Save, Award, Sparkles, LogOut, Download } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { firebaseService } from '../services/FirebaseService';
+import { exportService } from '../services/ExportService';
 
 const Profile: React.FC = () => {
   const { user, logout } = useAuth();
@@ -28,6 +29,7 @@ const Profile: React.FC = () => {
     pomodoroAlerts: true,
     weeklyReports: false,
   });
+  const [isExporting, setIsExporting] = useState(false);
 
   // Load real user data from Firebase
   useEffect(() => {
@@ -101,6 +103,34 @@ const Profile: React.FC = () => {
     }
   };
 
+  // Handle profile export
+  const handleExportProfile = async () => {
+    if (!user) return;
+    
+    try {
+      setIsExporting(true);
+      
+      const userProfile = {
+        name: user.name || 'User',
+        email: user.email || '',
+        joinDate: new Date(user.createdAt || Date.now()),
+        totalSessions: stats.completedTasks,
+        totalFocusTime: stats.focusTime,
+        streakCount: 0 // Would be calculated from actual data
+      };
+      
+      await exportService.exportProfileToPDF(userProfile, {
+        stats,
+        notificationPreferences,
+        aiFeedback
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto bg-white dark:bg-gray-900 min-h-screen">
       <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Profile</h1>
@@ -133,7 +163,7 @@ const Profile: React.FC = () => {
             </div>
           </div>
 
-          <div>
+          <div className="flex space-x-2">
             {isEditing ? (
               <button 
                 onClick={handleSaveProfile} 
@@ -142,12 +172,22 @@ const Profile: React.FC = () => {
                 <Save size={16} className="mr-1" /> Save
               </button>
             ) : (
-              <button 
-                onClick={() => setIsEditing(true)} 
-                className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
-              >
-                <Edit size={16} className="mr-1" /> Edit Profile
-              </button>
+              <>
+                <button 
+                  onClick={() => setIsEditing(true)} 
+                  className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
+                >
+                  <Edit size={16} className="mr-1" /> Edit Profile
+                </button>
+                <button 
+                  onClick={handleExportProfile}
+                  disabled={isExporting}
+                  className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+                >
+                  <Download size={16} className="mr-1" /> 
+                  {isExporting ? 'Exporting...' : 'Export'}
+                </button>
+              </>
             )}
           </div>
         </div>
