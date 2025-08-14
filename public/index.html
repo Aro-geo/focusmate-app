@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#000000" />
     <meta name="msapplication-TileColor" content="#000000" />
@@ -10,8 +10,8 @@
       name="description"
       content="FocusMate AI - Your intelligent productivity companion"
     />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/icons/icon-192.webp" />
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.webp" />
+    <link rel="manifest" href="/manifest.json" />
     <title>FocusMate AI</title>
   </head>
   <body>
@@ -22,7 +22,7 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('%PUBLIC_URL%/sw.js')
+          navigator.serviceWorker.register('/sw.js')
             .then((registration) => {
               console.log('SW registered: ', registration);
             })

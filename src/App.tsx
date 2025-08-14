@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Layout from './components/Layout';
 import EnhancedDashboard from './pages/EnhancedDashboard';
 import Pomodoro from './pages/Pomodoro';
+import EnhancedPomodoro from './pages/EnhancedPomodoro';
 import Journal from './pages/Journal';
 import Stats from './pages/Stats';
 import Profile from './pages/Profile';
@@ -13,7 +14,6 @@ import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import LandingPage from './pages/LandingPage';
 import MobileTestComponent from './components/MobileTestComponent';
-import PWAManager from './components/PWAManager';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './context/ThemeContext';
@@ -26,8 +26,6 @@ function App() {
       <ThemeProvider>
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AuthProvider>
-            {/* PWA Manager for install prompts and offline functionality */}
-            <PWAManager />
             <Routes>
               {/* Test Route for Theme and Responsiveness */}
               <Route path="/test" element={<MobileTestComponent />} />
@@ -50,7 +48,7 @@ function App() {
                   <Layout>
                     <Routes>
                       <Route path="dashboard" element={<EnhancedDashboard />} />
-                      <Route path="pomodoro" element={<Pomodoro />} />
+                      <Route path="pomodoro" element={<EnhancedPomodoro />} />
                       <Route path="journal" element={<Journal />} />
                       <Route path="stats" element={<Stats />} />
                       <Route path="todos" element={<EnhancedTodoList />} />

@@ -220,8 +220,8 @@ export const healthCheck = onRequest(async (req, res) => {
     const err = error as Error;
     logger.error("Health check failed", error);
     res.status(500).json({
-      status: "unhealthy", 
-      error: err.message
+      status: "unhealthy",
+      error: err.message,
     });
   }
 });

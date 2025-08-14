@@ -1,0 +1,10 @@
+.progress-bar {
+  height: 0.5rem;
+  border-radius: 9999px;
+  background-color: #6366f1; /* indigo-500 */
+  transition: width 0.3s ease-in-out;
+}
+
+.dark .progress-bar {
+  background-color: #4f46e5; /* indigo-600 */
+}

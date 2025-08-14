@@ -98,6 +98,38 @@ export class FirebaseService {
       throw e;
     }
   }
+  
+  async getPomodoroSessions() {
+    const user = auth.currentUser;
+    if (!user) throw new Error('User not authenticated');
+    
+    try {
+      const userSessionsCollection = collection(db, 'users', user.uid, 'pomodoroSessions');
+      const querySnapshot = await getDocs(userSessionsCollection);
+      const sessions = [];
+      
+      for (const doc of querySnapshot.docs) {
+        const data = doc.data();
+        sessions.push({
+          id: doc.id,
+          userId: data.userId,
+          taskName: data.taskName,
+          startTime: data.startTime?.toDate() || new Date(),
+          endTime: data.endTime?.toDate() || null,
+          durationMinutes: data.durationMinutes || 0,
+          sessionType: data.sessionType || 'pomodoro',
+          completed: data.completed || false,
+          notes: data.notes || '',
+          createdAt: data.createdAt?.toDate() || new Date()
+        });
+      }
+      
+      return sessions;
+    } catch (e) {
+      console.error("Error getting pomodoro sessions: ", SecurityUtils.sanitizeForLog(String(e)));
+      return []; // Return empty array instead of throwing to prevent app crashes
+    }
+  }
 
   // Example user management functions
   async addUser(name: string, email: string) {

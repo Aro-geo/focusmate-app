@@ -1,13 +1,14 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage";
 
-// Set App Check debug token for development
-if (typeof window !== 'undefined' && process.env.REACT_APP_FIREBASE_APPCHECK_DEBUG_TOKEN) {
+// Set App Check debug token for development only
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development' && process.env.REACT_APP_FIREBASE_APPCHECK_DEBUG_TOKEN) {
   window.FIREBASE_APPCHECK_DEBUG_TOKEN = process.env.REACT_APP_FIREBASE_APPCHECK_DEBUG_TOKEN;
-  console.log('🔧 App Check Debug Token set:', process.env.REACT_APP_FIREBASE_APPCHECK_DEBUG_TOKEN);
-} else {
-  console.warn('⚠️ App Check Debug Token not found in environment variables');
+  console.log('🔧 App Check Debug Token set for development environment');
+} else if (process.env.NODE_ENV !== 'development') {
+  // Don't log anything in production
 }
 
 const firebaseConfig = {
@@ -24,5 +25,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+const storage = getStorage(app);
 
-export { db, auth };
+export { db, auth, storage };

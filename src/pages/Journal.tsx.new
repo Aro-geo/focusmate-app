@@ -45,22 +45,17 @@ interface AIInsight {
   confidence?: number;
 }
 
+// Type for the user object to resolve TypeScript errors
+interface AuthUser {
+  uid: string;
+  // Add other user properties as needed
+}
+
 const Journal: React.FC = () => {
   const { darkMode } = useTheme();
-  const { user, firebaseUser, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  // Log authentication state to help debug
-  useEffect(() => {
-    console.log('Auth state in Journal:', { 
-      userExists: !!user, 
-      firebaseUserExists: !!firebaseUser,
-      isAuthenticated,
-      userId: user?.id,
-      firebaseUid: firebaseUser?.uid
-    });
-  }, [user, firebaseUser, isAuthenticated]);
-  
+  const authUser = user as unknown as AuthUser; // Cast to our interface type
 
   // Mood emojis mapping
   const moodEmojis = {
@@ -165,7 +160,7 @@ const Journal: React.FC = () => {
 
   // Load journal entries and stats
   useEffect(() => {
-    if (!firebaseUser || !isAuthenticated) return;
+    if (!authUser?.uid) return;
     
     const loadData = async () => {
       try {
@@ -173,11 +168,11 @@ const Journal: React.FC = () => {
         setError(null);
         
         // Get journal entries
-        const journalEntries = await SecureFirestoreService.getJournalEntries(firebaseUser.uid);
+        const journalEntries = await SecureFirestoreService.getJournalEntries(authUser.uid);
         setEntries(journalEntries);
         
         // Get journal stats
-        const journalStats = await SecureFirestoreService.getJournalStats(firebaseUser.uid);
+        const journalStats = await SecureFirestoreService.getJournalStats(authUser.uid);
         setStats(journalStats);
         setStreak(journalStats.streak);
         
@@ -199,18 +194,12 @@ const Journal: React.FC = () => {
     };
     
     loadData();
-  }, [firebaseUser, isAuthenticated]);
+  }, [authUser?.uid]);
 
   // Functions
   const handleSaveEntry = async () => {
-    // More detailed auth check and logging
-    if (!firebaseUser || !isAuthenticated) {
-      console.error('Auth validation failed:', {
-        userExists: !!user,
-        firebaseUserExists: !!firebaseUser,
-        isAuthenticated
-      });
-      setError('You must be logged in to save entries. Please try logging in again if this persists.');
+    if (!authUser?.uid) {
+      setError('You must be logged in to save entries.');
       return;
     }
 
@@ -231,11 +220,11 @@ const Journal: React.FC = () => {
         tags: currentTags.split(',').map(tag => tag.trim()).filter(tag => tag !== ''),
         attachments: currentAttachments,
         isPrivate: isPrivateEntry,
-        userId: firebaseUser.uid
+        userId: authUser.uid
       };
       
       // Save to database
-      const entryId = await SecureFirestoreService.addJournalEntry(newEntry, firebaseUser.uid);
+      const entryId = await SecureFirestoreService.addJournalEntry(newEntry, authUser.uid);
       
       // Analyze sentiment with AI
       const fullEntry = {
@@ -243,14 +232,14 @@ const Journal: React.FC = () => {
         id: entryId
       } as SecureJournalEntry;
       
-      await JournalAIService.updateJournalSentiment(fullEntry, firebaseUser.uid);
+      await JournalAIService.updateJournalSentiment(fullEntry, authUser.uid);
       
       // Refresh entries
-      const journalEntries = await SecureFirestoreService.getJournalEntries(firebaseUser.uid);
+      const journalEntries = await SecureFirestoreService.getJournalEntries(authUser.uid);
       setEntries(journalEntries);
       
       // Update stats
-      const journalStats = await SecureFirestoreService.getJournalStats(firebaseUser.uid);
+      const journalStats = await SecureFirestoreService.getJournalStats(authUser.uid);
       setStats(journalStats);
       setStreak(journalStats.streak);
       
@@ -324,13 +313,8 @@ const Journal: React.FC = () => {
 
   // Delete entry
   const handleDeleteEntry = async (id: string) => {
-    if (!firebaseUser || !isAuthenticated) {
-      console.error('Auth validation failed for delete:', {
-        userExists: !!user,
-        firebaseUserExists: !!firebaseUser,
-        isAuthenticated
-      });
-      setError('You must be logged in to delete entries. Please try logging in again if this persists.');
+    if (!authUser?.uid) {
+      setError('You must be logged in to delete entries.');
       return;
     }
 
@@ -349,7 +333,7 @@ const Journal: React.FC = () => {
       if (entryToDelete?.attachments && entryToDelete.attachments.length > 0) {
         for (const attachmentUrl of entryToDelete.attachments) {
           try {
-            await JournalAttachmentService.deleteImage(attachmentUrl, firebaseUser.uid);
+            await JournalAttachmentService.deleteImage(attachmentUrl, authUser.uid);
           } catch (err) {
             console.error('Error deleting attachment:', err);
             // Continue with entry deletion even if attachment deletion fails
@@ -358,13 +342,13 @@ const Journal: React.FC = () => {
       }
       
       // Delete the entry
-      await SecureFirestoreService.deleteJournalEntry(id, firebaseUser.uid);
+      await SecureFirestoreService.deleteJournalEntry(id, authUser.uid);
       
       // Update local state
       setEntries(entries.filter(entry => entry.id !== id));
       
       // Update stats
-      const journalStats = await SecureFirestoreService.getJournalStats(firebaseUser.uid);
+      const journalStats = await SecureFirestoreService.getJournalStats(authUser.uid);
       setStats(journalStats);
       setStreak(journalStats.streak);
       
@@ -378,14 +362,8 @@ const Journal: React.FC = () => {
 
   // Generate insights
   const handleGenerateInsight = async () => {
-    if (!firebaseUser || !isAuthenticated || entries.length === 0) {
-      console.error('Auth validation failed for insights:', {
-        userExists: !!user,
-        firebaseUserExists: !!firebaseUser,
-        isAuthenticated,
-        entriesCount: entries.length
-      });
-      setError('You need to be logged in and have journal entries to generate insights.');
+    if (!authUser?.uid || entries.length === 0) {
+      setError('You need journal entries to generate insights.');
       return;
     }
     
@@ -414,13 +392,8 @@ const Journal: React.FC = () => {
 
   // Export journal entries
   const handleExport = async () => {
-    if (!firebaseUser || !isAuthenticated) {
-      console.error('Auth validation failed for export:', {
-        userExists: !!user,
-        firebaseUserExists: !!firebaseUser,
-        isAuthenticated
-      });
-      setError('You must be logged in to export entries. Please try logging in again if this persists.');
+    if (!authUser?.uid) {
+      setError('You must be logged in to export entries.');
       return;
     }
     
@@ -429,7 +402,7 @@ const Journal: React.FC = () => {
       setError(null);
       
       // Get all journal entries
-      const allEntries = await SecureFirestoreService.exportJournalEntries(firebaseUser.uid);
+      const allEntries = await SecureFirestoreService.exportJournalEntries(authUser.uid);
       
       // Format entries for export
       const exportData = allEntries.map(entry => ({
@@ -472,14 +445,8 @@ const Journal: React.FC = () => {
 
   // Handle file attachment
   const handleAttachment = () => {
-    // More detailed auth check and logging
-    if (!firebaseUser || !isAuthenticated) {
-      console.error('Auth validation failed for attachment:', {
-        userExists: !!user,
-        firebaseUserExists: !!firebaseUser,
-        isAuthenticated
-      });
-      setError('You must be logged in to add attachments. Please try logging in again if this persists.');
+    if (!authUser?.uid) {
+      setError('You must be logged in to add attachments.');
       return;
     }
     
@@ -491,15 +458,8 @@ const Journal: React.FC = () => {
   
   // Handle file selection
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    // More detailed auth check and logging
-    if (!firebaseUser || !isAuthenticated) {
-      console.error('Auth validation failed for file upload:', {
-        userExists: !!user,
-        firebaseUserExists: !!firebaseUser,
-        isAuthenticated,
-        firebaseUid: firebaseUser?.uid
-      });
-      setError('You must be logged in to add attachments. Please try logging in again if this persists.');
+    if (!authUser?.uid) {
+      setError('You must be logged in to add attachments.');
       return;
     }
     
@@ -516,18 +476,15 @@ const Journal: React.FC = () => {
         return;
       }
       
-      console.log('Uploading file with UID:', firebaseUser.uid);
-      
       // Upload file to storage
-      const downloadUrl = await JournalAttachmentService.uploadImage(file, firebaseUser.uid);
-      console.log('File uploaded successfully, URL:', downloadUrl.substring(0, 50) + '...');
+      const downloadUrl = await JournalAttachmentService.uploadImage(file, authUser.uid);
       
       // Add URL to attachments
       setCurrentAttachments([...currentAttachments, downloadUrl]);
       
     } catch (err) {
       console.error('Error uploading attachment:', err);
-      setFileError(`Failed to upload attachment: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setFileError('Failed to upload attachment. Please try again.');
     } finally {
       setUploadingFile(false);
       // Reset the file input
@@ -644,7 +601,6 @@ const Journal: React.FC = () => {
         className="hidden" 
         accept="image/*" 
         onChange={handleFileChange}
-        title="Upload image attachment"
       />
       
       <div className="container mx-auto px-4 py-8">
@@ -819,7 +775,6 @@ const Journal: React.FC = () => {
                         className={`absolute -top-2 -right-2 rounded-full p-1 ${
                           darkMode ? 'bg-red-600 text-white' : 'bg-red-500 text-white'
                         }`}
-                        title="Remove attachment"
                       >
                         <X size={14} />
                       </button>
@@ -1223,7 +1178,7 @@ const Journal: React.FC = () => {
                           <div className="flex items-center">
                             <span className="mr-2">{moodEmojis[entry.mood as keyof typeof moodEmojis]}</span>
                             <button
-                              onClick={() => entry.id && handleDeleteEntry(entry.id)}
+                              onClick={() => handleDeleteEntry(entry.id)}
                               className={`p-1 rounded-lg text-sm transition-all ${
                                 darkMode
                                   ? 'hover:bg-red-500/20 text-red-400 hover:text-red-300'

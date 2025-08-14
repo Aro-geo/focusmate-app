@@ -17,7 +17,12 @@ import {
   Target,
   Zap,
   Clock,
-  Loader2
+  Loader2,
+  Settings,
+  History,
+  AlertTriangle,
+  X,
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../context/ThemeContext';
@@ -38,6 +43,12 @@ interface Task {
   text: string;
 }
 
+interface Distraction {
+  type: string;
+  notes: string;
+  timestamp: number;
+}
+
 interface Session {
   task: string | null;
   startTime: Date;
@@ -47,6 +58,10 @@ interface Session {
   mood: MoodType;
   feedback: string | null;
   completed: boolean;
+  notes: string | null;
+  distractions: Distraction[] | null;
+  timestamp: number;
+  id?: string;
 }
 
 const Pomodoro: React.FC = () => {
@@ -64,17 +79,26 @@ const Pomodoro: React.FC = () => {
 
 // Desktop Pomodoro component
 const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
-  // Configuration
-  const workDuration = 25 * 60; // 25 minutes in seconds
-  const shortBreakDuration = 5 * 60; // 5 minutes
-  const longBreakDuration = 15 * 60; // 15 minutes
-  const sessionsBeforeLongBreak = 4;
-
-  // State
-  const [timeRemaining, setTimeRemaining] = useState<number>(workDuration);
+  // Pomodoro Settings
+  const [settings, setSettings] = useState({
+    workDuration: 25,
+    shortBreakDuration: 5,
+    longBreakDuration: 15,
+    longBreakInterval: 4,
+    autoStartBreaks: true,
+    autoStartPomodoros: false,
+    soundEnabled: true,
+    dailyGoal: 8
+  });
+  
+  // Timer State
+  const [timeRemaining, setTimeRemaining] = useState<number>(settings.workDuration * 60);
   const [isActive, setIsActive] = useState<boolean>(false);
   const [mode, setMode] = useState<PomodoroMode>('work');
   const [completedSessions, setCompletedSessions] = useState<number>(0);
+  const [totalFocusTime, setTotalFocusTime] = useState<number>(0); // Total focus time in minutes
+  
+  // Task Management
   const [selectedTask, setSelectedTask] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([
     { id: 1, text: "Project proposal" },
@@ -83,14 +107,38 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
     { id: 4, text: "Code review" }
   ]);
   const [customTask, setCustomTask] = useState<string>("");
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
-  const [showFeedback, setShowFeedback] = useState<boolean>(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [mood, setMood] = useState<MoodType>(null);
-  const [sessions, setSessions] = useState<Session[]>([]);
+  
+  // Session Data
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
-  const [showSessionComplete, setShowSessionComplete] = useState<boolean>(false);
-  const [showTaskDropdown, setShowTaskDropdown] = useState<boolean>(false);
+  const [sessionHistory, setSessionHistory] = useState<Session[]>([]);
+  const [currentStreak, setCurrentStreak] = useState<number>(0);
+  const [longestStreak, setLongestStreak] = useState<number>(0);
+  
+  // UI Controls
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [showSessionHistory, setShowSessionHistory] = useState<boolean>(false);
+  const [showDistractionModal, setShowDistractionModal] = useState<boolean>(false);
+  const [showNotesModal, setShowNotesModal] = useState<boolean>(false);
+  const [selectedSessionNotes, setSelectedSessionNotes] = useState<{notes: string | null, task: string | null} | null>(null);
+  
+  // Distractions & Notes
+  const [distractions, setDistractions] = useState<Distraction[]>([]);
+  const [currentDistraction, setCurrentDistraction] = useState<{type: string; notes: string}>({ type: '', notes: '' });
+  const [sessionNotes, setSessionNotes] = useState<string>("");
+  
+  // Performance Stats
+  const [sessionStats, setSessionStats] = useState<{
+    today: number;
+    week: number;
+    month: number;
+    total: number;
+  }>({
+    today: 0,
+    week: 0,
+    month: 0,
+    total: 0
+  });
   
   // AI Assistant state
   const [aiMessage, setAiMessage] = useState<string>("Ready to focus? Select a task and let's get started with a productive Pomodoro session!");
@@ -124,31 +172,91 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
     }
   }, [isActive]);
 
+  // Load saved settings and session history
+  useEffect(() => {
+    // Load settings from local storage
+    const savedSettings = localStorage.getItem('pomodoroSettings');
+    if (savedSettings) {
+      try {
+        const parsedSettings = JSON.parse(savedSettings);
+        setSettings(parsedSettings);
+      } catch (error) {
+        console.error('Error parsing saved settings:', error);
+      }
+    }
+
+    // Load session history from service
+    const loadSessionHistory = async () => {
+      try {
+        const sessions = await DatabasePomodoroService.getSessions();
+        if (sessions && sessions.length > 0) {
+          // Convert to our Session format
+          const formattedSessions = sessions.map(session => ({
+            id: session.id,
+            task: session.taskName,
+            startTime: session.startTime,
+            endTime: session.endTime,
+            duration: session.durationMinutes,
+            mode: 'work' as PomodoroMode,
+            mood: null as MoodType,
+            feedback: null,
+            completed: session.completed,
+            notes: session.notes || null,
+            distractions: null,
+            timestamp: session.startTime.getTime()
+          }));
+          
+          // Calculate total focus time for today
+          const todaysSessions = sessions.filter(s => 
+            s.startTime.toDateString() === new Date().toDateString() && s.completed
+          );
+          
+          setSessionHistory(formattedSessions);
+          setCompletedSessions(todaysSessions.length);
+          
+          // Calculate total focus time in minutes
+          const focusTimeMinutes = todaysSessions.reduce((total, session) => {
+            return total + (session.durationMinutes || 0);
+          }, 0);
+          setTotalFocusTime(focusTimeMinutes);
+        }
+      } catch (error) {
+        console.error('Error loading session history:', error);
+      }
+    };
+    
+    loadSessionHistory();
+  }, []);
+
   // Mode change effect
   useEffect(() => {
     if (mode === 'work') {
-      setTimeRemaining(workDuration);
+      setTimeRemaining(settings.workDuration * 60);
     } else if (mode === 'shortBreak') {
-      setTimeRemaining(shortBreakDuration);
+      setTimeRemaining(settings.shortBreakDuration * 60);
     } else {
-      setTimeRemaining(longBreakDuration);
+      setTimeRemaining(settings.longBreakDuration * 60);
     }
     setIsActive(false);
-  }, [mode, workDuration, shortBreakDuration, longBreakDuration]);
+  }, [mode, settings]);
 
   // Functions
   const toggleTimer = () => {
-    if (!isActive && timeRemaining === workDuration && mode === 'work') {
+    if (!isActive && timeRemaining === settings.workDuration * 60 && mode === 'work') {
       // Starting a new session
       const newSession: Session = {
         task: selectedTask,
         startTime: new Date(),
         endTime: null,
-        duration: 0,
+        duration: settings.workDuration,
         mode: mode,
         mood: null,
         feedback: null,
-        completed: false
+        completed: false,
+        notes: sessionNotes,
+        distractions: [],
+        timestamp: Date.now(),
+        id: `session-${Date.now()}`
       };
       setCurrentSession(newSession);
     }
@@ -158,11 +266,11 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
   const resetTimer = () => {
     setIsActive(false);
     if (mode === 'work') {
-      setTimeRemaining(workDuration);
+      setTimeRemaining(settings.workDuration * 60);
     } else if (mode === 'shortBreak') {
-      setTimeRemaining(shortBreakDuration);
+      setTimeRemaining(settings.shortBreakDuration * 60);
     } else {
-      setTimeRemaining(longBreakDuration);
+      setTimeRemaining(settings.longBreakDuration * 60);
     }
   };
 
@@ -176,7 +284,7 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
     setIsActive(false);
 
     // Play sound if enabled
-    if (soundEnabled) {
+    if (settings.soundEnabled) {
       // Create and play a simple notification sound
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
@@ -190,47 +298,199 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
       // Complete work session
       const sessionsCount = completedSessions + 1;
       setCompletedSessions(sessionsCount);
+      
+      // Add the duration of this session to total focus time
+      const sessionDurationMinutes = settings.workDuration;
+      setTotalFocusTime(prevTime => prevTime + sessionDurationMinutes);
+
+      // Update stats
+      setSessionStats(prev => ({
+        ...prev,
+        today: prev.today + 1,
+        week: prev.week + 1,
+        month: prev.month + 1,
+        total: prev.total + 1
+      }));
+
+      // Update streak
+      const lastSessionDate = sessionHistory.length > 0 
+        ? new Date(sessionHistory[0].timestamp).toDateString() 
+        : null;
+      const today = new Date().toDateString();
+      
+      if (lastSessionDate === today) {
+        // Sessions on the same day, increment streak
+        setCurrentStreak(prev => prev + 1);
+      } else if (lastSessionDate) {
+        // Check if last session was yesterday
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayString = yesterday.toDateString();
+        
+        if (lastSessionDate === yesterdayString) {
+          // Session yesterday, maintain streak
+          setCurrentStreak(prev => prev + 1);
+        } else {
+          // Break in streak, reset
+          setCurrentStreak(1);
+        }
+      } else {
+        // First session ever
+        setCurrentStreak(1);
+      }
+      
+      // Update longest streak if current streak is longer
+      if (currentStreak > longestStreak) {
+        setLongestStreak(currentStreak);
+      }
+
+      // Check daily goal achievement
+      if (sessionsCount === settings.dailyGoal) {
+        // User reached their daily goal
+        setTimeout(() => {
+          setAiMessage(`Congratulations! You've reached your daily goal of ${settings.dailyGoal} Pomodoros! 🎉`);
+          // Could trigger confetti animation here
+        }, 1000);
+      }
 
       // Update current session
       if (currentSession) {
         const updatedSession: Session = {
           ...currentSession,
           endTime: new Date(),
-          duration: workDuration - timeRemaining
+          duration: settings.workDuration,
+          completed: true,
+          notes: sessionNotes || null,
+          distractions: distractions.length > 0 ? distractions : null,
+          timestamp: Date.now()
         };
         setCurrentSession(updatedSession);
 
-        // Add to sessions history
-        setSessions(prev => [...prev, updatedSession]);
+        // Add to sessions history at the beginning of array (most recent first)
+        setSessionHistory(prev => [updatedSession, ...prev]);
         
         // Save to Firestore
-        const durationMinutes = Math.round((workDuration - timeRemaining) / 60);
-        saveSessionToFirestore(updatedSession, durationMinutes);
+        saveSessionToFirestore(updatedSession);
       }
 
+      // Clear session notes and distractions
+      setSessionNotes("");
+      setDistractions([]);
+
       // Determine next break type
-      if (sessionsCount % sessionsBeforeLongBreak === 0) {
+      if (sessionsCount % settings.longBreakInterval === 0) {
         setMode('longBreak');
+        setTimeRemaining(settings.longBreakDuration * 60);
+        // Auto-start break if enabled
+        if (settings.autoStartBreaks) {
+          setTimeout(() => setIsActive(true), 500);
+        }
       } else {
         setMode('shortBreak');
+        setTimeRemaining(settings.shortBreakDuration * 60);
+        // Auto-start break if enabled
+        if (settings.autoStartBreaks) {
+          setTimeout(() => setIsActive(true), 500);
+        }
       }
     } else {
       // Complete break
       setMode('work');
+      setTimeRemaining(settings.workDuration * 60);
+      // Auto-start next pomodoro if enabled
+      if (settings.autoStartPomodoros) {
+        setTimeout(() => setIsActive(true), 500);
+      }
     }
-  }, [completedSessions, currentSession, mode, soundEnabled, timeRemaining, workDuration, sessionsBeforeLongBreak]);
+  }, [completedSessions, currentSession, mode, soundEnabled, timeRemaining, settings]);
 
-  // New function to save session to Firestore
-  const saveSessionToFirestore = async (session: Session, durationMinutes: number) => {
+  // Helper functions for new features
+  const updateSettings = (key: string, value: any) => {
+    setSettings(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  const saveSettings = () => {
+    // Save settings to local storage
+    localStorage.setItem('pomodoroSettings', JSON.stringify(settings));
+    // Update timer durations
+    if (mode === 'work') {
+      setTimeRemaining(settings.workDuration * 60);
+    } else if (mode === 'shortBreak') {
+      setTimeRemaining(settings.shortBreakDuration * 60);
+    } else {
+      setTimeRemaining(settings.longBreakDuration * 60);
+    }
+    setShowSettings(false);
+  };
+
+  const logDistraction = () => {
+    if (!currentDistraction.type) return;
+    
+    const newDistraction: Distraction = {
+      ...currentDistraction,
+      timestamp: Date.now()
+    };
+    
+    // Add to current session's distractions
+    setDistractions(prev => [...prev, newDistraction]);
+    
+    // Clear form
+    setCurrentDistraction({ type: '', notes: '' });
+    setShowDistractionModal(false);
+    
+    // Give feedback
+    setAiMessage("Distraction logged. Good job recognizing it! Let's get back to focus.");
+  };
+
+  const saveSessionNotes = () => {
+    // Update current session with notes if there is an active session
+    if (currentSession) {
+      const updatedSession = {
+        ...currentSession,
+        notes: sessionNotes
+      };
+      
+      setCurrentSession(updatedSession);
+      
+      // Update the session in the history if it exists there
+      if (currentSession.id) {
+        setSessionHistory(prev => 
+          prev.map(session => 
+            session.id === currentSession.id 
+              ? { ...session, notes: sessionNotes } 
+              : session
+          )
+        );
+        
+        // Also save to database if we have a session service
+        try {
+          if (DatabasePomodoroService.updateSession) {
+            DatabasePomodoroService.updateSession(currentSession.id, { notes: sessionNotes });
+          }
+        } catch (error) {
+          console.error('Error saving session notes:', error);
+        }
+      }
+    }
+    
+    setShowNotesModal(false);
+    setAiMessage("Notes saved. Good job documenting your progress!");
+  };
+
+  // Save session to database
+  const saveSessionToFirestore = async (session: Session) => {
     try {
       await DatabasePomodoroService.saveSession({
         taskName: session.task,
         startTime: session.startTime,
         endTime: session.endTime,
-        durationMinutes: durationMinutes,
+        durationMinutes: session.duration,
         sessionType: 'pomodoro',
         completed: true,
-        notes: session.feedback || ''
+        notes: session.notes || ''
       });
       console.log('Pomodoro session saved to Firestore');
     } catch (error) {
@@ -241,15 +501,15 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
   const generateAIFeedback = async (session: Session) => {
     try {
       setIsAiLoading(true);
-      const prompt = `A user just completed a ${session.duration / 60} minute focus session working on "${session.task}". 
+      const prompt = `A user just completed a ${session.duration} minute focus session working on "${session.task}". 
       Provide a brief, encouraging feedback message about their productivity. Format it with a short bold header followed by a motivational message. 
       Keep it under 50 words total. Use markdown formatting with ## for headers.`;
       
       const response = await aiService.chat(prompt);
-      setFeedback(response.response);
+      setAiMessage(response.response);
     } catch (error) {
       console.error('Failed to generate AI feedback:', error);
-      setFeedback("## Well Done! 🎉\nGreat job completing this focus session! You're building excellent productivity habits.");
+      setAiMessage("## Well Done! 🎉\nGreat job completing this focus session! You're building excellent productivity habits.");
     } finally {
       setIsAiLoading(false);
     }
@@ -370,11 +630,11 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
   const calculateProgress = (): number => {
     let totalTime: number;
     if (mode === 'work') {
-      totalTime = workDuration;
+      totalTime = settings.workDuration * 60;
     } else if (mode === 'shortBreak') {
-      totalTime = shortBreakDuration;
+      totalTime = settings.shortBreakDuration * 60;
     } else {
-      totalTime = longBreakDuration;
+      totalTime = settings.longBreakDuration * 60;
     }
 
     return ((totalTime - timeRemaining) / totalTime) * 100;
@@ -387,23 +647,21 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
         : 'bg-gradient-to-br from-blue-50 via-white to-indigo-50'
     }`}>
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
-        >
-          <h1 className={`text-4xl font-bold mb-4 ${
-            darkMode ? 'text-white' : 'text-gray-900'
-          }`}>
-            Pomodoro Timer
-          </h1>
-          <p className={`text-lg ${
-            darkMode ? 'text-gray-300' : 'text-gray-600'
-          }`}>
-            Focus • Work • Achieve
-          </p>
-        </motion.div>
+        {/* Header - positioned on the left side */}
+        <div className="flex items-center mb-8">
+          <div className="flex-1">
+            <h1 className={`text-3xl font-bold ${
+              darkMode ? 'text-white' : 'text-gray-900'
+            }`}>
+              Pomodoro Timer
+            </h1>
+            <p className={`text-lg ${
+              darkMode ? 'text-gray-300' : 'text-gray-600'
+            }`}>
+              Focus • Work • Achieve
+            </p>
+          </div>
+        </div>
 
         {/* Main Layout - Responsive Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-8 max-w-7xl mx-auto">
@@ -549,6 +807,19 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
                 >
                   {soundEnabled ? <Volume2 size={24} /> : <VolumeX size={24} />}
                 </motion.button>
+                
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setShowSettings(true)}
+                  className={`p-4 rounded-full ${
+                    darkMode
+                      ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                      : 'bg-purple-500 hover:bg-purple-600 text-white'
+                  } shadow-lg transition-colors`}
+                >
+                  <Settings size={24} />
+                </motion.button>
               </div>
 
               {/* Task Selection */}
@@ -618,6 +889,54 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
               </div>
             </motion.div>
 
+            {/* Session Tools Section */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`rounded-2xl p-6 ${
+                darkMode 
+                  ? 'bg-gray-800/50 border border-gray-700' 
+                  : 'bg-white/70 border border-white/20 shadow-lg backdrop-blur-sm'
+              }`}
+            >
+              <h3 className={`text-lg font-semibold mb-4 flex items-center ${
+                darkMode ? 'text-white' : 'text-gray-900'
+              }`}>
+                <FileText className="mr-2" size={20} />
+                Session Tools
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowSessionHistory(true)}
+                  className={`flex items-center justify-center px-4 py-3 rounded-xl ${
+                    darkMode
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                      : 'bg-blue-500 hover:bg-blue-600 text-white'
+                  } shadow-lg transition-colors`}
+                >
+                  <History size={18} className="mr-2" />
+                  Session History
+                </motion.button>
+                
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowNotesModal(true)}
+                  className={`flex items-center justify-center px-4 py-3 rounded-xl ${
+                    darkMode
+                      ? 'bg-green-600 hover:bg-green-700 text-white'
+                      : 'bg-green-500 hover:bg-green-600 text-white'
+                  } shadow-lg transition-colors`}
+                  disabled={!isActive && mode !== 'work'}
+                >
+                  <FileText size={18} className="mr-2" />
+                  Add Notes
+                </motion.button>
+              </div>
+            </motion.div>
+
             {/* Session Stats */}
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
@@ -634,6 +953,25 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
                 <Target className="mr-2" size={20} />
                 Today's Progress
               </h3>
+              
+              {/* Progress bar towards daily goal */}
+              <div className="mb-4">
+                <div className="flex justify-between items-center mb-1">
+                  <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    {completedSessions} of {settings.dailyGoal} pomodoros
+                  </span>
+                  <span className={`text-sm font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                    {Math.min(Math.round((completedSessions / settings.dailyGoal) * 100), 100)}%
+                  </span>
+                </div>
+                <div className={`w-full h-2 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                  <div 
+                    className={`h-2 rounded-full bg-blue-500 transition-all duration-300 progress-bar-width-${Math.min(Math.round((completedSessions / settings.dailyGoal) * 100), 100)}`}
+                  >
+                  </div>
+                </div>
+              </div>
+              
               <div className="grid grid-cols-2 gap-4">
                 <div className="text-center">
                   <div className={`text-2xl font-bold ${
@@ -651,7 +989,7 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
                   <div className={`text-2xl font-bold ${
                     darkMode ? 'text-green-400' : 'text-green-600'
                   }`}>
-                    {Math.floor(completedSessions * 25 / 60)}h {(completedSessions * 25) % 60}m
+                    {Math.floor(totalFocusTime / 60)}h {totalFocusTime % 60}m
                   </div>
                   <div className={`text-sm ${
                     darkMode ? 'text-gray-400' : 'text-gray-600'
@@ -659,6 +997,31 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
                     Focus Time
                   </div>
                 </div>
+              </div>
+              
+              <div className="mt-4 flex justify-end space-x-4">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowNotesModal(true)}
+                  className={`text-sm flex items-center ${
+                    darkMode ? 'text-purple-400 hover:text-purple-300' : 'text-purple-600 hover:text-purple-700'
+                  }`}
+                >
+                  <FileText size={14} className="mr-1" />
+                  Add Notes
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowSessionHistory(true)}
+                  className={`text-sm flex items-center ${
+                    darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'
+                  }`}
+                >
+                  <History size={14} className="mr-1" />
+                  View History
+                </motion.button>
               </div>
             </motion.div>
           </div>
@@ -729,6 +1092,659 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
           </div>
         </div>
       </div>
+
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className={`relative max-w-lg w-full rounded-2xl p-6 ${
+                darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'
+              } shadow-2xl`}
+            >
+              <button
+                onClick={() => setShowSettings(false)}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+                aria-label="Close settings modal"
+              >
+                <X size={24} />
+              </button>
+
+              <h2 className="text-2xl font-bold mb-6 flex items-center">
+                <Settings className="mr-2" size={24} />
+                Pomodoro Settings
+              </h2>
+
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-medium mb-3">Timer Durations</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label htmlFor="workDuration" className={`block text-sm font-medium mb-1 ${
+                        darkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        Work (minutes)
+                      </label>
+                      <input
+                        id="workDuration"
+                        type="number"
+                        min="1"
+                        max="60"
+                        value={settings.workDuration}
+                        onChange={(e) => updateSettings('workDuration', parseInt(e.target.value))}
+                        className={`w-full p-2 rounded-lg border ${
+                          darkMode
+                            ? 'bg-gray-700 border-gray-600 text-white'
+                            : 'bg-white border-gray-300 text-gray-900'
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="shortBreakDuration" className={`block text-sm font-medium mb-1 ${
+                        darkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        Short Break (minutes)
+                      </label>
+                      <input
+                        id="shortBreakDuration"
+                        type="number"
+                        min="1"
+                        max="30"
+                        value={settings.shortBreakDuration}
+                        onChange={(e) => updateSettings('shortBreakDuration', parseInt(e.target.value))}
+                        className={`w-full p-2 rounded-lg border ${
+                          darkMode
+                            ? 'bg-gray-700 border-gray-600 text-white'
+                            : 'bg-white border-gray-300 text-gray-900'
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="longBreakDuration" className={`block text-sm font-medium mb-1 ${
+                        darkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        Long Break (minutes)
+                      </label>
+                      <input
+                        id="longBreakDuration"
+                        type="number"
+                        min="5"
+                        max="60"
+                        value={settings.longBreakDuration}
+                        onChange={(e) => updateSettings('longBreakDuration', parseInt(e.target.value))}
+                        className={`w-full p-2 rounded-lg border ${
+                          darkMode
+                            ? 'bg-gray-700 border-gray-600 text-white'
+                            : 'bg-white border-gray-300 text-gray-900'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-medium mb-3">Session Preferences</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center">
+                      <input
+                        id="autoStartBreaks"
+                        type="checkbox"
+                        checked={settings.autoStartBreaks}
+                        onChange={(e) => updateSettings('autoStartBreaks', e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <label htmlFor="autoStartBreaks" className="ml-2 block text-sm">
+                        Auto-start breaks
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        id="autoStartPomodoros"
+                        type="checkbox"
+                        checked={settings.autoStartPomodoros}
+                        onChange={(e) => updateSettings('autoStartPomodoros', e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <label htmlFor="autoStartPomodoros" className="ml-2 block text-sm">
+                        Auto-start work sessions
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        id="longBreakInterval"
+                        type="number"
+                        min="2"
+                        max="10"
+                        value={settings.longBreakInterval}
+                        onChange={(e) => updateSettings('longBreakInterval', parseInt(e.target.value))}
+                        className={`w-16 p-2 rounded-lg border ${
+                          darkMode
+                            ? 'bg-gray-700 border-gray-600 text-white'
+                            : 'bg-white border-gray-300 text-gray-900'
+                        }`}
+                      />
+                      <label htmlFor="longBreakInterval" className="ml-2 block text-sm">
+                        sessions before long break
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-medium mb-3">Daily Goals</h3>
+                  <div className="flex items-center">
+                    <input
+                      id="dailyGoal"
+                      type="number"
+                      min="1"
+                      max="16"
+                      value={settings.dailyGoal}
+                      onChange={(e) => updateSettings('dailyGoal', parseInt(e.target.value))}
+                      className={`w-16 p-2 rounded-lg border ${
+                        darkMode
+                          ? 'bg-gray-700 border-gray-600 text-white'
+                          : 'bg-white border-gray-300 text-gray-900'
+                      }`}
+                    />
+                    <label htmlFor="dailyGoal" className="ml-2 block text-sm">
+                      completed pomodoros per day
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowSettings(false)}
+                    className={`px-4 py-2 rounded-lg ${
+                      darkMode
+                        ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                        : 'bg-gray-200 hover:bg-gray-300 text-gray-900'
+                    }`}
+                  >
+                    Cancel
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={saveSettings}
+                    className={`px-4 py-2 rounded-lg ${
+                      darkMode
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'bg-blue-500 hover:bg-blue-600 text-white'
+                    }`}
+                  >
+                    Save Changes
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Distraction Logging Modal */}
+      <AnimatePresence>
+        {showDistractionModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className={`relative max-w-md w-full rounded-2xl p-6 ${
+                darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'
+              } shadow-2xl`}
+            >
+              <button
+                onClick={() => setShowDistractionModal(false)}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+                aria-label="Close distraction modal"
+              >
+                <X size={24} />
+              </button>
+
+              <h2 className="text-2xl font-bold mb-6 flex items-center">
+                <AlertTriangle className="mr-2" size={24} />
+                Log Distraction
+              </h2>
+
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="distractionType" className={`block text-sm font-medium mb-1 ${
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>
+                    Type of Distraction
+                  </label>
+                  <select
+                    id="distractionType"
+                    value={currentDistraction.type}
+                    onChange={(e) => setCurrentDistraction({...currentDistraction, type: e.target.value})}
+                    className={`w-full p-3 rounded-xl border ${
+                      darkMode
+                        ? 'bg-gray-700 border-gray-600 text-white'
+                        : 'bg-white border-gray-300 text-gray-900'
+                    } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                  >
+                    <option value="">Select type...</option>
+                    <option value="notification">Notification</option>
+                    <option value="social-media">Social Media</option>
+                    <option value="colleague">Colleague Interruption</option>
+                    <option value="phone">Phone Call</option>
+                    <option value="personal">Personal Thought</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label htmlFor="distractionNotes" className={`block text-sm font-medium mb-1 ${
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>
+                    Notes (Optional)
+                  </label>
+                  <textarea
+                    id="distractionNotes"
+                    rows={3}
+                    value={currentDistraction.notes}
+                    onChange={(e) => setCurrentDistraction({...currentDistraction, notes: e.target.value})}
+                    placeholder="What happened? How did you handle it?"
+                    className={`w-full p-3 rounded-xl border ${
+                      darkMode
+                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                    } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                  />
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={logDistraction}
+                    disabled={!currentDistraction.type}
+                    className={`px-4 py-2 rounded-lg ${
+                      darkMode
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-600'
+                        : 'bg-blue-500 hover:bg-blue-600 text-white disabled:bg-gray-400'
+                    } disabled:cursor-not-allowed`}
+                  >
+                    Log Distraction
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Session History Modal */}
+      <AnimatePresence>
+        {showSessionHistory && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className={`relative max-w-4xl w-full rounded-2xl p-6 ${
+                darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'
+              } shadow-2xl max-h-[80vh] overflow-y-auto`}
+            >
+              <button
+                onClick={() => setShowSessionHistory(false)}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+                aria-label="Close session history modal"
+              >
+                <X size={24} />
+              </button>
+
+              <h2 className="text-2xl font-bold mb-6 flex items-center">
+                <Clock className="mr-2" size={24} />
+                Session History
+              </h2>
+
+              {sessionHistory.length === 0 ? (
+                <div className="text-center py-8">
+                  <History size={48} className="mx-auto mb-4 text-gray-400" />
+                  <p className="text-gray-500">No session history yet. Complete your first pomodoro!</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Summary Stats */}
+                  <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-700/50' : 'bg-gray-100'}`}>
+                    <h3 className="text-lg font-medium mb-3">Overview</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center">
+                        <div className={`text-2xl font-bold ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                          {sessionHistory.length}
+                        </div>
+                        <div className="text-sm text-gray-500">Total Sessions</div>
+                      </div>
+                      <div className="text-center">
+                        <div className={`text-2xl font-bold ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
+                          {Math.floor(
+                            sessionHistory.reduce((total, session) => total + (session.duration || 0), 0) / 60
+                          )}h {
+                            sessionHistory.reduce((total, session) => total + (session.duration || 0), 0) % 60
+                          }m
+                        </div>
+                        <div className="text-sm text-gray-500">Total Focus Time</div>
+                      </div>
+                      <div className="text-center">
+                        <div className={`text-2xl font-bold ${darkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                          {currentStreak}
+                        </div>
+                        <div className="text-sm text-gray-500">Current Streak</div>
+                      </div>
+                      <div className="text-center">
+                        <div className={`text-2xl font-bold ${darkMode ? 'text-purple-400' : 'text-purple-600'}`}>
+                          {longestStreak}
+                        </div>
+                        <div className="text-sm text-gray-500">Longest Streak</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Daily Progress Chart */}
+                  <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-700/50' : 'bg-gray-100'}`}>
+                    <h3 className="text-lg font-medium mb-3">Daily Progress</h3>
+                    <div className="h-32 flex items-end justify-between gap-1">
+                      {Array.from({ length: 7 }).map((_, i) => {
+                        // Get date for each of the last 7 days
+                        const date = new Date();
+                        date.setDate(date.getDate() - (6 - i));
+                        const dateString = date.toDateString();
+                        
+                        // Filter sessions for this day
+                        const dayCount = sessionHistory.filter(
+                          s => new Date(s.timestamp).toDateString() === dateString
+                        ).length;
+                        
+                        // Max height percentage based on daily goal or max sessions in a day
+                        const maxHeightPercentage = Math.min(100, (dayCount / settings.dailyGoal) * 100);
+                        
+                        return (
+                          <div key={i} className="flex flex-col items-center w-full">
+                            <div className="w-full flex justify-center mb-1">
+                              <div 
+                                className={`w-full rounded-t-md ${
+                                  maxHeightPercentage > 0 
+                                    ? dayCount >= settings.dailyGoal 
+                                      ? darkMode ? 'bg-green-500' : 'bg-green-600' 
+                                      : darkMode ? 'bg-blue-500' : 'bg-blue-600'
+                                    : darkMode ? 'bg-gray-600' : 'bg-gray-300'
+                                } chart-bar-height-${maxHeightPercentage === 0 ? 5 : Math.round(maxHeightPercentage)}`}
+                              ></div>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()]}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Session List */}
+                  <div>
+                    <h3 className="text-lg font-medium mb-3">Recent Sessions</h3>
+                    <div className={`rounded-xl overflow-hidden border ${
+                      darkMode ? 'border-gray-700' : 'border-gray-200'
+                    }`}>
+                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead className={darkMode ? 'bg-gray-700' : 'bg-gray-50'}>
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                              Date & Time
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                              Task
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                              Duration
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                              Distractions
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                              Notes
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className={`divide-y ${
+                          darkMode ? 'divide-gray-700 bg-gray-800' : 'divide-gray-200 bg-white'
+                        }`}>
+                          {sessionHistory.slice(0, 10).map((session, index) => (
+                            <tr key={index}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                {new Date(session.timestamp).toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                {session.task || 'No task'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                {session.duration} min
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                {session.distractions?.length || 0}
+                              </td>
+                              <td className="px-6 py-4 text-sm max-w-[200px] truncate">
+                                {session.notes 
+                                  ? (
+                                    <button 
+                                      onClick={() => setSelectedSessionNotes({
+                                        notes: session.notes,
+                                        task: session.task
+                                      })}
+                                      className={`flex items-center text-sm ${
+                                        darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'
+                                      }`}
+                                    >
+                                      <FileText size={14} className="mr-1" />
+                                      View Notes
+                                    </button>
+                                  ) 
+                                  : '-'
+                                }
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* View Session Notes Modal */}
+      <AnimatePresence>
+        {selectedSessionNotes && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className={`relative max-w-lg w-full rounded-2xl p-6 ${
+                darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'
+              } shadow-2xl max-h-[80vh] overflow-y-auto`}
+            >
+              <button
+                onClick={() => setSelectedSessionNotes(null)}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+                aria-label="Close notes view"
+              >
+                <X size={24} />
+              </button>
+
+              <h2 className="text-2xl font-bold mb-2 flex items-center">
+                <FileText className="mr-2" size={24} />
+                Session Notes
+              </h2>
+              
+              <div className="mb-4 text-sm text-gray-500">
+                Task: {selectedSessionNotes.task || 'No task'}
+              </div>
+              
+              <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                {selectedSessionNotes.notes 
+                  ? <div className="whitespace-pre-wrap">{selectedSessionNotes.notes}</div>
+                  : <div className="text-gray-500">No notes were recorded for this session.</div>
+                }
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Quick Action Floating Button */}
+      <div className="fixed bottom-8 right-8 flex flex-col-reverse space-y-reverse space-y-2">
+        {isActive && mode === 'work' && (
+          <motion.button
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setShowDistractionModal(true)}
+            className="p-4 rounded-full bg-red-500 text-white shadow-lg hover:bg-red-600 transition-colors"
+            title="Log a distraction"
+          >
+            <AlertTriangle size={24} />
+          </motion.button>
+        )}
+
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setShowSessionHistory(true)}
+          className="p-4 rounded-full bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-colors"
+          title="View session history"
+        >
+          <History size={24} />
+        </motion.button>
+
+        {isActive && mode === 'work' && (
+          <motion.button
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setShowNotesModal(true)}
+            className="p-4 rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600 transition-colors"
+            title="Add session notes"
+          >
+            <FileText size={24} />
+          </motion.button>
+        )}
+      </div>
+
+      {/* Notes Modal */}
+      <AnimatePresence>
+        {showNotesModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className={`relative max-w-md w-full rounded-2xl p-6 ${
+                darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'
+              } shadow-2xl`}
+            >
+              <button
+                onClick={() => setShowNotesModal(false)}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+                aria-label="Close notes modal"
+              >
+                <X size={24} />
+              </button>
+
+              <h2 className="text-2xl font-bold mb-6 flex items-center">
+                <FileText className="mr-2" size={24} />
+                Session Notes
+              </h2>
+
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="sessionNotes" className={`block text-sm font-medium mb-1 ${
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>
+                    Add notes for this session
+                  </label>
+                  <textarea
+                    id="sessionNotes"
+                    rows={5}
+                    value={sessionNotes}
+                    onChange={(e) => setSessionNotes(e.target.value)}
+                    placeholder="What did you accomplish? What's next?"
+                    className={`w-full p-3 rounded-xl border ${
+                      darkMode
+                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                    } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                  />
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowNotesModal(false)}
+                    className={`px-4 py-2 rounded-lg ${
+                      darkMode
+                        ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                        : 'bg-gray-200 hover:bg-gray-300 text-gray-900'
+                    }`}
+                  >
+                    Cancel
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={saveSessionNotes}
+                    className={`px-4 py-2 rounded-lg ${
+                      darkMode
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'bg-blue-500 hover:bg-blue-600 text-white'
+                    }`}
+                  >
+                    Save Notes
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Floating AI Assistant */}
       <FloatingAssistant

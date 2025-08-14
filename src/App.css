@@ -74,3 +74,56 @@
   z-index: 1000;
   white-space: nowrap;
 }
+
+/* Progress bar utility classes for dynamic widths */
+.progress-bar-width-0 { width: 0%; }
+.progress-bar-width-1 { width: 1%; }
+.progress-bar-width-2 { width: 2%; }
+.progress-bar-width-3 { width: 3%; }
+.progress-bar-width-4 { width: 4%; }
+.progress-bar-width-5 { width: 5%; }
+.progress-bar-width-6 { width: 6%; }
+.progress-bar-width-7 { width: 7%; }
+.progress-bar-width-8 { width: 8%; }
+.progress-bar-width-9 { width: 9%; }
+.progress-bar-width-10 { width: 10%; }
+.progress-bar-width-15 { width: 15%; }
+.progress-bar-width-20 { width: 20%; }
+.progress-bar-width-25 { width: 25%; }
+.progress-bar-width-30 { width: 30%; }
+.progress-bar-width-35 { width: 35%; }
+.progress-bar-width-40 { width: 40%; }
+.progress-bar-width-45 { width: 45%; }
+.progress-bar-width-50 { width: 50%; }
+.progress-bar-width-55 { width: 55%; }
+.progress-bar-width-60 { width: 60%; }
+.progress-bar-width-65 { width: 65%; }
+.progress-bar-width-70 { width: 70%; }
+.progress-bar-width-75 { width: 75%; }
+.progress-bar-width-80 { width: 80%; }
+.progress-bar-width-85 { width: 85%; }
+.progress-bar-width-90 { width: 90%; }
+.progress-bar-width-95 { width: 95%; }
+.progress-bar-width-100 { width: 100%; }
+
+/* Chart bar heights */
+.chart-bar-height-5 { height: 5%; }
+.chart-bar-height-10 { height: 10%; }
+.chart-bar-height-15 { height: 15%; }
+.chart-bar-height-20 { height: 20%; }
+.chart-bar-height-25 { height: 25%; }
+.chart-bar-height-30 { height: 30%; }
+.chart-bar-height-35 { height: 35%; }
+.chart-bar-height-40 { height: 40%; }
+.chart-bar-height-45 { height: 45%; }
+.chart-bar-height-50 { height: 50%; }
+.chart-bar-height-55 { height: 55%; }
+.chart-bar-height-60 { height: 60%; }
+.chart-bar-height-65 { height: 65%; }
+.chart-bar-height-70 { height: 70%; }
+.chart-bar-height-75 { height: 75%; }
+.chart-bar-height-80 { height: 80%; }
+.chart-bar-height-85 { height: 85%; }
+.chart-bar-height-90 { height: 90%; }
+.chart-bar-height-95 { height: 95%; }
+.chart-bar-height-100 { height: 100%; }

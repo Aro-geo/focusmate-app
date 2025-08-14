@@ -1,0 +1,29 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user is accessing their own data
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // By default, deny all reads and writes
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // User-specific journal attachments
+    match /users/{userId}/journal_attachments/{fileName} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Allow users to read and write only to their own folder
+    match /users/{userId}/{allUserPaths=**} {
+      allow read, write: if isOwner(userId);
+    }
+  }
+}

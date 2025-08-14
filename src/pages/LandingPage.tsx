@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Brain, 
-  CheckCircle, 
-  Clock, 
+ 
+ 
   Shield, 
-  Zap, 
+ 
   Target, 
   BarChart3, 
   Users, 
@@ -16,7 +16,7 @@ import {
   BookOpen,
   TrendingUp
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+// import { Link } from 'react-router-dom';
 import FloatingAuthModal from '../components/FloatingAuthModal';
 import { FocusMateAvatar } from '../components/FocusMateAvatar';
 

@@ -112,10 +112,12 @@ class PWAService {
    */
   private handleInstallPrompt() {
     window.addEventListener('beforeinstallprompt', (e) => {
-      console.log('📱 Install prompt available');
+      console.log('📱 Install prompt available (banner disabled)');
       e.preventDefault();
       this.deferredPrompt = e;
-      this.showInstallButton();
+      // We're intentionally not showing the install button anymore
+      // to avoid the intrusive floating banner
+      // this.showInstallButton();
     });
 
     window.addEventListener('appinstalled', () => {

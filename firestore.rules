@@ -29,12 +29,17 @@ service cloud.firestore {
       }
 
       // Pomodoro sessions subcollection
-      match /pomodoro/{sessionId} {
+      match /pomodoroSessions/{sessionId} {
         allow read, write: if isOwner(userId);
       }
 
       // Journal entries subcollection
-      match /journal/{entryId} {
+      match /journal_entries/{entryId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Journal entries with alt name for backward compatibility
+      match /journalEntries/{entryId} {
         allow read, write: if isOwner(userId);
       }
 
