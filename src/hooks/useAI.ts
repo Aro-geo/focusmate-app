@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import SecureDeepSeekService, { TaskAnalysis, TaskPrioritization } from '../services/SecureDeepSeekService';
+import SecureDeepSeekService, { TaskAnalysis } from '../services/SecureDeepSeekService';
 
 export const useAI = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -38,20 +38,8 @@ export const useAI = () => {
     }
   }, []);
 
-  const prioritizeTasks = useCallback(async (tasks: any[]): Promise<TaskPrioritization> => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      return await SecureDeepSeekService.prioritizeTasks(tasks);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Task prioritization failed';
-      setError(errorMessage);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  // Removed prioritizeTasks function to avoid token consumption and performance issues
+  // Use chat() function instead for AI suggestions
 
   const getProductivityTip = useCallback(async (currentActivity?: string) => {
     setIsLoading(true);
@@ -108,7 +96,6 @@ export const useAI = () => {
     clearError,
     chat,
     analyzeTask,
-    prioritizeTasks,
     getProductivityTip,
     analyzeFocusSession,
     getJournalInsights

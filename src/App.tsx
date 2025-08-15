@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import EnhancedDashboard from './pages/EnhancedDashboard';
-
+import AdminDashboard from './pages/AdminDashboard';
 import Pomodoro from './pages/Pomodoro';
 import Journal from './pages/Journal';
 import Stats from './pages/Stats';
@@ -15,6 +15,7 @@ import SignUp from './pages/SignUp';
 import LandingPage from './pages/LandingPage';
 import MobileTestComponent from './components/MobileTestComponent';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
@@ -48,6 +49,11 @@ function App() {
                   <Layout>
                     <Routes>
                       <Route path="dashboard" element={<EnhancedDashboard />} />
+                      <Route path="admin" element={
+                        <AdminRoute>
+                          <AdminDashboard />
+                        </AdminRoute>
+                      } />
                       <Route path="pomodoro" element={<Pomodoro />} />
                       <Route path="journal" element={<Journal />} />
                       <Route path="stats" element={<Stats />} />

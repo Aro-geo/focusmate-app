@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { SecurityUtils } from '../utils/security';
 
@@ -158,6 +158,69 @@ export class FirebaseService {
     } catch (e) {
       console.error("Error getting users: ", e);
       throw e;
+    }
+  }
+
+  // Subscription management methods
+  async saveUserSubscription(userId: string, subscription: any): Promise<void> {
+    try {
+      await setDoc(doc(db, 'subscriptions', userId), {
+        ...subscription,
+        updatedAt: new Date()
+      });
+    } catch (error) {
+      console.error('Error saving user subscription:', error);
+      throw error;
+    }
+  }
+
+  async getUserSubscription(userId: string): Promise<any | null> {
+    try {
+      const subscriptionDoc = await getDoc(doc(db, 'subscriptions', userId));
+      return subscriptionDoc.exists() ? subscriptionDoc.data() : null;
+    } catch (error) {
+      console.error('Error getting user subscription:', error);
+      return null;
+    }
+  }
+
+  async getLastAIRequestDate(userId: string): Promise<string | null> {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      const userData = userDoc.data();
+      return userData?.lastAIRequestDate || null;
+    } catch (error) {
+      console.error('Error getting last AI request date:', error);
+      return null;
+    }
+  }
+
+  async resetDailyAIRequests(userId: string): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'users', userId), {
+        dailyAIRequests: 0,
+        lastAIRequestDate: new Date().toDateString()
+      });
+    } catch (error) {
+      console.error('Error resetting daily AI requests:', error);
+    }
+  }
+
+  async recordAIRequest(userId: string): Promise<void> {
+    try {
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userRef);
+      const userData = userDoc.data();
+      
+      const dailyRequests = (userData?.dailyAIRequests || 0) + 1;
+      
+      await updateDoc(userRef, {
+        dailyAIRequests: dailyRequests,
+        lastAIRequestDate: new Date().toDateString(),
+        totalAIRequests: (userData?.totalAIRequests || 0) + 1
+      });
+    } catch (error) {
+      console.error('Error recording AI request:', error);
     }
   }
 }

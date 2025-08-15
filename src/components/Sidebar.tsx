@@ -6,13 +6,16 @@ import {
   Timer, 
   BookOpen, 
   BarChart3, 
-  CheckSquare
+  CheckSquare,
+  Shield
 } from 'lucide-react';
 import StaggeredList from './StaggeredList';
 import UserProfileDropdown from './UserProfileDropdown';
+import SubscriptionStatus from './SubscriptionStatus';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import FocusMateAvatar from './FocusMateAvatar';
+import { adminService } from '../services/AdminService';
 
 const Sidebar: React.FC = () => {
   const navigate = useNavigate();
@@ -25,6 +28,9 @@ const Sidebar: React.FC = () => {
     { to: '/app/journal', icon: BookOpen, label: 'Journal' },
     { to: '/app/stats', icon: BarChart3, label: 'Stats' },
     { to: '/app/todos', icon: CheckSquare, label: 'Todos' },
+    ...(user?.email && adminService.isAdmin(user.email) ? [
+      { to: '/app/admin', icon: Shield, label: 'Admin Panel' }
+    ] : [])
   ];
 
   const handleLogout = async () => {
@@ -94,6 +100,16 @@ const Sidebar: React.FC = () => {
           ))}
         </StaggeredList>
       </nav>
+
+      {/* Subscription Status */}
+      <motion.div
+        className="px-4 py-3"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+      >
+        <SubscriptionStatus compact={true} />
+      </motion.div>
 
       {/* User Profile at Bottom */}
       <motion.div

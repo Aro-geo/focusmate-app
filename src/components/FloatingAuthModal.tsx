@@ -60,8 +60,12 @@ const FloatingAuthModal: React.FC<FloatingAuthModalProps> = ({ isOpen, onClose, 
     try {
       const success = await signInWithGoogle();
       if (success) {
-        navigate('/app/dashboard');
+        // Close modal first to prevent flickering
         onClose();
+        // Small delay to ensure auth state is updated
+        setTimeout(() => {
+          navigate('/app/dashboard');
+        }, 100);
       } else {
         setError('Google sign-in failed');
       }

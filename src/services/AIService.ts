@@ -56,19 +56,8 @@ class AIService {
     }
   }
 
-  async prioritizeTasks(tasks: any[]): Promise<TaskPrioritization> {
-    try {
-      const prioritizeTasks = httpsCallable(this.functions, 'prioritizeTasks');
-      const result = await prioritizeTasks({ tasks });
-      return result.data as TaskPrioritization;
-    } catch (error) {
-      console.error('Task prioritization error:', error);
-      return {
-        aiSuggestion: "Hey there! I'd suggest focusing on your most urgent deadlines first, then moving to the important but less time-sensitive stuff. This way you'll keep stress levels down!",
-        prioritizedTasks: [...tasks].sort((a, b) => a.createdAt - b.createdAt)
-      };
-    }
-  }
+  // Removed prioritizeTasks function to avoid token consumption and performance issues
+  // Use chat() function instead for AI-powered task suggestions
 
   async getProductivityTip(currentActivity?: string): Promise<string> {
     try {

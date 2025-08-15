@@ -75,52 +75,9 @@ export const analyzeTask = onCall(async (request) => {
   }
 });
 
-export const prioritizeTasks = onCall(async (request) => {
-  const {tasks, model = "deepseek-chat", temperature = 1.0} = request.data;
-
-  if (!config.deepseek.apiKey) {
-    throw new Error("DeepSeek API key not configured");
-  }
-
-  try {
-    const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${config.deepseek.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{
-          role: "system",
-          content: "You are a friendly productivity assistant. Write in a " +
-            "conversational, warm tone as if speaking to a friend. Don't use " +
-            "markdown, bullet points, or formal language.",
-        },
-        {
-          role: "user",
-          content: `Prioritize tasks: ${JSON.stringify(tasks)}`,
-        }],
-        max_tokens: 300,
-        temperature,
-      }),
-    });
-
-    const data = await response.json();
-    const aiResponse = data.choices[0]?.message?.content || "";
-
-    return {
-      aiSuggestion: aiResponse,
-      prioritizedTasks: tasks.map((task: unknown, index: number) => ({
-        ...(task as object),
-        priority: index % 3 === 0 ? "high" : index % 2 === 0 ? "medium" : "low",
-      })),
-    };
-  } catch (error) {
-    logger.error("Task prioritization failed", error);
-    throw new Error("Failed to prioritize tasks");
-  }
-});
+// Removed prioritizeTasks cloud function to avoid excessive token consumption
+// and performance issues. Task prioritization is now handled client-side
+// using rule-based sorting and the stable chat() function for AI suggestions.
 
 export const generateUserAnalytics = onDocumentCreated(
   "users/{userId}/sessions/{sessionId}",

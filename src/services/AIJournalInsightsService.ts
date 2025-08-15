@@ -336,14 +336,18 @@ Make suggestions practical and tailored to this person's specific situation.`;
     if (entries.length > 0) {
       // Basic word frequency analysis
       const allText = entries.map(e => e.content.toLowerCase()).join(' ');
-      const words = allText.split(/\s+/);
+      const words = allText.split(/\s+/).filter(word => word.length > 3);
       const wordCount = words.length;
+
+      // Analyze writing frequency
+      const recentEntries = entries.slice(0, 7); // Last 7 entries
+      const avgWordsPerEntry = Math.round(wordCount / entries.length);
 
       insights.push({
         id: 'fallback-activity',
         type: 'pattern',
-        title: 'Journal Activity',
-        description: `You've written ${entries.length} journal entries with a total of ${wordCount} words. Regular journaling shows commitment to self-reflection.`,
+        title: 'Journal Activity Analysis',
+        description: `You've written ${entries.length} journal entries with an average of ${avgWordsPerEntry} words per entry. ${entries.length > 10 ? 'Your consistent journaling habit shows strong commitment to self-reflection.' : 'Keep building your journaling habit for deeper insights.'}`,
         confidence: 0.9,
         relatedEntries: entries.slice(0, 5).map(e => e.id),
         timestamp: new Date()
@@ -358,20 +362,260 @@ Make suggestions practical and tailored to this person's specific situation.`;
         }, {} as Record<string, number>);
 
         const dominantMood = Object.entries(moodCounts).sort(([,a], [,b]) => b - a)[0];
+        const moodPercentage = Math.round((dominantMood[1] / moodEntries.length) * 100);
         
         insights.push({
           id: 'fallback-mood',
           type: 'emotion',
-          title: 'Mood Pattern',
-          description: `Your most frequently recorded mood is "${dominantMood[0]}" (${dominantMood[1]} times). Consider what factors contribute to this emotional state.`,
+          title: 'Emotional Pattern',
+          description: `Your most frequent mood is "${dominantMood[0]}" (${moodPercentage}% of entries). ${dominantMood[0] === 'happy' || dominantMood[0] === 'excited' ? 'This positive trend suggests good emotional well-being.' : dominantMood[0] === 'neutral' ? 'Consider exploring what brings you joy and energy.' : 'Consider what activities or practices help improve your mood.'}`,
           confidence: 0.8,
           relatedEntries: moodEntries.slice(0, 3).map(e => e.id),
           timestamp: new Date()
         });
       }
+
+      // Analyze common themes
+      const commonWords = this.getCommonWords(allText);
+      if (commonWords.length > 0) {
+        const topTheme = commonWords[0];
+        insights.push({
+          id: 'fallback-themes',
+          type: 'pattern',
+          title: 'Common Themes',
+          description: `The word "${topTheme.word}" appears frequently in your entries (${topTheme.count} times). This suggests it's an important theme in your life right now.`,
+          confidence: 0.7,
+          relatedEntries: entries.slice(0, 3).map(e => e.id),
+          timestamp: new Date()
+        });
+      }
+
+      // Provide multiple suggestions and insights
+      insights.push({
+        id: 'fallback-suggestion',
+        type: 'suggestion',
+        title: 'Journaling Tip',
+        description: entries.length < 5 
+          ? 'Try to journal consistently for a week to start seeing patterns in your thoughts and emotions.'
+          : entries.length < 15
+          ? 'Consider adding specific goals or gratitude items to your entries for more structured reflection.'
+          : 'You have a solid journaling foundation! Try reviewing your past entries monthly to track your personal growth.',
+        confidence: 0.8,
+        relatedEntries: entries.slice(0, 2).map(e => e.id),
+        timestamp: new Date()
+      });
+
+      // Analyze writing consistency
+      if (entries.length > 3) {
+        const dates = entries.map(e => new Date(e.createdAt).toDateString());
+        const uniqueDates = new Set(dates);
+        const consistency = uniqueDates.size / entries.length;
+        
+        insights.push({
+          id: 'fallback-consistency',
+          type: 'pattern',
+          title: 'Writing Consistency',
+          description: consistency > 0.8 
+            ? `You write consistently across different days (${uniqueDates.size} unique days). This regular practice helps build self-awareness.`
+            : consistency > 0.5
+            ? `You have moderate writing consistency. Try spreading your entries across more days for better habit formation.`
+            : `You tend to write multiple entries on the same days. Consider spreading your journaling across more days for consistent reflection.`,
+          confidence: 0.7,
+          relatedEntries: entries.slice(0, 3).map(e => e.id),
+          timestamp: new Date()
+        });
+      }
+
+      // Analyze entry length patterns
+      const entryLengths = entries.map(e => e.content.length);
+      const avgLength = entryLengths.reduce((a, b) => a + b, 0) / entryLengths.length;
+      const shortEntries = entryLengths.filter(l => l < avgLength * 0.5).length;
+      const longEntries = entryLengths.filter(l => l > avgLength * 1.5).length;
+
+      if (entryLengths.length > 2) {
+        insights.push({
+          id: 'fallback-length',
+          type: 'pattern',
+          title: 'Writing Style Analysis',
+          description: avgLength > 500 
+            ? `You write detailed entries (average ${Math.round(avgLength)} characters). This depth allows for thorough self-reflection.`
+            : avgLength > 200
+            ? `You write moderate-length entries (average ${Math.round(avgLength)} characters). Consider occasionally writing longer entries for deeper insights.`
+            : `You prefer concise entries (average ${Math.round(avgLength)} characters). Sometimes longer entries can reveal more insights.`,
+          confidence: 0.6,
+          relatedEntries: entries.slice(0, 2).map(e => e.id),
+          timestamp: new Date()
+        });
+      }
+
+      // Analyze tags if available
+      const allTags = entries.flatMap(e => e.tags || []);
+      if (allTags.length > 0) {
+        const tagCounts = allTags.reduce((acc, tag) => {
+          acc[tag] = (acc[tag] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+
+        const topTags = Object.entries(tagCounts)
+          .sort(([,a], [,b]) => b - a)
+          .slice(0, 3);
+
+        insights.push({
+          id: 'fallback-tags',
+          type: 'pattern',
+          title: 'Topic Focus',
+          description: `Your most common topics are: ${topTags.map(([tag, count]) => `"${tag}" (${count} times)`).join(', ')}. These themes seem to be important areas of focus in your life.`,
+          confidence: 0.7,
+          relatedEntries: entries.filter(e => e.tags?.includes(topTags[0][0])).slice(0, 3).map(e => e.id),
+          timestamp: new Date()
+        });
+      }
+
+      // Time-based insights
+      const timePatterns = this.analyzeTimePatterns(entries);
+      if (timePatterns) {
+        insights.push(timePatterns);
+      }
+
+      // Growth insights
+      if (entries.length > 5) {
+        const recentEntries = entries.slice(0, Math.floor(entries.length / 2));
+        const olderEntries = entries.slice(Math.floor(entries.length / 2));
+        
+        const recentAvgLength = recentEntries.reduce((sum, e) => sum + e.content.length, 0) / recentEntries.length;
+        const olderAvgLength = olderEntries.reduce((sum, e) => sum + e.content.length, 0) / olderEntries.length;
+        
+        const lengthChange = ((recentAvgLength - olderAvgLength) / olderAvgLength) * 100;
+        
+        if (Math.abs(lengthChange) > 20) {
+          insights.push({
+            id: 'fallback-growth',
+            type: 'growth',
+            title: 'Writing Evolution',
+            description: lengthChange > 0 
+              ? `Your recent entries are ${Math.round(lengthChange)}% longer than earlier ones, suggesting deeper reflection over time.`
+              : `Your recent entries are ${Math.round(Math.abs(lengthChange))}% shorter than earlier ones. You may be becoming more concise or focused.`,
+            confidence: 0.6,
+            relatedEntries: [...recentEntries.slice(0, 2), ...olderEntries.slice(0, 1)].map(e => e.id),
+            timestamp: new Date()
+          });
+        }
+      }
+
+      // Emotional journey insight
+      if (moodEntries.length > 3) {
+        const moodTrend = this.analyzeMoodTrend(moodEntries);
+        if (moodTrend) {
+          insights.push(moodTrend);
+        }
+      }
     }
 
     return insights;
+  }
+
+  private getCommonWords(text: string): Array<{word: string, count: number}> {
+    const words = text.toLowerCase().split(/\s+/);
+    const stopWords = new Set(['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'up', 'about', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'among', 'this', 'that', 'these', 'those', 'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours', 'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', 'her', 'hers', 'herself', 'it', 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves', 'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those', 'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does', 'did', 'doing', 'a', 'an', 'as', 'if', 'each', 'how', 'when', 'where', 'why']);
+    
+    const wordCounts: Record<string, number> = {};
+    
+    words.forEach(word => {
+      const cleanWord = word.replace(/[^\w]/g, '');
+      if (cleanWord.length > 3 && !stopWords.has(cleanWord)) {
+        wordCounts[cleanWord] = (wordCounts[cleanWord] || 0) + 1;
+      }
+    });
+
+    return Object.entries(wordCounts)
+      .map(([word, count]) => ({word, count}))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }
+
+  private analyzeTimePatterns(entries: JournalEntry[]): AIInsight | null {
+    const timeData = entries.map(entry => ({
+      hour: new Date(entry.createdAt).getHours(),
+      date: entry.createdAt
+    }));
+
+    const hourCounts = timeData.reduce((acc, {hour}) => {
+      acc[hour] = (acc[hour] || 0) + 1;
+      return acc;
+    }, {} as Record<number, number>);
+
+    const mostCommonHour = Object.entries(hourCounts)
+      .sort(([,a], [,b]) => b - a)[0];
+
+    if (mostCommonHour && parseInt(mostCommonHour[0]) !== undefined) {
+      const hour = parseInt(mostCommonHour[0]);
+      const count = mostCommonHour[1];
+      const percentage = Math.round((count / entries.length) * 100);
+
+      let timeDescription = '';
+      if (hour >= 5 && hour < 12) {
+        timeDescription = 'morning';
+      } else if (hour >= 12 && hour < 17) {
+        timeDescription = 'afternoon';
+      } else if (hour >= 17 && hour < 21) {
+        timeDescription = 'evening';
+      } else {
+        timeDescription = 'late night/early morning';
+      }
+
+      return {
+        id: 'fallback-time',
+        type: 'pattern',
+        title: 'Writing Time Preference',
+        description: `You tend to write most often in the ${timeDescription} (${percentage}% of entries around ${hour}:00). This suggests when you're most reflective or have time for introspection.`,
+        confidence: 0.6,
+        relatedEntries: entries.slice(0, 3).map(e => e.id),
+        timestamp: new Date()
+      };
+    }
+
+    return null;
+  }
+
+  private analyzeMoodTrend(moodEntries: JournalEntry[]): AIInsight | null {
+    if (moodEntries.length < 4) return null;
+
+    const moodValues: Record<string, number> = {
+      'sad': 1,
+      'frustrated': 2,
+      'tired': 3,
+      'neutral': 4,
+      'reflective': 5,
+      'grateful': 6,
+      'happy': 7,
+      'productive': 8,
+      'creative': 8,
+      'excited': 9
+    };
+
+    const recentMoods = moodEntries.slice(0, Math.floor(moodEntries.length / 2));
+    const olderMoods = moodEntries.slice(Math.floor(moodEntries.length / 2));
+
+    const recentAvg = recentMoods.reduce((sum, entry) => sum + (moodValues[entry.mood!] || 4), 0) / recentMoods.length;
+    const olderAvg = olderMoods.reduce((sum, entry) => sum + (moodValues[entry.mood!] || 4), 0) / olderMoods.length;
+
+    const trend = recentAvg - olderAvg;
+
+    if (Math.abs(trend) > 0.5) {
+      return {
+        id: 'fallback-mood-trend',
+        type: 'emotion',
+        title: 'Emotional Journey',
+        description: trend > 0 
+          ? `Your recent entries show an upward emotional trend. You seem to be feeling more positive lately compared to earlier entries.`
+          : `Your recent entries show a more reflective or challenging emotional period compared to earlier entries. This is normal and shows you're processing life's ups and downs.`,
+        confidence: 0.7,
+        relatedEntries: [...recentMoods.slice(0, 2), ...olderMoods.slice(0, 1)].map(e => e.id),
+        timestamp: new Date()
+      };
+    }
+
+    return null;
   }
 
   /**

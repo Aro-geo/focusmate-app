@@ -31,7 +31,10 @@ const LandingPage: React.FC = () => {
   // Check if user was redirected after logout
   React.useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('logout') === 'true' || window.location.pathname === '/' && document.referrer.includes('/app/')) {
+    // Don't auto-open modal if user is in the middle of Google sign-in process
+    const isGoogleSignIn = urlParams.get('code') || urlParams.get('state') || window.location.hash.includes('access_token');
+    
+    if (!isGoogleSignIn && (urlParams.get('logout') === 'true' || (window.location.pathname === '/' && document.referrer.includes('/app/')))) {
       setAuthModal({ isOpen: true, mode: 'signin' });
       // Clean up URL
       window.history.replaceState({}, document.title, '/');
@@ -120,7 +123,6 @@ const LandingPage: React.FC = () => {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="flex flex-col items-center mb-8"
             >
-              <FocusMateAvatar size="2xl" animated />
               <div className="inline-flex items-center px-4 py-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm font-medium">
                 <Sparkles className="w-4 h-4 mr-2" />
                 AI-Powered Productivity Platform
@@ -398,144 +400,11 @@ const LandingPage: React.FC = () => {
 
 
 
-      {/* Pricing Section */}
-      <section id="pricing" className="py-24 bg-gray-50 dark:bg-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              Simple, Transparent Pricing
-            </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300">
-              Choose the plan that fits your productivity needs
-            </p>
-          </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Free Plan */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              viewport={{ once: true }}
-              className="bg-white dark:bg-gray-900 p-8 rounded-2xl border border-gray-200 dark:border-gray-700"
-            >
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Free</h3>
-              <div className="mb-6">
-                <span className="text-4xl font-bold text-gray-900 dark:text-white">$0</span>
-                <span className="text-gray-600 dark:text-gray-400">/month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  <span className="text-gray-700 dark:text-gray-300">Basic Pomodoro Timer</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  <span className="text-gray-700 dark:text-gray-300">Simple Task Management</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  <span className="text-gray-700 dark:text-gray-300">Basic Analytics</span>
-                </li>
-              </ul>
-              <button className="w-full py-3 px-6 border border-indigo-500 text-indigo-500 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors duration-200">
-                Get Started Free
-              </button>
-            </motion.div>
-
-            {/* Pro Plan */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              viewport={{ once: true }}
-              className="bg-indigo-500 p-8 rounded-2xl text-white relative transform scale-105"
-            >
-              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                <span className="bg-yellow-400 text-yellow-900 px-4 py-1 rounded-full text-sm font-semibold">
-                  Most Popular
-                </span>
-              </div>
-              <h3 className="text-2xl font-bold mb-4">Pro</h3>
-              <div className="mb-6">
-                <span className="text-4xl font-bold">$9</span>
-                <span className="text-indigo-200">/month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-green-300" />
-                  <span>Everything in Free</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-green-300" />
-                  <span>AI Focus Coach</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-green-300" />
-                  <span>Advanced Analytics</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-green-300" />
-                  <span>Smart Insights</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-green-300" />
-                  <span>Priority Support</span>
-                </li>
-              </ul>
-              <button className="w-full py-3 px-6 bg-white text-indigo-500 rounded-lg hover:bg-gray-100 transition-colors duration-200 font-semibold">
-                Start Pro Trial
-              </button>
-            </motion.div>
-
-            {/* Team Plan */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              viewport={{ once: true }}
-              className="bg-white dark:bg-gray-900 p-8 rounded-2xl border border-gray-200 dark:border-gray-700"
-            >
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Team</h3>
-              <div className="mb-6">
-                <span className="text-4xl font-bold text-gray-900 dark:text-white">$19</span>
-                <span className="text-gray-600 dark:text-gray-400">/month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  <span className="text-gray-700 dark:text-gray-300">Everything in Pro</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  <span className="text-gray-700 dark:text-gray-300">Team Collaboration</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  <span className="text-gray-700 dark:text-gray-300">Team Analytics</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  <span className="text-gray-700 dark:text-gray-300">Admin Dashboard</span>
-                </li>
-              </ul>
-              <button className="w-full py-3 px-6 border border-indigo-500 text-indigo-500 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors duration-200">
-                Contact Sales
-              </button>
-            </motion.div>
-          </div>
-        </div>
-      </section>
 
       {/* Contact Section */}
       <section id="contact" className="py-24 bg-white dark:bg-gray-900">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -547,66 +416,169 @@ const LandingPage: React.FC = () => {
               Get in Touch
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300">
-              Have questions? We'd love to hear from you.
+              Have questions? We'd love to hear from you
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            {/* Contact Form */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8 }}
               viewport={{ once: true }}
-              className="text-center p-6 bg-gray-50 dark:bg-gray-800 rounded-xl"
+              className="bg-gray-50 dark:bg-gray-800 p-8 rounded-2xl"
             >
-              <MessageCircle className="h-12 w-12 text-indigo-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                Chat Support
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+                Send us a Message
               </h3>
-              <p className="text-gray-600 dark:text-gray-300 mb-4">
-                Get instant help from our support team
-              </p>
-              <button className="text-indigo-500 hover:text-indigo-600 font-medium">
-                Start Chat
-              </button>
+              <form className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      First Name
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder="John"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Last Name
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder="Doe"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    placeholder="john@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Subject
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    placeholder="How can we help you?"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Message
+                  </label>
+                  <textarea
+                    rows={5}
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                    placeholder="Tell us more about your inquiry..."
+                  ></textarea>
+                </div>
+                <button
+                  type="submit"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
+                >
+                  Send Message
+                </button>
+              </form>
             </motion.div>
 
+            {/* Contact Information */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8 }}
               viewport={{ once: true }}
-              className="text-center p-6 bg-gray-50 dark:bg-gray-800 rounded-xl"
+              className="space-y-8"
             >
-              <Brain className="h-12 w-12 text-indigo-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                Product Demo
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300 mb-4">
-                See FocusMate AI in action
-              </p>
-              <button className="text-indigo-500 hover:text-indigo-600 font-medium">
-                Book Demo
-              </button>
-            </motion.div>
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+                  Contact Information
+                </h3>
+                <div className="space-y-6">
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
+                        <MessageCircle className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Email</h4>
+                      <p className="text-gray-600 dark:text-gray-300">focusmate-ai@hotmail.com</p>
+                    </div>
+                  </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              viewport={{ once: true }}
-              className="text-center p-6 bg-gray-50 dark:bg-gray-800 rounded-xl"
-            >
-              <Award className="h-12 w-12 text-indigo-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                Enterprise
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300 mb-4">
-                Custom solutions for large teams
-              </p>
-              <button className="text-indigo-500 hover:text-indigo-600 font-medium">
-                Contact Sales
-              </button>
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+                        <MessageCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white">WhatsApp</h4>
+                      <p className="text-gray-600 dark:text-gray-300 mb-2">Get instant support via WhatsApp</p>
+                      <a
+                        href="https://wa.me/254726796020?text=Hi%2C%20I%27m%20interested%20in%20FocusMate%20AI"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors duration-200"
+                      >
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        Chat on WhatsApp
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                        <Timer className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Response Time</h4>
+                      <p className="text-gray-600 dark:text-gray-300">We typically respond within 24 hours</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-indigo-50 dark:bg-indigo-900/20 p-6 rounded-xl">
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                  Need Immediate Help?
+                </h4>
+                <p className="text-gray-600 dark:text-gray-300 mb-4">
+                  For urgent inquiries or technical support, reach out via WhatsApp for the fastest response.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <a
+                    href="https://wa.me/254726796020?text=Hi%2C%20I%20need%20urgent%20help%20with%20FocusMate%20AI"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors duration-200"
+                  >
+                    <MessageCircle className="w-4 h-4 mr-2" />
+                    Urgent Support
+                  </a>
+                  <a
+                    href="mailto:focusmate-ai@hotmail.com"
+                    className="inline-flex items-center justify-center px-4 py-2 border border-indigo-500 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors duration-200"
+                  >
+                    Send Email
+                  </a>
+                </div>
+              </div>
             </motion.div>
           </div>
         </div>
@@ -676,7 +648,7 @@ const LandingPage: React.FC = () => {
               <h3 className="text-lg font-semibold mb-4">Product</h3>
               <ul className="space-y-2">
                 <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Features</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Pricing</a></li>
+
                 <li><a href="#" className="text-gray-400 hover:text-white transition-colors">API</a></li>
                 <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Integrations</a></li>
               </ul>

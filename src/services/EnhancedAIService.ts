@@ -89,37 +89,11 @@ class EnhancedAIService {
 
   /**
    * Intelligent Task Prioritization
-   * Uses AI to suggest task order based on energy, deadlines, and dependencies
+   * Uses rule-based sorting to avoid token consumption and performance issues
    */
   async prioritizeTasks(tasks: any[], userState: any): Promise<any[]> {
     try {
-      const messages = [
-        {
-          role: 'system',
-          content: `You are a task prioritization expert. Analyze the given tasks and user state to suggest optimal order.
-          Consider: urgency, importance, user energy levels, dependencies, and optimal timing.
-          Return the tasks reordered with priority scores and reasoning.`
-        },
-        {
-          role: 'user',
-          content: `Tasks: ${JSON.stringify(tasks)}
-          User State: ${JSON.stringify(userState)}
-          
-          Please reorder these tasks with priority scores (1-10) and brief reasoning for each.`
-        }
-      ];
-
-      const response = await BaseApiService.post<any[]>('ai/prioritize-tasks', {
-        messages,
-        tasks,
-        userState
-      });
-
-      if (response.success && response.data) {
-        return response.data;
-      }
-
-      // Fallback prioritization
+      // Use rule-based prioritization instead of AI to avoid token consumption
       return this.generateFallbackPrioritization(tasks);
     } catch (error) {
       console.error('Task prioritization error:', error);

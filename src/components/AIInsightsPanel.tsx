@@ -22,6 +22,8 @@ interface Task {
   priority?: 'low' | 'medium' | 'high';
   due_date?: string;
   estimated_duration?: number;
+  completed?: boolean;
+  dueDate?: string; // Alternative property name
 }
 
 interface AIInsightsPanelProps {
@@ -51,10 +53,10 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({
     }
   }, [currentTask]);
 
-  // Get prioritized tasks when tasks list changes
+  // Use local prioritization instead of AI to avoid token consumption
   useEffect(() => {
     if (tasks.length > 0) {
-      prioritizeTasks();
+      prioritizeTasksLocally();
     }
   }, [tasks]);
 
@@ -91,21 +93,32 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({
     }
   };
 
-  const prioritizeTasks = async () => {
-    try {
-      const currentTime = new Date().toISOString();
-      const userCurrentState = {
-        currentTime,
-        energy_level: userState?.energy_level || 7,
-        mood: userState?.mood || 'focused',
-        ...userState
-      };
+  // Removed prioritizeTasks function to avoid token consumption
+  // Using rule-based prioritization instead
+  const prioritizeTasksLocally = () => {
+    const prioritized = tasks
+      .filter(task => !task.completed) // Filter out completed tasks
+      .sort((a, b) => {
+        // Sort by priority first
+        const priorityOrder = { high: 3, medium: 2, low: 1 };
+        const aPriority = a.priority || 'medium';
+        const bPriority = b.priority || 'medium';
+        const priorityDiff = priorityOrder[bPriority] - priorityOrder[aPriority];
+        if (priorityDiff !== 0) return priorityDiff;
 
-      const prioritized = await enhancedAIService.prioritizeTasks(tasks, userCurrentState);
-      setPrioritizedTasks(prioritized.slice(0, 5)); // Show top 5
-    } catch (error) {
-      console.error('Task prioritization failed:', error);
-    }
+        // Then by due date (sooner first) - handle both property names
+        const aDueDate = a.dueDate || a.due_date;
+        const bDueDate = b.dueDate || b.due_date;
+        
+        if (aDueDate && bDueDate) {
+          return new Date(aDueDate).getTime() - new Date(bDueDate).getTime();
+        }
+        if (aDueDate) return -1;
+        if (bDueDate) return 1;
+        return 0;
+      });
+    
+    setPrioritizedTasks(prioritized.slice(0, 5)); // Show top 5
   };
 
   const getContextualInsights = async () => {
@@ -187,7 +200,7 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({
           whileHover={{ rotate: 180 }}
           onClick={() => {
             if (activeTab === 'analysis') analyzeCurrentTask();
-            else if (activeTab === 'priority') prioritizeTasks();
+            else if (activeTab === 'priority') prioritizeTasksLocally();
             else getContextualInsights();
           }}
           className={`p-2 rounded-lg transition-colors ${

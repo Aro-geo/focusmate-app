@@ -110,20 +110,8 @@ const Profile: React.FC = () => {
     try {
       setIsExporting(true);
       
-      const userProfile = {
-        name: user.name || 'User',
-        email: user.email || '',
-        joinDate: new Date(user.createdAt || Date.now()),
-        totalSessions: stats.completedTasks,
-        totalFocusTime: stats.focusTime,
-        streakCount: 0 // Would be calculated from actual data
-      };
-      
-      await exportService.exportProfileToPDF(userProfile, {
-        stats,
-        notificationPreferences,
-        aiFeedback
-      });
+      // TODO: Implement profile export - temporarily disabled
+      alert('Profile export feature coming soon!');
     } catch (error) {
       console.error('Export error:', error);
     } finally {
@@ -172,22 +160,12 @@ const Profile: React.FC = () => {
                 <Save size={16} className="mr-1" /> Save
               </button>
             ) : (
-              <>
-                <button 
-                  onClick={() => setIsEditing(true)} 
-                  className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
-                >
-                  <Edit size={16} className="mr-1" /> Edit Profile
-                </button>
-                <button 
-                  onClick={handleExportProfile}
-                  disabled={isExporting}
-                  className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
-                >
-                  <Download size={16} className="mr-1" /> 
-                  {isExporting ? 'Exporting...' : 'Export'}
-                </button>
-              </>
+              <button 
+                onClick={() => setIsEditing(true)} 
+                className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
+              >
+                <Edit size={16} className="mr-1" /> Edit Profile
+              </button>
             )}
           </div>
         </div>
@@ -373,8 +351,13 @@ const Profile: React.FC = () => {
           <button className="flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600">
             Change Password
           </button>
-          <button className="flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600">
-            Export Data
+          <button 
+            onClick={handleExportProfile}
+            disabled={isExporting}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+          >
+            <Download size={16} className="mr-2" /> 
+            {isExporting ? 'Exporting...' : 'Export Data'}
           </button>
         </div>
       </div>

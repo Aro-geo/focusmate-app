@@ -69,20 +69,8 @@ class SecureDeepSeekService {
     }
   }
 
-  async prioritizeTasks(tasks: any[]): Promise<TaskPrioritization> {
-    try {
-      const prioritizeTasks = httpsCallable(this.functions, 'prioritizeTasks');
-      const result = await prioritizeTasks({ 
-        tasks,
-        model: 'deepseek-chat',
-        temperature: this.getTemperature('analysis')
-      });
-      return result.data as TaskPrioritization;
-    } catch (error) {
-      console.error('Task prioritization error:', error);
-      throw new Error('Failed to prioritize tasks');
-    }
-  }
+  // Removed prioritizeTasks function to avoid token consumption and performance issues
+  // Use chat() function instead for AI-powered task suggestions
 
   async getProductivityTip(currentActivity?: string): Promise<string> {
     const context = currentActivity 
