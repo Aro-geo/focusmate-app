@@ -13,6 +13,11 @@ interface FloatingAuthModalProps {
 
 const FloatingAuthModal: React.FC<FloatingAuthModalProps> = ({ isOpen, onClose, initialMode }) => {
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
+  
+  // Update mode when initialMode prop changes
+  React.useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -96,6 +101,8 @@ const FloatingAuthModal: React.FC<FloatingAuthModalProps> = ({ isOpen, onClose, 
             <button
               onClick={onClose}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              title="Close modal"
+              aria-label="Close modal"
             >
               <X className="w-6 h-6" />
             </button>

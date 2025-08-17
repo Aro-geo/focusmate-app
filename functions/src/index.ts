@@ -28,8 +28,16 @@ try {
 
 setGlobalOptions({maxInstances: 10});
 
-export const analyzeTask = onCall(async (request) => {
-  const {task, model = "deepseek-chat", temperature = 1.0} = request.data;
+// Force deployment with correct model names
+
+export const analyzeTask = onCall({
+  cors: [config.app.corsOrigin, "https://focusmate-ai-8cad6.web.app", "https://focusmate-ai-8cad6.firebaseapp.com"],
+}, async (request) => {
+  const {
+    task,
+    model = "deepseek-chat",
+    temperature = 1.0,
+  } = request.data;
 
   if (!config.deepseek.apiKey) {
     throw new Error("DeepSeek API key not configured");
@@ -108,7 +116,9 @@ export const generateUserAnalytics = onDocumentCreated(
   }
 );
 
-export const aiChat = onCall(async (request) => {
+export const aiChat = onCall({
+  cors: [config.app.corsOrigin, "https://focusmate-ai-8cad6.web.app", "https://focusmate-ai-8cad6.firebaseapp.com"],
+}, async (request) => {
   const {
     message,
     context,
@@ -162,9 +172,12 @@ export const aiChat = onCall(async (request) => {
   }
 });
 
-export const healthCheck = onRequest(async (req, res) => {
-  res.set("Access-Control-Allow-Origin", config.app.corsOrigin || "*");
-  res.set("Access-Control-Allow-Methods", "GET");
+export const healthCheck = onRequest({
+  cors: [config.app.corsOrigin, "https://focusmate-ai-8cad6.web.app", "https://focusmate-ai-8cad6.firebaseapp.com"],
+}, async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "https://focusmate-ai-8cad6.web.app");
+  res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
   try {
     const status = {

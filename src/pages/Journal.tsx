@@ -406,7 +406,7 @@ const Journal: React.FC = () => {
 
       // Generate comprehensive AI insights
       const insights = await aiJournalInsightsService.generateInsights(journalEntries);
-      
+
       console.log('Generated insights:', insights.length, 'insights');
       console.log('Insights:', insights);
 
@@ -917,9 +917,8 @@ const Journal: React.FC = () => {
               </div>
 
               {/* Simple writing tip */}
-              <div className={`mb-2 p-2 rounded-lg ${
-                darkMode ? 'bg-gray-700/50' : 'bg-blue-50'
-              }`}>
+              <div className={`mb-2 p-2 rounded-lg ${darkMode ? 'bg-gray-700/50' : 'bg-blue-50'
+                }`}>
                 <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                   💡 Write naturally - your thoughts will be beautifully formatted when displayed
                 </p>
@@ -1030,30 +1029,9 @@ const Journal: React.FC = () => {
                     </>
                   )}
                 </button>
-                
+
                 {/* Test button for debugging */}
-                {process.env.NODE_ENV === 'development' && (
-                  <button
-                    onClick={() => {
-                      console.log('Test button clicked');
-                      setAiInsights([
-                        {
-                          id: 'test-1',
-                          type: 'emotion',
-                          title: 'Test Insight',
-                          description: 'This is a test insight to verify the display is working.',
-                          confidence: 0.9,
-                          relatedEntries: [],
-                          timestamp: new Date()
-                        }
-                      ]);
-                      setShowAIInsights(true);
-                    }}
-                    className="ml-2 px-2 py-1 bg-yellow-500 text-white rounded text-xs"
-                  >
-                    Test Insights
-                  </button>
-                )}
+
               </div>
 
               {aiInsight ? (
@@ -1111,6 +1089,8 @@ const Journal: React.FC = () => {
                         onClick={() => setShowAIInsights(false)}
                         className={`p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 ${darkMode ? 'text-gray-400' : 'text-gray-500'
                           }`}
+                        title="Close insights"
+                        aria-label="Close AI insights"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -1129,13 +1109,12 @@ const Journal: React.FC = () => {
                             }`}
                         >
                           <div className="flex items-start space-x-2">
-                            <div className={`p-1 rounded-full ${
-                              insight.type === 'emotion' ? 'bg-pink-100 dark:bg-pink-900/30' :
-                              insight.type === 'pattern' ? 'bg-blue-100 dark:bg-blue-900/30' :
-                              insight.type === 'suggestion' ? 'bg-yellow-100 dark:bg-yellow-900/30' :
-                              insight.type === 'growth' ? 'bg-green-100 dark:bg-green-900/30' :
-                              insight.type === 'concern' ? 'bg-red-100 dark:bg-red-900/30' :
-                              'bg-gray-100 dark:bg-gray-700'
+                            <div className={`p-1 rounded-full ${insight.type === 'emotion' ? 'bg-pink-100 dark:bg-pink-900/30' :
+                                insight.type === 'pattern' ? 'bg-blue-100 dark:bg-blue-900/30' :
+                                  insight.type === 'suggestion' ? 'bg-yellow-100 dark:bg-yellow-900/30' :
+                                    insight.type === 'growth' ? 'bg-green-100 dark:bg-green-900/30' :
+                                      insight.type === 'concern' ? 'bg-red-100 dark:bg-red-900/30' :
+                                        'bg-gray-100 dark:bg-gray-700'
                               }`}>
                               {insight.type === 'emotion' && <span className="text-pink-600 dark:text-pink-400">💭</span>}
                               {insight.type === 'pattern' && <span className="text-blue-600 dark:text-blue-400">🔍</span>}
@@ -1147,9 +1126,7 @@ const Journal: React.FC = () => {
                               <div className="flex items-center justify-between mb-1">
                                 <h4 className={`font-medium text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'
                                   }`}>
-                                  {insight.type === 'emotion' ? 'Emotional Pattern Detection' :
-                                   insight.type === 'pattern' ? 'Thought Pattern Identification' :
-                                   insight.type === 'suggestion' ? 'AI Suggestion' : insight.title}
+                                  {insight.title}
                                 </h4>
                                 <span className={`text-xs px-2 py-1 rounded-full ${insight.confidence > 0.8 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
                                   insight.confidence > 0.6 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :

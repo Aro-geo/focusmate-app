@@ -326,22 +326,30 @@ const EnhancedTodoListDesktop: React.FC<{ user: any }> = ({ user }) => {
 
   // Check for new badges
   const checkBadges = React.useCallback(() => {
-    const newBadges = [...badges];
     const completedToday = tasks.filter(t =>
       t.completed &&
       new Date(t.updatedAt).toDateString() === new Date().toDateString()
     ).length;
 
-    if (completedToday >= 5 && !badges.includes('productive-day')) {
-      newBadges.push('productive-day');
-    }
+    const totalCompleted = tasks.filter(t => t.completed).length;
 
-    if (tasks.filter(t => t.completed).length >= 50 && !badges.includes('task-master')) {
-      newBadges.push('task-master');
-    }
+    setBadges(prevBadges => {
+      const newBadges = [...prevBadges];
+      let hasChanges = false;
 
-    setBadges(newBadges);
-  }, [tasks, badges]);
+      if (completedToday >= 5 && !prevBadges.includes('productive-day')) {
+        newBadges.push('productive-day');
+        hasChanges = true;
+      }
+
+      if (totalCompleted >= 50 && !prevBadges.includes('task-master')) {
+        newBadges.push('task-master');
+        hasChanges = true;
+      }
+
+      return hasChanges ? newBadges : prevBadges;
+    });
+  }, [tasks]);
 
   // Only calculate streaks and badges when tasks change, not AI suggestions
   // AI suggestions are now opt-in to avoid automatic token consumption
@@ -925,6 +933,8 @@ const EnhancedTodoListDesktop: React.FC<{ user: any }> = ({ user }) => {
                     ? 'bg-white dark:bg-gray-600 shadow-sm'
                     : 'hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
+                  title="List view"
+                  aria-label="Switch to list view"
                 >
                   <List className="w-4 h-4" />
                 </button>
@@ -935,6 +945,8 @@ const EnhancedTodoListDesktop: React.FC<{ user: any }> = ({ user }) => {
                     ? 'bg-white dark:bg-gray-600 shadow-sm'
                     : 'hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
+                  title="Calendar view"
+                  aria-label="Switch to calendar view"
                 >
                   <Calendar className="w-4 h-4" />
                 </button>
@@ -1173,6 +1185,8 @@ const EnhancedTodoListDesktop: React.FC<{ user: any }> = ({ user }) => {
                     ? 'border-gray-600 bg-gray-700 text-white'
                     : 'border-gray-300 bg-white text-gray-900'
                     }`}
+                  title="Group tasks by"
+                  aria-label="Group tasks by"
                 >
                   <option value="none">No grouping</option>
                   <option value="priority">Group by priority</option>
@@ -1186,6 +1200,8 @@ const EnhancedTodoListDesktop: React.FC<{ user: any }> = ({ user }) => {
                 <span className="text-sm text-gray-500">Sort:</span>
                 <select
                   value={sortBy}
+                  title="Sort tasks by"
+                  aria-label="Sort tasks by"
                   onChange={(e) => setSortBy(e.target.value as any)}
                   className={`text-sm border rounded px-2 py-1 ${darkMode
                     ? 'border-gray-600 bg-gray-700 text-white'

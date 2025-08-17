@@ -52,9 +52,9 @@ export const getConfig = (): Config => {
       token: process.env.DEBUG_TOKEN || "",
     },
     app: {
-      url: process.env.APP_URL || "https://focusmate-ai-8cad6.firebaseapp.com",
+      url: process.env.APP_URL || "https://focusmate-ai-8cad6.web.app",
       corsOrigin: process.env.CORS_ORIGIN || process.env.APP_URL ||
-      "https://focusmate-ai-8cad6.firebaseapp.com",
+      "https://focusmate-ai-8cad6.web.app",
     },
   };
 };

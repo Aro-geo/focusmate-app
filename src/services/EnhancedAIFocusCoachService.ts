@@ -144,29 +144,21 @@ Respond as the AI Focus Coach:`;
   private async callAIService(contextPrompt: string): Promise<AIResponse> {
     try {
       // Call Firebase Cloud Function
-      const response = await fetch('https://aichat-juyojvwr7q-uc.a.run.app', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          data: {
-            message: contextPrompt,
-            context: 'focus_coaching',
-            model: 'deepseek-chat',
-            temperature: 0.7
-          }
-        })
+      const { getFunctions, httpsCallable } = await import('firebase/functions');
+      const functions = getFunctions();
+      const aiChat = httpsCallable(functions, 'aiChat');
+      
+      const result = await aiChat({
+        message: contextPrompt,
+        context: 'focus_coaching',
+        model: 'deepseek-chat',
+        temperature: 0.7
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = result.data as { response: string };
       
       // Parse the AI response to extract different components
-      const aiMessage = data.result?.response || data.result || 'Let me help you stay focused!';
+      const aiMessage = data.response || 'Let me help you stay focused!';
       
       return this.parseAIResponse(aiMessage);
     } catch (error) {

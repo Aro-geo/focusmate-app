@@ -129,26 +129,25 @@ class AdminService {
    */
   async getAIPerformanceMetrics(): Promise<AIPerformanceMetrics> {
     try {
-      const response = await fetch('https://aichat-juyojvwr7q-uc.a.run.app/health', {
+      // Use Firebase Functions health check
+      const response = await fetch('https://healthcheck-juyojvwr7q-uc.a.run.app', {
         method: 'GET'
       });
 
       const healthData = response.ok ? await response.json() : null;
 
-      // Test AI response time
+      // Test AI response time using Firebase Functions
       const startTime = Date.now();
       try {
-        await fetch('https://aichat-juyojvwr7q-uc.a.run.app', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            data: {
-              message: 'Health check test',
-              context: 'admin_test',
-              model: 'deepseek-chat',
-              temperature: 0.1
-            }
-          })
+        const { getFunctions, httpsCallable } = await import('firebase/functions');
+        const functions = getFunctions();
+        const aiChat = httpsCallable(functions, 'aiChat');
+
+        await aiChat({
+          message: 'Health check test',
+          context: 'admin_test',
+          model: 'deepseek-chat',
+          temperature: 0.1
         });
       } catch (e) {
         // Ignore test errors
@@ -190,7 +189,7 @@ class AdminService {
   async testDatabaseConnection(): Promise<DatabaseHealth> {
     try {
       const startTime = Date.now();
-      
+
       // Test Firestore connection
       const response = await fetch('https://firestore.googleapis.com/v1/projects/focusmate-ai-8cad6/databases/(default)/documents', {
         method: 'GET'
@@ -242,25 +241,21 @@ class AdminService {
   }> {
     try {
       const startTime = Date.now();
-      
-      const response = await fetch('https://aichat-juyojvwr7q-uc.a.run.app', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          data: {
-            message: 'Admin connection test',
-            context: 'admin_health_check',
-            model: 'deepseek-chat',
-            temperature: 0.1
-          }
-        })
+
+      const { getFunctions, httpsCallable } = await import('firebase/functions');
+      const functions = getFunctions();
+      const aiChat = httpsCallable(functions, 'aiChat');
+
+      const result = await aiChat({
+        message: 'Admin connection test',
+        context: 'admin_health_check',
+        model: 'deepseek-chat',
+        temperature: 0.1
       });
 
       const responseTime = Date.now() - startTime;
 
-      if (response.ok) {
+      if (result.data) {
         return {
           status: 'healthy',
           responseTime,
@@ -271,7 +266,7 @@ class AdminService {
           status: 'degraded',
           responseTime,
           lastTest: new Date(),
-          error: `HTTP ${response.status}: ${response.statusText}`
+          error: 'AI service returned no data'
         };
       }
     } catch (error) {
@@ -326,7 +321,7 @@ class AdminService {
     try {
       // Mock CSV data for now
       let csvData = '';
-      
+
       switch (dataType) {
         case 'users':
           csvData = 'ID,Email,Name,Created At,Last Login\n';

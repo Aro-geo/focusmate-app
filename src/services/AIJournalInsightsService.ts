@@ -1,3 +1,5 @@
+import { getFunctions, httpsCallable } from 'firebase/functions';
+
 interface JournalEntry {
   id: string;
   title: string;
@@ -39,7 +41,7 @@ interface ThoughtPattern {
 }
 
 class AIJournalInsightsService {
-  private readonly AI_CHAT_ENDPOINT = 'https://aichat-juyojvwr7q-uc.a.run.app';
+  private functions = getFunctions();
 
   /**
    * Generate comprehensive AI insights from journal entries
@@ -203,30 +205,24 @@ Make suggestions practical and tailored to this person's specific situation.`;
   }
 
   /**
-   * Call the AI service with a prompt
+   * Call the AI service with a prompt using Firebase Functions
    */
   private async callAIService(prompt: string): Promise<string> {
-    const response = await fetch(this.AI_CHAT_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        data: {
-          message: prompt,
-          context: 'journal_analysis',
-          model: 'deepseek-chat',
-          temperature: 0.7
-        }
-      })
-    });
+    try {
+      const aiChat = httpsCallable(this.functions, 'aiChat');
+      const result = await aiChat({
+        message: prompt,
+        context: 'journal_analysis',
+        model: 'deepseek-chat',
+        temperature: 0.7
+      });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const data = result.data as { response: string };
+      return data.response || '';
+    } catch (error) {
+      console.error('Firebase function call failed:', error);
+      throw new Error('Failed to get AI response from Firebase Functions');
     }
-
-    const data = await response.json();
-    return data.result?.response || data.result || '';
   }
 
   /**
@@ -328,190 +324,153 @@ Make suggestions practical and tailored to this person's specific situation.`;
   }
 
   /**
-   * Provide fallback insights when AI service fails
+   * Provide 5 precise, high-quality insights when AI service fails
    */
   private getFallbackInsights(entries: JournalEntry[]): AIInsight[] {
     const insights: AIInsight[] = [];
 
-    if (entries.length > 0) {
-      // Basic word frequency analysis
-      const allText = entries.map(e => e.content.toLowerCase()).join(' ');
-      const words = allText.split(/\s+/).filter(word => word.length > 3);
-      const wordCount = words.length;
+    if (entries.length === 0) return insights;
 
-      // Analyze writing frequency
-      const recentEntries = entries.slice(0, 7); // Last 7 entries
-      const avgWordsPerEntry = Math.round(wordCount / entries.length);
+    // 1. Journal Activity & Consistency Analysis (Most Important)
+    const allText = entries.map(e => e.content.toLowerCase()).join(' ');
+    const wordCount = allText.split(/\s+/).filter(word => word.length > 3).length;
+    const avgWordsPerEntry = Math.round(wordCount / entries.length);
+    const dates = entries.map(e => new Date(e.createdAt).toDateString());
+    const uniqueDates = new Set(dates);
+    const consistency = uniqueDates.size / entries.length;
 
+    insights.push({
+      id: 'key-activity',
+      type: 'pattern',
+      title: 'Journaling Overview',
+      description: `You've written ${entries.length} entries (avg ${avgWordsPerEntry} words each) across ${uniqueDates.size} days. ${consistency > 0.7 ? 'Your consistent daily practice shows strong commitment to self-reflection.' : consistency > 0.4 ? 'You have moderate consistency - try spreading entries across more days for better habit formation.' : 'You tend to write multiple entries on the same days. Consider daily journaling for deeper insights.'}`,
+      confidence: 0.95,
+      relatedEntries: entries.slice(0, 3).map(e => e.id),
+      timestamp: new Date()
+    });
+
+    // 2. Emotional Pattern Analysis (If mood data available)
+    const moodEntries = entries.filter(e => e.mood);
+    if (moodEntries.length > 0) {
+      const moodCounts = moodEntries.reduce((acc, entry) => {
+        acc[entry.mood!] = (acc[entry.mood!] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const dominantMood = Object.entries(moodCounts).sort(([,a], [,b]) => b - a)[0];
+      const moodPercentage = Math.round((dominantMood[1] / moodEntries.length) * 100);
+      
+      // Analyze mood trend if enough data
+      let trendInsight = '';
+      if (moodEntries.length > 4) {
+        const moodTrend = this.analyzeMoodTrend(moodEntries);
+        if (moodTrend) {
+          trendInsight = moodTrend.description.includes('upward') ? ' Recent entries show improving emotional trends.' : ' Your emotional journey shows natural ups and downs.';
+        }
+      }
+      
       insights.push({
-        id: 'fallback-activity',
-        type: 'pattern',
-        title: 'Journal Activity Analysis',
-        description: `You've written ${entries.length} journal entries with an average of ${avgWordsPerEntry} words per entry. ${entries.length > 10 ? 'Your consistent journaling habit shows strong commitment to self-reflection.' : 'Keep building your journaling habit for deeper insights.'}`,
-        confidence: 0.9,
-        relatedEntries: entries.slice(0, 5).map(e => e.id),
+        id: 'key-emotion',
+        type: 'emotion',
+        title: 'Emotional Insights',
+        description: `Your most frequent mood is "${dominantMood[0]}" (${moodPercentage}% of entries).${trendInsight} ${dominantMood[0] === 'happy' || dominantMood[0] === 'excited' ? 'This positive pattern suggests good emotional well-being.' : dominantMood[0] === 'neutral' ? 'Consider exploring what brings you more joy and energy.' : 'Focus on activities that help improve your mood and well-being.'}`,
+        confidence: 0.85,
+        relatedEntries: moodEntries.slice(0, 3).map(e => e.id),
         timestamp: new Date()
       });
+    }
 
-      // Check for mood patterns if available
-      const moodEntries = entries.filter(e => e.mood);
-      if (moodEntries.length > 0) {
-        const moodCounts = moodEntries.reduce((acc, entry) => {
-          acc[entry.mood!] = (acc[entry.mood!] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-
-        const dominantMood = Object.entries(moodCounts).sort(([,a], [,b]) => b - a)[0];
-        const moodPercentage = Math.round((dominantMood[1] / moodEntries.length) * 100);
-        
-        insights.push({
-          id: 'fallback-mood',
-          type: 'emotion',
-          title: 'Emotional Pattern',
-          description: `Your most frequent mood is "${dominantMood[0]}" (${moodPercentage}% of entries). ${dominantMood[0] === 'happy' || dominantMood[0] === 'excited' ? 'This positive trend suggests good emotional well-being.' : dominantMood[0] === 'neutral' ? 'Consider exploring what brings you joy and energy.' : 'Consider what activities or practices help improve your mood.'}`,
-          confidence: 0.8,
-          relatedEntries: moodEntries.slice(0, 3).map(e => e.id),
-          timestamp: new Date()
-        });
-      }
-
-      // Analyze common themes
-      const commonWords = this.getCommonWords(allText);
-      if (commonWords.length > 0) {
-        const topTheme = commonWords[0];
-        insights.push({
-          id: 'fallback-themes',
-          type: 'pattern',
-          title: 'Common Themes',
-          description: `The word "${topTheme.word}" appears frequently in your entries (${topTheme.count} times). This suggests it's an important theme in your life right now.`,
-          confidence: 0.7,
-          relatedEntries: entries.slice(0, 3).map(e => e.id),
-          timestamp: new Date()
-        });
-      }
-
-      // Provide multiple suggestions and insights
-      insights.push({
-        id: 'fallback-suggestion',
-        type: 'suggestion',
-        title: 'Journaling Tip',
-        description: entries.length < 5 
-          ? 'Try to journal consistently for a week to start seeing patterns in your thoughts and emotions.'
-          : entries.length < 15
-          ? 'Consider adding specific goals or gratitude items to your entries for more structured reflection.'
-          : 'You have a solid journaling foundation! Try reviewing your past entries monthly to track your personal growth.',
-        confidence: 0.8,
-        relatedEntries: entries.slice(0, 2).map(e => e.id),
-        timestamp: new Date()
-      });
-
-      // Analyze writing consistency
-      if (entries.length > 3) {
-        const dates = entries.map(e => new Date(e.createdAt).toDateString());
-        const uniqueDates = new Set(dates);
-        const consistency = uniqueDates.size / entries.length;
-        
-        insights.push({
-          id: 'fallback-consistency',
-          type: 'pattern',
-          title: 'Writing Consistency',
-          description: consistency > 0.8 
-            ? `You write consistently across different days (${uniqueDates.size} unique days). This regular practice helps build self-awareness.`
-            : consistency > 0.5
-            ? `You have moderate writing consistency. Try spreading your entries across more days for better habit formation.`
-            : `You tend to write multiple entries on the same days. Consider spreading your journaling across more days for consistent reflection.`,
-          confidence: 0.7,
-          relatedEntries: entries.slice(0, 3).map(e => e.id),
-          timestamp: new Date()
-        });
-      }
-
-      // Analyze entry length patterns
-      const entryLengths = entries.map(e => e.content.length);
-      const avgLength = entryLengths.reduce((a, b) => a + b, 0) / entryLengths.length;
-      const shortEntries = entryLengths.filter(l => l < avgLength * 0.5).length;
-      const longEntries = entryLengths.filter(l => l > avgLength * 1.5).length;
-
-      if (entryLengths.length > 2) {
-        insights.push({
-          id: 'fallback-length',
-          type: 'pattern',
-          title: 'Writing Style Analysis',
-          description: avgLength > 500 
-            ? `You write detailed entries (average ${Math.round(avgLength)} characters). This depth allows for thorough self-reflection.`
-            : avgLength > 200
-            ? `You write moderate-length entries (average ${Math.round(avgLength)} characters). Consider occasionally writing longer entries for deeper insights.`
-            : `You prefer concise entries (average ${Math.round(avgLength)} characters). Sometimes longer entries can reveal more insights.`,
-          confidence: 0.6,
-          relatedEntries: entries.slice(0, 2).map(e => e.id),
-          timestamp: new Date()
-        });
-      }
-
-      // Analyze tags if available
-      const allTags = entries.flatMap(e => e.tags || []);
+    // 3. Key Themes & Topics (Most meaningful content analysis)
+    const commonWords = this.getCommonWords(allText);
+    const allTags = entries.flatMap(e => e.tags || []);
+    
+    if (commonWords.length > 0 || allTags.length > 0) {
+      let themeDescription = '';
+      
       if (allTags.length > 0) {
         const tagCounts = allTags.reduce((acc, tag) => {
           acc[tag] = (acc[tag] || 0) + 1;
           return acc;
         }, {} as Record<string, number>);
-
-        const topTags = Object.entries(tagCounts)
-          .sort(([,a], [,b]) => b - a)
-          .slice(0, 3);
-
+        const topTags = Object.entries(tagCounts).sort(([,a], [,b]) => b - a).slice(0, 2);
+        themeDescription = `Your main topics are: ${topTags.map(([tag, count]) => `"${tag}" (${count}x)`).join(', ')}. `;
+      }
+      
+      if (commonWords.length > 0) {
+        const topWord = commonWords[0];
+        themeDescription += `The word "${topWord.word}" appears ${topWord.count} times, indicating it's a significant focus in your reflections.`;
+      }
+      
+      if (themeDescription) {
         insights.push({
-          id: 'fallback-tags',
+          id: 'key-themes',
           type: 'pattern',
-          title: 'Topic Focus',
-          description: `Your most common topics are: ${topTags.map(([tag, count]) => `"${tag}" (${count} times)`).join(', ')}. These themes seem to be important areas of focus in your life.`,
-          confidence: 0.7,
-          relatedEntries: entries.filter(e => e.tags?.includes(topTags[0][0])).slice(0, 3).map(e => e.id),
+          title: 'Core Themes',
+          description: themeDescription + ' These recurring elements reveal what matters most to you right now.',
+          confidence: 0.8,
+          relatedEntries: entries.slice(0, 3).map(e => e.id),
           timestamp: new Date()
         });
       }
-
-      // Time-based insights
-      const timePatterns = this.analyzeTimePatterns(entries);
-      if (timePatterns) {
-        insights.push(timePatterns);
-      }
-
-      // Growth insights
-      if (entries.length > 5) {
-        const recentEntries = entries.slice(0, Math.floor(entries.length / 2));
-        const olderEntries = entries.slice(Math.floor(entries.length / 2));
-        
-        const recentAvgLength = recentEntries.reduce((sum, e) => sum + e.content.length, 0) / recentEntries.length;
-        const olderAvgLength = olderEntries.reduce((sum, e) => sum + e.content.length, 0) / olderEntries.length;
-        
-        const lengthChange = ((recentAvgLength - olderAvgLength) / olderAvgLength) * 100;
-        
-        if (Math.abs(lengthChange) > 20) {
-          insights.push({
-            id: 'fallback-growth',
-            type: 'growth',
-            title: 'Writing Evolution',
-            description: lengthChange > 0 
-              ? `Your recent entries are ${Math.round(lengthChange)}% longer than earlier ones, suggesting deeper reflection over time.`
-              : `Your recent entries are ${Math.round(Math.abs(lengthChange))}% shorter than earlier ones. You may be becoming more concise or focused.`,
-            confidence: 0.6,
-            relatedEntries: [...recentEntries.slice(0, 2), ...olderEntries.slice(0, 1)].map(e => e.id),
-            timestamp: new Date()
-          });
-        }
-      }
-
-      // Emotional journey insight
-      if (moodEntries.length > 3) {
-        const moodTrend = this.analyzeMoodTrend(moodEntries);
-        if (moodTrend) {
-          insights.push(moodTrend);
-        }
-      }
     }
 
-    return insights;
+    // 4. Writing Evolution & Growth (If enough entries)
+    if (entries.length > 5) {
+      const recentEntries = entries.slice(0, Math.floor(entries.length / 2));
+      const olderEntries = entries.slice(Math.floor(entries.length / 2));
+      
+      const recentAvgLength = recentEntries.reduce((sum, e) => sum + e.content.length, 0) / recentEntries.length;
+      const olderAvgLength = olderEntries.reduce((sum, e) => sum + e.content.length, 0) / olderEntries.length;
+      const lengthChange = ((recentAvgLength - olderAvgLength) / olderAvgLength) * 100;
+      
+      let growthDescription = '';
+      if (Math.abs(lengthChange) > 15) {
+        growthDescription = lengthChange > 0 
+          ? `Your recent entries are ${Math.round(lengthChange)}% longer, showing deeper reflection over time. `
+          : `Your recent entries are ${Math.round(Math.abs(lengthChange))}% more concise, suggesting focused clarity. `;
+      } else {
+        growthDescription = 'Your writing style has remained consistent, showing stable reflection habits. ';
+      }
+      
+      growthDescription += 'This evolution reflects your growing self-awareness and journaling maturity.';
+      
+      insights.push({
+        id: 'key-growth',
+        type: 'growth',
+        title: 'Personal Growth',
+        description: growthDescription,
+        confidence: 0.75,
+        relatedEntries: [...recentEntries.slice(0, 2), ...olderEntries.slice(0, 1)].map(e => e.id),
+        timestamp: new Date()
+      });
+    }
+
+    // 5. Personalized Actionable Suggestion (Always provide one)
+    let suggestionText = '';
+    if (entries.length < 5) {
+      suggestionText = 'Build momentum by journaling for 7 consecutive days. Even short entries help establish patterns and insights.';
+    } else if (entries.length < 15) {
+      suggestionText = 'Try themed journaling: dedicate specific days to gratitude, goals, or challenges to add structure to your reflections.';
+    } else if (consistency < 0.5) {
+      suggestionText = 'Spread your journaling across more days rather than multiple entries per day. Daily reflection builds stronger self-awareness.';
+    } else if (avgWordsPerEntry < 100) {
+      suggestionText = 'Occasionally write longer entries to explore your thoughts more deeply. Ask yourself "why" and "how" questions.';
+    } else {
+      suggestionText = 'Consider monthly reviews of your entries to identify patterns and track your personal growth journey.';
+    }
+
+    insights.push({
+      id: 'key-suggestion',
+      type: 'suggestion',
+      title: 'Next Step',
+      description: suggestionText,
+      confidence: 0.9,
+      relatedEntries: entries.slice(0, 2).map(e => e.id),
+      timestamp: new Date()
+    });
+
+    // Return exactly 5 insights (or fewer if some conditions aren't met)
+    return insights.slice(0, 5);
   }
 
   private getCommonWords(text: string): Array<{word: string, count: number}> {
