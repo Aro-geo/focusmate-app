@@ -12,16 +12,19 @@ import {
   Tag,
   X,
   Upload,
-  Image
+  Image,
+  BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../context/ThemeContext';
 import FloatingAssistant from '../components/FloatingAssistant';
+import JournalInsightsModal from '../components/JournalInsightsModal';
 import SecureFirestoreService, { SecureJournalEntry } from '../services/SecureFirestoreService';
 import JournalAIService from '../services/JournalAIService';
 import JournalAttachmentService from '../services/JournalAttachmentService';
 import { exportService } from '../services/ExportService';
 import { aiJournalInsightsService, AIInsight as AIJournalInsight } from '../services/AIJournalInsightsService';
+import { journalInsightsService } from '../services/JournalInsightsService';
 import { useAuth } from '../context/AuthContext';
 import { Timestamp } from 'firebase/firestore';
 
@@ -154,6 +157,7 @@ const Journal: React.FC = () => {
   const [showAIInsights, setShowAIInsights] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [showExportMenu, setShowExportMenu] = useState<boolean>(false);
+  const [showInsightsModal, setShowInsightsModal] = useState<boolean>(false);
 
   // Filtered entries
   const filteredEntries = entries.filter(entry => {
@@ -259,6 +263,20 @@ const Journal: React.FC = () => {
       setCurrentTags('');
       setCurrentAttachments([]);
       setIsPrivateEntry(false);
+
+      // Auto-generate insight from entry
+      const insightData = journalInsightsService.generateInsightFromEntry(currentEntry, entryId);
+      if (insightData) {
+        try {
+          await journalInsightsService.saveInsight({
+            ...insightData,
+            sessionDate: new Date(),
+            entryIds: [entryId]
+          });
+        } catch (err) {
+          console.error('Error saving auto-generated insight:', err);
+        }
+      }
 
       // Show success message
       alert('Journal entry saved successfully!');
@@ -1284,6 +1302,37 @@ const Journal: React.FC = () => {
               </p>
             </motion.div>
 
+            {/* Journal Insights */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.15 }}
+              className={`rounded-2xl p-6 ${darkMode
+                ? 'bg-gray-800/50 border border-gray-700'
+                : 'bg-white/70 border border-white/20 shadow-lg backdrop-blur-sm'
+                }`}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  <Lightbulb className="inline-block mr-2" size={20} />
+                  Session Insights
+                </h2>
+                <button
+                  onClick={() => setShowInsightsModal(true)}
+                  className={`flex items-center px-3 py-2 rounded-lg text-sm ${darkMode
+                    ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                    : 'bg-purple-500 hover:bg-purple-600 text-white'
+                    }`}
+                >
+                  <BookOpen size={16} className="mr-2" />
+                  View All
+                </button>
+              </div>
+              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-3`}>
+                Key takeaways and patterns are automatically saved from your entries.
+              </p>
+            </motion.div>
+
             {/* Past Entries */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}
@@ -1420,6 +1469,12 @@ const Journal: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Journal Insights Modal */}
+      <JournalInsightsModal
+        isOpen={showInsightsModal}
+        onClose={() => setShowInsightsModal(false)}
+      />
 
       {/* Floating AI Assistant */}
       <FloatingAssistant

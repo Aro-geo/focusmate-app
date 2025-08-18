@@ -22,13 +22,15 @@ import {
   History,
   AlertTriangle,
   X,
-  FileText
+  FileText,
+  BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../context/ThemeContext';
 import FloatingAssistant from '../components/FloatingAssistant';
 import FormattedMessage from '../components/FormattedMessage';
 import MobilePomodoro from '../components/MobilePomodoro';
+import SavedTipsModal from '../components/SavedTipsModal';
 import aiService from '../services/AIService';
 import useResponsive from '../hooks/useResponsive';
 import DatabasePomodoroService from '../services/DatabasePomodoroService';
@@ -121,6 +123,7 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
   const [showDistractionModal, setShowDistractionModal] = useState<boolean>(false);
   const [showNotesModal, setShowNotesModal] = useState<boolean>(false);
   const [selectedSessionNotes, setSelectedSessionNotes] = useState<{notes: string | null, task: string | null} | null>(null);
+  const [showSavedTips, setShowSavedTips] = useState<boolean>(false);
   
   // Distractions & Notes
   const [distractions, setDistractions] = useState<Distraction[]>([]);
@@ -935,6 +938,22 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
                   Add Notes
                 </motion.button>
               </div>
+              
+              <div className="mt-4">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowSavedTips(true)}
+                  className={`w-full flex items-center justify-center px-4 py-3 rounded-xl ${
+                    darkMode
+                      ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                      : 'bg-purple-500 hover:bg-purple-600 text-white'
+                  } shadow-lg transition-colors`}
+                >
+                  <BookOpen size={18} className="mr-2" />
+                  Saved Tips
+                </motion.button>
+              </div>
             </motion.div>
 
             {/* Session Stats */}
@@ -1746,6 +1765,12 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
         )}
       </AnimatePresence>
 
+      {/* Saved Tips Modal */}
+      <SavedTipsModal
+        isOpen={showSavedTips}
+        onClose={() => setShowSavedTips(false)}
+      />
+
       {/* Floating AI Assistant */}
       <FloatingAssistant
         isAiLoading={isAiLoading}
@@ -1754,6 +1779,7 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
         setAiChatInput={setAiChatInput}
         onAskAI={handleAskAI}
         onGetTip={handleGetTip}
+        sessionId={currentSession?.id}
       />
     </div>
   );

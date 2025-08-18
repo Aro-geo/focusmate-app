@@ -6,10 +6,12 @@ import {
   Lightbulb, 
   Minimize2,
   Loader,
-  Send
+  Send,
+  BookmarkPlus
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import FormattedMessage from './FormattedMessage';
+import { aiFocusTipsService } from '../services/AIFocusTipsService';
 
 interface FloatingAssistantProps {
   isAiLoading: boolean;
@@ -18,6 +20,7 @@ interface FloatingAssistantProps {
   setAiChatInput: (value: string) => void;
   onAskAI: () => void;
   onGetTip: () => void;
+  sessionId?: string;
 }
 
 const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
@@ -26,7 +29,8 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
   aiChatInput,
   setAiChatInput,
   onAskAI,
-  onGetTip
+  onGetTip,
+  sessionId
 }) => {
   const { darkMode } = useTheme();
   const [isMinimized, setIsMinimized] = useState(false);
@@ -71,6 +75,21 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
       onAskAI();
     }
   }, [aiChatInput, isAiLoading, onAskAI]);
+
+  const handleSaveTip = useCallback(async () => {
+    try {
+      const tipData = aiFocusTipsService.extractTipFromAIMessage(aiMessage);
+      if (tipData) {
+        await aiFocusTipsService.saveTip({
+          ...tipData,
+          source: 'ai-coach',
+          sessionId
+        });
+      }
+    } catch (error) {
+      console.error('Error saving tip:', error);
+    }
+  }, [aiMessage, sessionId]);
 
   if (isMinimized) {
     return (
@@ -244,10 +263,10 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
           )}
 
           {/* Action Buttons */}
-          <div className="flex space-x-2">
+          <div className="grid grid-cols-3 gap-2">
             <motion.button 
               onClick={() => setShowChat(!showChat)}
-              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center space-x-2 ${
+              className={`px-2 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center ${
                 showChat 
                   ? (darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700')
                   : (darkMode ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white')
@@ -257,11 +276,10 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
               disabled={isAiLoading}
             >
               <MessageCircle className="w-4 h-4" />
-              <span>{showChat ? 'Hide Chat' : 'Chat'}</span>
             </motion.button>
             <motion.button 
               onClick={onGetTip}
-              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center space-x-2 ${
+              className={`px-2 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center ${
                 darkMode 
                   ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
                   : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
@@ -271,7 +289,19 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
               disabled={isAiLoading}
             >
               <Lightbulb className="w-4 h-4" />
-              <span>Get Tip</span>
+            </motion.button>
+            <motion.button 
+              onClick={handleSaveTip}
+              className={`px-2 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center ${
+                darkMode 
+                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                  : 'bg-green-500 hover:bg-green-600 text-white'
+              }`}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              disabled={isAiLoading || !aiMessage.includes('##')}
+            >
+              <BookmarkPlus className="w-4 h-4" />
             </motion.button>
           </div>
         </div>
