@@ -45,30 +45,34 @@ class AIJournalInsightsService {
 
   /**
    * Generate comprehensive AI insights from journal entries
+   * Limited to 5 high-quality insights to avoid overwhelming users
    */
   async generateInsights(entries: JournalEntry[]): Promise<AIInsight[]> {
     if (entries.length === 0) return [];
 
     try {
-      const insights: AIInsight[] = [];
+      const allInsights: AIInsight[] = [];
 
-      // Analyze emotions
+      // Analyze emotions (limit to 2 insights)
       const emotionalInsights = await this.analyzeEmotions(entries);
-      insights.push(...emotionalInsights);
+      allInsights.push(...emotionalInsights.slice(0, 2));
 
-      // Analyze thought patterns
+      // Analyze thought patterns (limit to 1 insight)
       const patternInsights = await this.analyzeThoughtPatterns(entries);
-      insights.push(...patternInsights);
+      allInsights.push(...patternInsights.slice(0, 1));
 
-      // Generate growth insights
+      // Generate growth insights (limit to 1 insight)
       const growthInsights = await this.analyzePersonalGrowth(entries);
-      insights.push(...growthInsights);
+      allInsights.push(...growthInsights.slice(0, 1));
 
-      // Generate suggestions
+      // Generate suggestions (limit to 1 insight)
       const suggestionInsights = await this.generateSuggestions(entries);
-      insights.push(...suggestionInsights);
+      allInsights.push(...suggestionInsights.slice(0, 1));
 
-      return insights.sort((a, b) => b.confidence - a.confidence);
+      // Sort by confidence and return top 5
+      return allInsights
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, 5);
     } catch (error) {
       console.error('Error generating AI insights:', error);
       return this.getFallbackInsights(entries);
@@ -226,24 +230,29 @@ Make suggestions practical and tailored to this person's specific situation.`;
   }
 
   /**
-   * Parse emotional insights from AI response
+   * Parse emotional insights from AI response - limit to most significant insights
    */
   private parseEmotionalInsights(response: string, entries: JournalEntry[]): AIInsight[] {
     const insights: AIInsight[] = [];
-    const lines = response.split('\n').filter(line => line.trim());
+    const lines = response.split('\n').filter(line => line.trim() && line.length > 20);
 
-    // Extract key emotional insights
+    // Extract only the most significant emotional insights
+    let insightCount = 0;
     for (const line of lines) {
-      if (line.toLowerCase().includes('emotion') || line.toLowerCase().includes('feeling')) {
+      if (insightCount >= 2) break; // Limit to 2 emotional insights
+      
+      if ((line.toLowerCase().includes('emotion') || line.toLowerCase().includes('feeling')) && 
+          (line.toLowerCase().includes('pattern') || line.toLowerCase().includes('trend') || line.toLowerCase().includes('dominant'))) {
         insights.push({
           id: `emotion-${Date.now()}-${Math.random()}`,
           type: 'emotion',
-          title: 'Emotional Pattern Detected',
+          title: 'Emotional Pattern',
           description: line.trim(),
           confidence: 0.8,
           relatedEntries: entries.slice(0, 3).map(e => e.id),
           timestamp: new Date()
         });
+        insightCount++;
       }
     }
 
@@ -251,23 +260,26 @@ Make suggestions practical and tailored to this person's specific situation.`;
   }
 
   /**
-   * Parse thought pattern insights from AI response
+   * Parse thought pattern insights from AI response - focus on most significant pattern
    */
   private parsePatternInsights(response: string, entries: JournalEntry[]): AIInsight[] {
     const insights: AIInsight[] = [];
-    const lines = response.split('\n').filter(line => line.trim());
+    const lines = response.split('\n').filter(line => line.trim() && line.length > 30);
 
+    // Find the most comprehensive pattern insight
     for (const line of lines) {
-      if (line.toLowerCase().includes('pattern') || line.toLowerCase().includes('recurring')) {
+      if ((line.toLowerCase().includes('pattern') || line.toLowerCase().includes('recurring')) && 
+          (line.toLowerCase().includes('thought') || line.toLowerCase().includes('cognitive') || line.toLowerCase().includes('mental'))) {
         insights.push({
           id: `pattern-${Date.now()}-${Math.random()}`,
           type: 'pattern',
-          title: 'Thought Pattern Identified',
+          title: 'Key Thought Pattern',
           description: line.trim(),
           confidence: 0.75,
           relatedEntries: entries.slice(0, 5).map(e => e.id),
           timestamp: new Date()
         });
+        break; // Only take the first (most significant) pattern
       }
     }
 
@@ -275,23 +287,26 @@ Make suggestions practical and tailored to this person's specific situation.`;
   }
 
   /**
-   * Parse growth insights from AI response
+   * Parse growth insights from AI response - focus on most significant growth
    */
   private parseGrowthInsights(response: string, entries: JournalEntry[]): AIInsight[] {
     const insights: AIInsight[] = [];
-    const lines = response.split('\n').filter(line => line.trim());
+    const lines = response.split('\n').filter(line => line.trim() && line.length > 25);
 
+    // Find the most significant growth insight
     for (const line of lines) {
-      if (line.toLowerCase().includes('growth') || line.toLowerCase().includes('progress') || line.toLowerCase().includes('development')) {
+      if ((line.toLowerCase().includes('growth') || line.toLowerCase().includes('progress') || line.toLowerCase().includes('development')) &&
+          (line.toLowerCase().includes('change') || line.toLowerCase().includes('improve') || line.toLowerCase().includes('evolv'))) {
         insights.push({
           id: `growth-${Date.now()}-${Math.random()}`,
           type: 'growth',
-          title: 'Personal Growth Observed',
+          title: 'Personal Growth',
           description: line.trim(),
           confidence: 0.85,
-          relatedEntries: entries.map(e => e.id),
+          relatedEntries: entries.slice(0, 3).map(e => e.id),
           timestamp: new Date()
         });
+        break; // Only take the most significant growth insight
       }
     }
 
@@ -299,24 +314,27 @@ Make suggestions practical and tailored to this person's specific situation.`;
   }
 
   /**
-   * Parse suggestion insights from AI response
+   * Parse suggestion insights from AI response - focus on most actionable suggestion
    */
   private parseSuggestionInsights(response: string, entries: JournalEntry[]): AIInsight[] {
     const insights: AIInsight[] = [];
-    const lines = response.split('\n').filter(line => line.trim());
+    const lines = response.split('\n').filter(line => line.trim() && line.length > 20);
 
+    // Find the most actionable and specific suggestion
     for (const line of lines) {
-      if (line.toLowerCase().includes('suggest') || line.toLowerCase().includes('recommend') || line.toLowerCase().includes('try')) {
+      if ((line.toLowerCase().includes('suggest') || line.toLowerCase().includes('recommend') || line.toLowerCase().includes('try')) &&
+          (line.toLowerCase().includes('consider') || line.toLowerCase().includes('focus') || line.toLowerCase().includes('practice'))) {
         insights.push({
           id: `suggestion-${Date.now()}-${Math.random()}`,
           type: 'suggestion',
-          title: 'AI Suggestion',
+          title: 'Actionable Suggestion',
           description: line.trim(),
           confidence: 0.7,
           relatedEntries: entries.slice(0, 3).map(e => e.id),
           actionable: line.trim(),
           timestamp: new Date()
         });
+        break; // Only take the most actionable suggestion
       }
     }
 

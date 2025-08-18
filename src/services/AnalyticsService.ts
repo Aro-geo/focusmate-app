@@ -228,7 +228,7 @@ class AnalyticsService {
       return createdDate >= startDate && createdDate <= endDate;
     });
     
-    const completedTasks = tasksInPeriod.filter(task => task.completed);
+    const completedTasks = tasks.filter(task => task.completed);
     
     // Process session data
     const totalFocusMinutes = sessions.reduce((total, session) => {
@@ -292,20 +292,33 @@ class AnalyticsService {
       mood: string;
     }> = [];
     
-    // Create a map of dates
-    const dateMap = new Map();
-    const currentDate = new Date(startDate);
+    // Always limit to last 7 days (Monday to Sunday)
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Convert to Monday = 0
     
-    while (currentDate <= endDate) {
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - daysFromMonday);
+    weekStart.setHours(0, 0, 0, 0);
+    
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+    
+    // Create a map of dates for the current week
+    const dateMap = new Map();
+    const currentDate = new Date(weekStart);
+    
+    for (let i = 0; i < 7; i++) {
       const dateString = currentDate.toISOString().split('T')[0];
+      const dayName = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
       dateMap.set(dateString, {
-        date: dateString,
+        date: dayName,
         focusMinutes: 0,
         sessions: 0,
         completedTasks: 0,
         mood: 'Neutral'
       });
-      
       currentDate.setDate(currentDate.getDate() + 1);
     }
     
@@ -317,7 +330,6 @@ class AnalyticsService {
         const dayStats = dateMap.get(dateString);
         dayStats.focusMinutes += session.durationMinutes;
         dayStats.sessions += 1;
-        // If session has a mood note, use the most recent one for the day
         if (session.notes) {
           dayStats.mood = session.notes;
         }
@@ -334,12 +346,17 @@ class AnalyticsService {
       }
     });
     
-    // Convert map to array
-    dateMap.forEach(stats => {
-      dailyStats.push(stats);
-    });
+    // Convert map to array in correct order
+    const weekStartDate = new Date(weekStart);
+    for (let i = 0; i < 7; i++) {
+      const dateString = weekStartDate.toISOString().split('T')[0];
+      if (dateMap.has(dateString)) {
+        dailyStats.push(dateMap.get(dateString));
+      }
+      weekStartDate.setDate(weekStartDate.getDate() + 1);
+    }
     
-    return dailyStats.sort((a, b) => a.date.localeCompare(b.date));
+    return dailyStats;
   }
   
   private generateLabels(startDate: Date, endDate: Date, timeRange: 'week' | 'month' | 'quarter'): string[] {
@@ -365,26 +382,27 @@ class AnalyticsService {
   }
   
   private generateTaskCategories(tasks: Task[], sessions: FocusSession[]) {
-    // In a real app, you'd have task categories stored with tasks
-    // For now, we'll create mock categories based on task names
     const categories = new Map<string, { totalMinutes: number, count: number }>();
     
-    // Initialize with some default categories
-    categories.set('Work', { totalMinutes: 0, count: 0 });
-    categories.set('Study', { totalMinutes: 0, count: 0 });
-    categories.set('Personal', { totalMinutes: 0, count: 0 });
+    if (tasks.length === 0) {
+      return [];
+    }
     
     // Assign tasks to categories based on keywords in the title
     tasks.forEach(task => {
-      let category = 'Other';
+      let category = 'General';
       const title = task.title.toLowerCase();
       
-      if (title.includes('work') || title.includes('project') || title.includes('meeting')) {
+      if (title.includes('work') || title.includes('project') || title.includes('meeting') || title.includes('job') || title.includes('office')) {
         category = 'Work';
-      } else if (title.includes('study') || title.includes('learn') || title.includes('read')) {
+      } else if (title.includes('study') || title.includes('learn') || title.includes('read') || title.includes('course') || title.includes('book')) {
         category = 'Study';
-      } else if (title.includes('personal') || title.includes('health') || title.includes('hobby')) {
+      } else if (title.includes('personal') || title.includes('health') || title.includes('hobby') || title.includes('exercise') || title.includes('family')) {
         category = 'Personal';
+      } else if (title.includes('code') || title.includes('programming') || title.includes('development') || title.includes('tech')) {
+        category = 'Development';
+      } else if (title.includes('creative') || title.includes('design') || title.includes('art') || title.includes('write')) {
+        category = 'Creative';
       }
       
       if (!categories.has(category)) {
@@ -394,7 +412,12 @@ class AnalyticsService {
       const categoryData = categories.get(category)!;
       categoryData.count += 1;
       
-      // Find related sessions for this task
+      // Estimate time based on task completion (25 minutes per completed task as default)
+      if (task.completed) {
+        categoryData.totalMinutes += 25;
+      }
+      
+      // Add actual session time if available
       const taskSessions = sessions.filter(session => session.taskId === task.id);
       taskSessions.forEach(session => {
         categoryData.totalMinutes += session.durationMinutes;
@@ -403,12 +426,21 @@ class AnalyticsService {
     
     // Convert to array and calculate percentages
     const totalMinutes = Array.from(categories.values()).reduce((total, cat) => total + cat.totalMinutes, 0);
+    const totalTasks = Array.from(categories.values()).reduce((total, cat) => total + cat.count, 0);
     
-    return Array.from(categories.entries()).map(([name, data]) => ({
-      name,
-      totalMinutes: data.totalMinutes,
-      percentage: totalMinutes > 0 ? (data.totalMinutes / totalMinutes) * 100 : 0
-    }));
+    // If no time data, use task count for percentages
+    const useTaskCount = totalMinutes === 0;
+    
+    return Array.from(categories.entries())
+      .map(([name, data]) => ({
+        name,
+        totalMinutes: data.totalMinutes,
+        percentage: useTaskCount 
+          ? (data.count / totalTasks) * 100
+          : (data.totalMinutes / totalMinutes) * 100
+      }))
+      .filter(cat => cat.percentage > 0)
+      .sort((a, b) => b.percentage - a.percentage);
   }
   
   private aggregateSessionsByDay(sessions: FocusSession[], labels: string[]): number[] {

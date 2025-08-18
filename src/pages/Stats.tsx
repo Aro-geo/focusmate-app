@@ -1,24 +1,193 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BarChart3, Clock, Brain, Calendar, LineChart, PieChart, TrendingUp, 
   Flame, BarChart, CheckCircle, Smile, Meh, Frown, Zap, Lightbulb,
-  Target, Award, Timer, Activity, Sun, Moon
+  Target, Award, Timer, Activity, Trophy, Star, Medal,
+  ArrowUp, ArrowDown, Minus, Download, Share2, Settings, Eye, Coffee
 } from 'lucide-react';
-import AdvancedChart, { 
-  createProductivityChartData, 
-  createPomodoroChartData, 
-  createMoodChartData, 
-  createTasksChartData 
-} from '../components/AdvancedChart';
 import { FocusTimeBarChart, TaskDistributionChart } from '../components/Charts';
 import { analyticsService, AnalyticsData } from '../services/AnalyticsService';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import FirestoreService from '../services/FirestoreService';
 import FloatingAssistant from '../components/FloatingAssistant';
-import AnimatedPage from '../components/AnimatedPage';
-import { generateTestData } from '../utils/testDataGenerator';
+import aiService from '../services/AIService';
+
+// Enhanced Mood & Energy Levels Component
+const EnhancedMoodEnergyLevels: React.FC<{ dailyStats: any[], darkMode: boolean }> = ({ dailyStats, darkMode }) => {
+  const getMoodIcon = (mood: string, focusMinutes: number) => {
+    // Generate mood based on activity if not set
+    if (!mood || mood === 'Neutral') {
+      if (focusMinutes >= 120) return { icon: Zap, color: 'amber', label: 'Energetic' };
+      if (focusMinutes >= 60) return { icon: Smile, color: 'green', label: 'Productive' };
+      if (focusMinutes >= 25) return { icon: Meh, color: 'blue', label: 'Focused' };
+      if (focusMinutes > 0) return { icon: Coffee, color: 'orange', label: 'Getting Started' };
+      return { icon: Frown, color: 'gray', label: 'Inactive' };
+    }
+    
+    const moodMap: any = {
+      'productive': { icon: Smile, color: 'green', label: 'Productive' },
+      'energetic': { icon: Zap, color: 'amber', label: 'Energetic' },
+      'creative': { icon: Lightbulb, color: 'purple', label: 'Creative' },
+      'focused': { icon: Target, color: 'blue', label: 'Focused' },
+      'tired': { icon: Frown, color: 'red', label: 'Tired' },
+      'neutral': { icon: Meh, color: 'gray', label: 'Neutral' }
+    };
+    
+    return moodMap[mood.toLowerCase()] || { icon: Meh, color: 'gray', label: 'Neutral' };
+  };
+  
+  const getColorClasses = (color: string) => {
+    const colors: any = {
+      green: { bg: darkMode ? 'bg-green-600/20' : 'bg-green-100', text: 'text-green-600', border: 'border-green-200' },
+      amber: { bg: darkMode ? 'bg-amber-600/20' : 'bg-amber-100', text: 'text-amber-600', border: 'border-amber-200' },
+      blue: { bg: darkMode ? 'bg-blue-600/20' : 'bg-blue-100', text: 'text-blue-600', border: 'border-blue-200' },
+      purple: { bg: darkMode ? 'bg-purple-600/20' : 'bg-purple-100', text: 'text-purple-600', border: 'border-purple-200' },
+      red: { bg: darkMode ? 'bg-red-600/20' : 'bg-red-100', text: 'text-red-600', border: 'border-red-200' },
+      orange: { bg: darkMode ? 'bg-orange-600/20' : 'bg-orange-100', text: 'text-orange-600', border: 'border-orange-200' },
+      gray: { bg: darkMode ? 'bg-gray-600/20' : 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200' }
+    };
+    return colors[color] || colors.gray;
+  };
+  
+  if (dailyStats.length === 0) {
+    return (
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+        className={`rounded-xl shadow-sm p-6 border transition-all hover:shadow-lg ${
+          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'
+        }`}
+      >
+        <div className="flex justify-between items-center mb-6">
+          <h2 className={`text-lg font-semibold flex items-center transition-colors ${
+            darkMode ? 'text-white' : 'text-gray-800'
+          }`}>
+            <TrendingUp className="h-5 w-5 mr-2 text-green-600" />
+            Daily Activity Overview
+          </h2>
+        </div>
+        <div className="text-center py-8">
+          <div className={`text-gray-500 ${darkMode ? 'text-gray-400' : ''}`}>
+            <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p className="text-lg mb-2">No activity data yet</p>
+            <p className="text-sm">Start completing tasks and focus sessions to see your daily patterns</p>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+  
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.5 }}
+      className={`rounded-xl shadow-sm p-6 border transition-all hover:shadow-lg ${
+        darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'
+      }`}
+    >
+      <div className="flex justify-between items-center mb-6">
+        <h2 className={`text-lg font-semibold flex items-center transition-colors ${
+          darkMode ? 'text-white' : 'text-gray-800'
+        }`}>
+          <TrendingUp className="h-5 w-5 mr-2 text-green-600" />
+          Daily Activity Overview
+        </h2>
+      </div>
+      
+      <div className="grid grid-cols-7 gap-2">
+        {dailyStats.map((day: any, idx: number) => {
+          const moodData = getMoodIcon(day.mood, day.focusMinutes);
+          const MoodIcon = moodData.icon;
+          
+          return (
+            <motion.div
+              key={idx}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: idx * 0.1 }}
+              whileHover={{ scale: 1.05, y: -2 }}
+              className={`p-3 rounded-xl border transition-all duration-200 ${
+                darkMode ? 'bg-gray-700/50 border-gray-600 hover:bg-gray-700' : 'bg-gray-50 border-gray-200 hover:bg-white'
+              } hover:shadow-lg cursor-pointer`}
+            >
+              <div className="text-center">
+                <div className={`text-xs font-medium mb-2 ${
+                  darkMode ? 'text-gray-300' : 'text-gray-600'
+                }`}>
+                  {day.date}
+                </div>
+                
+                <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-2 relative ${
+                  darkMode ? 'bg-gray-600/30' : 'bg-gray-100'
+                }`}>
+                  <MoodIcon className={`h-6 w-6 ${moodData.color === 'green' ? 'text-green-500' : 
+                    moodData.color === 'amber' ? 'text-amber-500' : 
+                    moodData.color === 'blue' ? 'text-blue-500' : 
+                    moodData.color === 'purple' ? 'text-purple-500' : 
+                    moodData.color === 'red' ? 'text-red-500' : 
+                    moodData.color === 'orange' ? 'text-orange-500' : 'text-gray-500'}`} />
+                  
+                  {day.focusMinutes > 0 && (
+                    <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                      {Math.floor(day.focusMinutes / 60) || Math.ceil(day.focusMinutes / 60)}
+                    </div>
+                  )}
+                </div>
+                
+                <div className="space-y-1">
+                  <div className={`text-xs font-medium text-blue-600`}>
+                    {day.focusMinutes > 0 ? `${Math.floor(day.focusMinutes / 60)}h ${day.focusMinutes % 60}m` : '0m'}
+                  </div>
+                  
+                  <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    {day.sessions}s • {day.completedTasks}t
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+      
+      {/* Week Summary */}
+      <div className={`mt-4 pt-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+        <div className="grid grid-cols-4 gap-4 text-center">
+          <div>
+            <div className={`text-lg font-bold text-blue-600`}>
+              {Math.floor(dailyStats.reduce((sum, d) => sum + d.focusMinutes, 0) / 60)}h {dailyStats.reduce((sum, d) => sum + d.focusMinutes, 0) % 60}m
+            </div>
+            <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total Focus</div>
+          </div>
+          
+          <div>
+            <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+              {dailyStats.reduce((sum, d) => sum + d.sessions, 0)}
+            </div>
+            <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Sessions</div>
+          </div>
+          
+          <div>
+            <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+              {dailyStats.reduce((sum, d) => sum + d.completedTasks, 0)}
+            </div>
+            <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Tasks</div>
+          </div>
+          
+          <div>
+            <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+              {dailyStats.filter(d => d.focusMinutes > 0).length}/7
+            </div>
+            <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Active Days</div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
 
 const Stats: React.FC = () => {
   const { darkMode, toggleTheme } = useTheme();
@@ -27,8 +196,12 @@ const Stats: React.FC = () => {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [userTasks, setUserTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTab, setSelectedTab] = useState<'overview' | 'productivity' | 'focus' | 'mood'>('overview');
-  const [isGeneratingTestData, setIsGeneratingTestData] = useState(false);
+  const [showAchievements, setShowAchievements] = useState(false);
+  const [goals, setGoals] = useState({ weeklyFocus: 600, weeklyTasks: 20 }); // Default goals
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [celebrateAchievement, setCelebrateAchievement] = useState<string | null>(null);
+  const [aiInsights, setAiInsights] = useState<string[]>([]);
+  const [isLoadingInsights, setIsLoadingInsights] = useState(false);
 
   // AI Assistant state
   const [aiMessage, setAiMessage] = useState<string>("Ready to analyze your productivity patterns! Ask me about your stats or request tips for improvement.");
@@ -57,6 +230,13 @@ const Stats: React.FC = () => {
 
     loadAnalytics();
   }, [timePeriod, firebaseUser]);
+
+  // Generate AI insights when data changes
+  useEffect(() => {
+    if (analyticsData) {
+      generateAIInsights();
+    }
+  }, [analyticsData]);
   // Extract analytics data safely
   const dailyStats = analyticsData?.dailyStats || [];
   const totalCompletedTasks = analyticsData?.totalCompletedTasks || 0;
@@ -73,42 +253,261 @@ const Stats: React.FC = () => {
     const mins = minutes % 60;
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
+  // Generate AI insights based on user data
+  const generateAIInsights = async () => {
+    if (isLoadingInsights) return;
+    
+    setIsLoadingInsights(true);
+    try {
+      // Generate contextual insights based on real data
+      const contextualInsights = [];
+      
+      // Check if we have any data
+      if (totalSessions === 0 && totalCompletedTasks === 0) {
+        contextualInsights.push(
+          'Start your productivity journey by completing your first focus session or task to unlock personalized insights.'
+        );
+        setAiInsights(contextualInsights);
+        return;
+      }
+      
+      // Most productive day insight
+      if (dailyStats.length > 0) {
+        const daysWithActivity = dailyStats.filter(day => day.focusMinutes > 0);
+        if (daysWithActivity.length > 0) {
+          const mostProductiveDay = daysWithActivity.reduce((max, day) => 
+            day.focusMinutes > max.focusMinutes ? day : max
+          );
+          const dayName = new Date(mostProductiveDay.date).toLocaleDateString('en-US', { weekday: 'long' });
+          contextualInsights.push(
+            `Your most productive day was ${dayName} with ${formatMinutes(mostProductiveDay.focusMinutes)} of focus time. Try to replicate the conditions that made this day successful.`
+          );
+        }
+      }
+      
+      // Task completion efficiency
+      if (totalSessions > 0 && totalCompletedTasks > 0) {
+        const tasksPerSession = (totalCompletedTasks / totalSessions).toFixed(1);
+        if (parseFloat(tasksPerSession) >= 1.5) {
+          contextualInsights.push(
+            `Excellent efficiency! You complete ${tasksPerSession} tasks per focus session on average. This shows great task management skills.`
+          );
+        } else if (parseFloat(tasksPerSession) >= 1.0) {
+          contextualInsights.push(
+            `Good progress with ${tasksPerSession} tasks per session. Consider breaking larger tasks into smaller, more manageable chunks to increase completion rates.`
+          );
+        } else {
+          contextualInsights.push(
+            `You're completing ${tasksPerSession} tasks per session. Try breaking down complex tasks into smaller subtasks to boost your completion rate and motivation.`
+          );
+        }
+      }
+      
+      // Focus time analysis
+      if (avgFocusMinutesPerDay > 0) {
+        const dailyHours = (avgFocusMinutesPerDay / 60).toFixed(1);
+        if (parseFloat(dailyHours) >= 2) {
+          contextualInsights.push(
+            `Outstanding commitment! Your daily average of ${dailyHours} hours shows strong dedication to deep work. Maintain this momentum for continued success.`
+          );
+        } else if (parseFloat(dailyHours) >= 1) {
+          contextualInsights.push(
+            `Good foundation with ${dailyHours} hours of daily focus time. Consider gradually increasing to 2+ hours for even better productivity outcomes.`
+          );
+        } else {
+          contextualInsights.push(
+            `Your current ${dailyHours} hours of daily focus time is a good start. Aim to gradually increase this to at least 1-2 hours for optimal productivity.`
+          );
+        }
+      }
+      
+      // Consistency analysis
+      const activeDays = dailyStats.filter(day => day.focusMinutes > 0).length;
+      const totalDays = dailyStats.length;
+      const consistencyRate = totalDays > 0 ? (activeDays / totalDays) * 100 : 0;
+      
+      if (consistencyRate >= 80) {
+        contextualInsights.push(
+          `Exceptional consistency! You've been active ${activeDays} out of ${totalDays} days (${consistencyRate.toFixed(0)}%). This regular habit is key to long-term success.`
+        );
+      } else if (consistencyRate >= 50) {
+        contextualInsights.push(
+          `Good consistency with activity on ${activeDays} out of ${totalDays} days. Try to establish a daily routine to reach 80%+ consistency.`
+        );
+      } else if (activeDays > 0) {
+        contextualInsights.push(
+          `You've been active ${activeDays} out of ${totalDays} days. Focus on building a consistent daily habit - even 15-20 minutes daily is better than longer, irregular sessions.`
+        );
+      }
+      
+      // Productivity score insight
+      if (productivityScore > 0) {
+        if (productivityScore >= 80) {
+          contextualInsights.push(
+            `Excellent productivity score of ${productivityScore}! You're in the top tier. Keep maintaining this consistency and consider mentoring others.`
+          );
+        } else if (productivityScore >= 60) {
+          contextualInsights.push(
+            `Good productivity score of ${productivityScore}. You're on the right track! Try extending focus sessions or reducing distractions to reach the 80+ range.`
+          );
+        } else {
+          contextualInsights.push(
+            `Your productivity score of ${productivityScore} shows room for improvement. Consider using the Pomodoro technique and setting specific daily goals to boost your score.`
+          );
+        }
+      }
+      
+      // Task category insights
+      if (taskCategories.length > 0) {
+        const topCategory = taskCategories.reduce((max, cat) => 
+          cat.percentage > max.percentage ? cat : max
+        );
+        if (topCategory.percentage > 50) {
+          contextualInsights.push(
+            `You're heavily focused on ${topCategory.name} tasks (${topCategory.percentage.toFixed(0)}% of your time). Consider diversifying your activities for better work-life balance.`
+          );
+        }
+      }
+      
+      // Fallback insights if no specific data
+      if (contextualInsights.length === 0) {
+        contextualInsights.push(
+          'Continue building your productivity habits. Consistency is more important than perfection.',
+          'Try the Pomodoro technique: 25 minutes of focused work followed by 5-minute breaks.',
+          'Set specific, achievable daily goals to maintain motivation and track progress.'
+        );
+      }
+      
+      setAiInsights(contextualInsights.slice(0, 5)); // Limit to 5 insights
+    } catch (error) {
+      console.error('Failed to generate AI insights:', error);
+      setAiInsights([
+        'Focus on maintaining consistent daily habits for better productivity.',
+        'Try the Pomodoro technique: 25 minutes of focused work followed by 5-minute breaks.',
+        'Schedule your most important tasks during your peak energy hours.',
+        'Break large tasks into smaller, manageable chunks to improve completion rates.',
+        'Regular breaks between focus sessions help maintain mental clarity throughout the day.'
+      ]);
+    } finally {
+      setIsLoadingInsights(false);
+    }
+  };
+
   // AI Assistant handlers
   const handleAskAI = async () => {
     if (!aiChatInput.trim()) return;
     
     setIsAiLoading(true);
-    // Mock AI response based on stats
-    setTimeout(() => {
-      const responses = [
-        `Based on your ${formatMinutes(totalFocusMinutes)} of focus time this ${timePeriod}, you're performing well! Your productivity score of ${productivityScore} shows consistent effort.`,
-        `I notice you've completed ${totalCompletedTasks} tasks with ${totalSessions} focus sessions. Try to maintain this rhythm for optimal productivity.`,
-        `Your average of ${avgTasksPerDay} tasks per day is solid. Consider setting a daily goal of ${Math.ceil(parseFloat(avgTasksPerDay) * 1.2)} tasks to challenge yourself.`,
-        `Looking at your patterns, you seem most effective during morning hours. Try scheduling your most important work before 2PM for best results.`
-      ];
-      setAiMessage(responses[Math.floor(Math.random() * responses.length)]);
+    try {
+      const context = `User stats: ${totalFocusMinutes} minutes focus time, ${totalCompletedTasks} tasks completed, ${totalSessions} sessions, productivity score: ${productivityScore}`;
+      const response = await aiService.chat(aiChatInput, context);
+      setAiMessage(response.response);
+    } catch (error) {
+      setAiMessage(`Based on your ${formatMinutes(totalFocusMinutes)} of focus time and ${totalCompletedTasks} completed tasks, you're making good progress! Keep up the consistent effort.`);
+    } finally {
       setAiChatInput('');
       setIsAiLoading(false);
-    }, 1500);
+    }
   };
 
   const handleGetTip = async () => {
     setIsAiLoading(true);
-    setTimeout(() => {
-      const tips = [
-        "💡 Tip: Your most productive sessions last 25-45 minutes. Try the Pomodoro technique for optimal focus.",
-        "🎯 Strategy: Batch similar tasks together. Your data shows 30% efficiency gains when you group development work.",
-        "⏰ Timing: Your productivity peaks between 9-11 AM. Schedule your most challenging work during this window.",
-        "🔄 Balance: Take 5-10 minute breaks between sessions. Your data shows this prevents afternoon productivity drops.",
-        "📊 Progress: You're improving! Your focus time has increased by 15% compared to last period."
-      ];
-      setAiMessage(tips[Math.floor(Math.random() * tips.length)]);
+    try {
+      const tip = await aiService.getProductivityTip(`Focus time: ${totalFocusMinutes}min, Tasks: ${totalCompletedTasks}, Sessions: ${totalSessions}`);
+      setAiMessage(tip);
+    } catch (error) {
+      setAiMessage("💡 Tip: Try the Pomodoro technique - 25 minutes of focused work followed by a 5-minute break. This rhythm helps maintain high concentration while preventing burnout.");
+    } finally {
       setIsAiLoading(false);
-    }, 1000);
+    }
   };
 
   // Get max value for the chart scaling
   const maxFocusMinutes = dailyStats.length > 0 ? Math.max(...dailyStats.map((day: any) => day.focusMinutes)) : 0;
+
+  // Calculate achievements
+  const achievements = [
+    {
+      id: 'first_session',
+      title: 'First Steps',
+      description: 'Complete your first focus session',
+      icon: Timer,
+      unlocked: totalSessions >= 1,
+      progress: Math.min(100, (totalSessions / 1) * 100)
+    },
+    {
+      id: 'focus_master',
+      title: 'Focus Master',
+      description: 'Accumulate 10 hours of focus time',
+      icon: Clock,
+      unlocked: totalFocusMinutes >= 600,
+      progress: Math.min(100, (totalFocusMinutes / 600) * 100)
+    },
+    {
+      id: 'task_crusher',
+      title: 'Task Crusher',
+      description: 'Complete 50 tasks',
+      icon: CheckCircle,
+      unlocked: totalCompletedTasks >= 50,
+      progress: Math.min(100, (totalCompletedTasks / 50) * 100)
+    },
+    {
+      id: 'consistency_king',
+      title: 'Consistency King',
+      description: 'Focus for 7 days in a row',
+      icon: Flame,
+      unlocked: dailyStats.filter((d: any) => d.focusMinutes > 0).length >= 7,
+      progress: Math.min(100, (dailyStats.filter((d: any) => d.focusMinutes > 0).length / 7) * 100)
+    },
+    {
+      id: 'productivity_pro',
+      title: 'Productivity Pro',
+      description: 'Achieve 90+ productivity score',
+      icon: Trophy,
+      unlocked: productivityScore >= 90,
+      progress: Math.min(100, (productivityScore / 90) * 100)
+    }
+  ];
+
+  // Calculate trends (mock data for demo)
+  const previousPeriodData = {
+    focusMinutes: Math.max(0, totalFocusMinutes - Math.floor(Math.random() * 200)),
+    tasks: Math.max(0, totalCompletedTasks - Math.floor(Math.random() * 10)),
+    sessions: Math.max(0, totalSessions - Math.floor(Math.random() * 5))
+  };
+
+  const trends = {
+    focusTime: totalFocusMinutes > 0 ? ((totalFocusMinutes - previousPeriodData.focusMinutes) / previousPeriodData.focusMinutes * 100) : 0,
+    tasks: totalCompletedTasks > 0 ? ((totalCompletedTasks - previousPeriodData.tasks) / previousPeriodData.tasks * 100) : 0,
+    sessions: totalSessions > 0 ? ((totalSessions - previousPeriodData.sessions) / previousPeriodData.sessions * 100) : 0
+  };
+
+  // Goal progress
+  const goalProgress = {
+    weeklyFocus: Math.min(100, (totalFocusMinutes / goals.weeklyFocus) * 100),
+    weeklyTasks: Math.min(100, (totalCompletedTasks / goals.weeklyTasks) * 100)
+  };
+
+  // Check for new achievements
+  useEffect(() => {
+    const newAchievements = achievements.filter(a => a.unlocked && a.progress === 100);
+    if (newAchievements.length > 0 && !celebrateAchievement) {
+      setCelebrateAchievement(newAchievements[0].title);
+      setTimeout(() => setCelebrateAchievement(null), 3000);
+    }
+  }, [totalSessions, totalFocusMinutes, totalCompletedTasks]);
+
+  const getTrendIcon = (trend: number) => {
+    if (trend > 5) return <ArrowUp className="w-4 h-4 text-green-500" />;
+    if (trend < -5) return <ArrowDown className="w-4 h-4 text-red-500" />;
+    return <Minus className="w-4 h-4 text-gray-400" />;
+  };
+
+  const getTrendColor = (trend: number) => {
+    if (trend > 5) return 'text-green-500';
+    if (trend < -5) return 'text-red-500';
+    return 'text-gray-400';
+  };
   
   return (
     <div className={`min-h-screen transition-colors duration-300 ${
@@ -142,45 +541,7 @@ const Stats: React.FC = () => {
             </div>
             
             <div className="flex items-center space-x-3">
-              {/* Debug: Generate Test Data */}
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={async () => {
-                  setIsGeneratingTestData(true);
-                  const success = await generateTestData();
-                  if (success) {
-                    // Reload analytics data
-                    const data = await analyticsService.getAnalyticsData(timePeriod);
-                    setAnalyticsData(data);
-                  }
-                  setIsGeneratingTestData(false);
-                }}
-                disabled={isGeneratingTestData}
-                className={`px-4 py-2 rounded-xl text-sm transition-all ${
-                  darkMode
-                    ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                    : 'bg-purple-500 hover:bg-purple-600 text-white'
-                } disabled:opacity-50`}
-                title="Generate test data for debugging"
-              >
-                {isGeneratingTestData ? 'Generating...' : 'Generate Test Data'}
-              </motion.button>
-              
-              {/* Theme Toggle */}
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={toggleTheme}
-                className={`p-3 rounded-xl transition-all ${
-                  darkMode
-                    ? 'bg-gray-700 hover:bg-gray-600 text-yellow-400'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
-                }`}
-                title={`Switch to ${darkMode ? 'light' : 'dark'} mode`}
-              >
-                {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </motion.button>
+              {/* Empty space for future actions */}
             </div>
           </div>
         </div>
@@ -257,7 +618,152 @@ const Stats: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* Top Stats Cards */}
+        {/* Achievement Celebration */}
+        <AnimatePresence>
+          {celebrateAchievement && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.5, y: 50 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.5, y: -50 }}
+              className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"
+            >
+              <div className={`p-8 rounded-2xl shadow-2xl border-2 border-yellow-400 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                <div className="text-center">
+                  <Trophy className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+                  <h3 className={`text-2xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+                    Achievement Unlocked!
+                  </h3>
+                  <p className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    {celebrateAchievement}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Goals & Achievements Section */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8"
+        >
+          {/* Weekly Goals */}
+          <motion.div 
+            whileHover={{ scale: 1.02 }}
+            className={`rounded-xl shadow-sm p-6 border transition-all hover:shadow-lg ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Weekly Goals</h3>
+              <button
+                onClick={() => setShowGoalModal(true)}
+                className={`p-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}>Focus Time</span>
+                  <span className={`font-medium ${goalProgress.weeklyFocus >= 100 ? 'text-green-500' : darkMode ? 'text-white' : 'text-gray-800'}`}>
+                    {formatMinutes(totalFocusMinutes)} / {formatMinutes(goals.weeklyFocus)}
+                  </span>
+                </div>
+                <div className={`w-full bg-gray-200 rounded-full h-2 ${darkMode ? 'bg-gray-700' : ''}`}>
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${goalProgress.weeklyFocus}%` }}
+                    className="bg-indigo-600 h-2 rounded-full transition-all duration-1000"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}>Tasks</span>
+                  <span className={`font-medium ${goalProgress.weeklyTasks >= 100 ? 'text-green-500' : darkMode ? 'text-white' : 'text-gray-800'}`}>
+                    {totalCompletedTasks} / {goals.weeklyTasks}
+                  </span>
+                </div>
+                <div className={`w-full bg-gray-200 rounded-full h-2 ${darkMode ? 'bg-gray-700' : ''}`}>
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${goalProgress.weeklyTasks}%` }}
+                    className="bg-purple-600 h-2 rounded-full transition-all duration-1000"
+                  />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Recent Achievements */}
+          <motion.div 
+            whileHover={{ scale: 1.02 }}
+            className={`rounded-xl shadow-sm p-6 border transition-all hover:shadow-lg ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Achievements</h3>
+              <button
+                onClick={() => setShowAchievements(true)}
+                className={`text-sm text-indigo-600 hover:text-indigo-700 flex items-center`}
+              >
+                <Eye className="w-4 h-4 mr-1" /> View All
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              {achievements.slice(0, 3).map((achievement) => {
+                const Icon = achievement.icon;
+                return (
+                  <div key={achievement.id} className="flex items-center space-x-3">
+                    <div className={`p-2 rounded-lg ${achievement.unlocked ? 'bg-yellow-100 text-yellow-600' : darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-400'}`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1">
+                      <p className={`text-sm font-medium ${achievement.unlocked ? (darkMode ? 'text-white' : 'text-gray-800') : (darkMode ? 'text-gray-400' : 'text-gray-500')}`}>
+                        {achievement.title}
+                      </p>
+                      <div className={`w-full bg-gray-200 rounded-full h-1 mt-1 ${darkMode ? 'bg-gray-700' : ''}`}>
+                        <div 
+                          className={`h-1 rounded-full ${achievement.unlocked ? 'bg-yellow-500' : 'bg-gray-300'}`}
+                          style={{ width: `${achievement.progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+
+          {/* Quick Actions */}
+          <motion.div 
+            whileHover={{ scale: 1.02 }}
+            className={`rounded-xl shadow-sm p-6 border transition-all hover:shadow-lg ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}
+          >
+            <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-800'}`}>Quick Actions</h3>
+            
+            <div className="space-y-3">
+              <button className={`w-full p-3 rounded-lg border transition-all hover:shadow-md ${darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'}`}>
+                <div className="flex items-center space-x-3">
+                  <Download className="w-4 h-4 text-indigo-600" />
+                  <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>Export Stats</span>
+                </div>
+              </button>
+              
+              <button className={`w-full p-3 rounded-lg border transition-all hover:shadow-md ${darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'}`}>
+                <div className="flex items-center space-x-3">
+                  <Share2 className="w-4 h-4 text-green-600" />
+                  <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>Share Progress</span>
+                </div>
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+
+        {/* Top Stats Cards with Trends */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -285,9 +791,17 @@ const Stats: React.FC = () => {
                 }`}>
                   {formatMinutes(totalFocusMinutes)}
                 </h3>
-                <p className="text-sm text-indigo-600 mt-1">
-                  ~{formatMinutes(avgFocusMinutesPerDay)}/day
-                </p>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-sm text-indigo-600">
+                    ~{formatMinutes(avgFocusMinutesPerDay)}/day
+                  </p>
+                  <div className="flex items-center space-x-1">
+                    {getTrendIcon(trends.focusTime)}
+                    <span className={`text-xs font-medium ${getTrendColor(trends.focusTime)}`}>
+                      {Math.abs(trends.focusTime).toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
               </div>
               <div className={`p-3 rounded-lg ${
                 darkMode ? 'bg-indigo-600/20' : 'bg-indigo-50'
@@ -318,9 +832,17 @@ const Stats: React.FC = () => {
                 }`}>
                   {totalSessions}
                 </h3>
-                <p className="text-sm text-green-600 mt-1">
-                  ~{(totalSessions / Math.max(dailyStats.length, 1)).toFixed(1)}/day
-                </p>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-sm text-green-600">
+                    ~{(totalSessions / Math.max(dailyStats.length, 1)).toFixed(1)}/day
+                  </p>
+                  <div className="flex items-center space-x-1">
+                    {getTrendIcon(trends.sessions)}
+                    <span className={`text-xs font-medium ${getTrendColor(trends.sessions)}`}>
+                      {Math.abs(trends.sessions).toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
               </div>
               <div className={`p-3 rounded-lg ${
                 darkMode ? 'bg-green-600/20' : 'bg-green-50'
@@ -351,9 +873,17 @@ const Stats: React.FC = () => {
                 }`}>
                   {totalCompletedTasks}
                 </h3>
-                <p className="text-sm text-purple-600 mt-1">
-                  ~{avgTasksPerDay}/day
-                </p>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-sm text-purple-600">
+                    ~{avgTasksPerDay}/day
+                  </p>
+                  <div className="flex items-center space-x-1">
+                    {getTrendIcon(trends.tasks)}
+                    <span className={`text-xs font-medium ${getTrendColor(trends.tasks)}`}>
+                      {Math.abs(trends.tasks).toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
               </div>
               <div className={`p-3 rounded-lg ${
                 darkMode ? 'bg-purple-600/20' : 'bg-purple-50'
@@ -477,166 +1007,185 @@ const Stats: React.FC = () => {
           <div className={`transition-colors ${
             darkMode ? 'text-gray-300' : 'text-gray-700'
           }`}>
-            <p className="mb-4">Based on your productivity patterns:</p>
-            <ul className="space-y-3">
-              <li className="flex items-start">
-                <span className="text-indigo-600 mr-3 mt-1">•</span>
-                <span>Your most productive day is <span className="font-medium">Thursday</span>, with an average of 3 hours of focus time.</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-indigo-600 mr-3 mt-1">•</span>
-                <span>You complete the most tasks when you have at least 4 focus sessions per day.</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-indigo-600 mr-3 mt-1">•</span>
-                <span>Your productivity drops by 25% after 2PM - consider scheduling your most important work in the morning.</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-indigo-600 mr-3 mt-1">•</span>
-                <span>Taking a 15-minute break after 25 minutes of focus has improved your overall productivity by 15%.</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-indigo-600 mr-3 mt-1">•</span>
-                <span>Development tasks take up most of your focus time (42.7%). Consider batching similar tasks together for better efficiency.</span>
-              </li>
-            </ul>
+            {isLoadingInsights ? (
+              <div className="flex items-center space-x-3">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+                <p>Analyzing your productivity patterns...</p>
+              </div>
+            ) : (
+              <>
+                <p className="mb-4">Based on your productivity patterns:</p>
+                <ul className="space-y-3">
+                  {aiInsights.length > 0 ? (
+                    aiInsights.map((insight, index) => (
+                      <li key={index} className="flex items-start">
+                        <span className="text-indigo-600 mr-3 mt-1">•</span>
+                        <span>{insight}</span>
+                      </li>
+                    ))
+                  ) : (
+                    <li className="flex items-start">
+                      <span className="text-indigo-600 mr-3 mt-1">•</span>
+                      <span>Complete more focus sessions to unlock personalized AI insights about your productivity patterns.</span>
+                    </li>
+                  )}
+                </ul>
+                <button
+                  onClick={generateAIInsights}
+                  className={`mt-4 px-4 py-2 rounded-lg text-sm transition-colors flex items-center space-x-2 ${
+                    darkMode
+                      ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                      : 'bg-indigo-500 hover:bg-indigo-600 text-white'
+                  } disabled:opacity-50`}
+                  disabled={isLoadingInsights}
+                >
+                  {isLoadingInsights ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Analyzing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Brain className="w-4 h-4" />
+                      <span>Refresh Insights</span>
+                    </>
+                  )}
+                </button>
+              </>
+            )}
           </div>
         </motion.div>
         
-        {/* Mood & Energy Levels Section */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className={`rounded-xl shadow-sm p-6 border transition-all hover:shadow-lg ${
-            darkMode 
-              ? 'bg-gray-800 border-gray-700' 
-              : 'bg-white border-gray-100'
-          }`}
-        >
-          <div className="flex justify-between items-center mb-6">
-            <h2 className={`text-lg font-semibold flex items-center transition-colors ${
-              darkMode ? 'text-white' : 'text-gray-800'
-            }`}>
-              <TrendingUp className="h-5 w-5 mr-2 text-green-600" />
-              Mood & Energy Levels
-            </h2>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <div className="min-w-max">
-              {/* Days header */}
-              <div className="flex space-x-4 mb-4">
-                <div className="w-20"></div>
-                {dailyStats.map((day: any, idx: number) => (
-                  <div key={idx} className={`w-16 text-center text-sm font-medium transition-colors ${
-                    darkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
-                    {day.date}
-                  </div>
-                ))}
-              </div>
-              
-              {/* Mood row */}
-              <div className={`flex space-x-4 items-center py-4 border-b transition-colors ${
-                darkMode ? 'border-gray-700 odd:bg-gray-800/50' : 'border-gray-100 odd:bg-gray-50'
-              }`}>
-                <div className={`w-20 text-sm font-medium transition-colors ${
-                  darkMode ? 'text-gray-400' : 'text-gray-600'
-                }`}>
-                  Mood
-                </div>
-                {dailyStats.map((day: any, idx: number) => (
-                  <div key={idx} className="w-16 flex justify-center">
-                    {day.mood === 'productive' && (
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                        darkMode ? 'bg-green-600/20' : 'bg-green-100'
-                      }`}>
-                        <Smile className="h-5 w-5 text-green-600" />
-                      </div>
-                    )}
-                    {day.mood === 'neutral' && (
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                        darkMode ? 'bg-blue-600/20' : 'bg-blue-100'
-                      }`}>
-                        <Meh className="h-5 w-5 text-blue-600" />
-                      </div>
-                    )}
-                    {day.mood === 'tired' && (
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                        darkMode ? 'bg-red-600/20' : 'bg-red-100'
-                      }`}>
-                        <Frown className="h-5 w-5 text-red-600" />
-                      </div>
-                    )}
-                    {day.mood === 'energetic' && (
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                        darkMode ? 'bg-amber-600/20' : 'bg-amber-100'
-                      }`}>
-                        <Zap className="h-5 w-5 text-amber-600" />
-                      </div>
-                    )}
-                    {day.mood === 'creative' && (
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                        darkMode ? 'bg-purple-600/20' : 'bg-purple-100'
-                      }`}>
-                        <Lightbulb className="h-5 w-5 text-purple-600" />
-                      </div>
-                    )}
-                    {day.mood === 'reflective' && (
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                        darkMode ? 'bg-cyan-600/20' : 'bg-cyan-100'
-                      }`}>
-                        <Brain className="h-5 w-5 text-cyan-600" />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              
-              {/* Sessions row */}
-              <div className={`flex space-x-4 items-center py-4 border-b transition-colors ${
-                darkMode ? 'border-gray-700 even:bg-gray-800/30' : 'border-gray-100 even:bg-gray-25'
-              }`}>
-                <div className={`w-20 text-sm font-medium transition-colors ${
-                  darkMode ? 'text-gray-400' : 'text-gray-600'
-                }`}>
-                  Sessions
-                </div>
-                {dailyStats.map((day: any, idx: number) => (
-                  <div key={idx} className="w-16 text-center">
-                    <span className={`text-sm font-medium transition-colors ${
-                      darkMode ? 'text-gray-200' : 'text-gray-800'
-                    }`}>
-                      {day.sessions}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              
-              {/* Tasks row */}
-              <div className={`flex space-x-4 items-center py-4 transition-colors ${
-                darkMode ? 'odd:bg-gray-800/50' : 'odd:bg-gray-50'
-              }`}>
-                <div className={`w-20 text-sm font-medium transition-colors ${
-                  darkMode ? 'text-gray-400' : 'text-gray-600'
-                }`}>
-                  Tasks
-                </div>
-                {dailyStats.map((day: any, idx: number) => (
-                  <div key={idx} className="w-16 text-center">
-                    <span className={`text-sm font-medium transition-colors ${
-                      darkMode ? 'text-gray-200' : 'text-gray-800'
-                    }`}>
-                      {day.completedTasks}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </motion.div>
+        {/* Enhanced Mood & Energy Levels Section */}
+        <EnhancedMoodEnergyLevels dailyStats={dailyStats} darkMode={darkMode} />
       </div>
+
+      {/* Achievements Modal */}
+      <AnimatePresence>
+        {showAchievements && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowAchievements(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className={`max-w-2xl w-full rounded-xl shadow-2xl p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>All Achievements</h2>
+                <button
+                  onClick={() => setShowAchievements(false)}
+                  className={`p-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {achievements.map((achievement) => {
+                  const Icon = achievement.icon;
+                  return (
+                    <div key={achievement.id} className={`p-4 rounded-lg border ${achievement.unlocked ? (darkMode ? 'bg-yellow-900/20 border-yellow-600' : 'bg-yellow-50 border-yellow-200') : (darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200')}`}>
+                      <div className="flex items-start space-x-3">
+                        <div className={`p-3 rounded-lg ${achievement.unlocked ? 'bg-yellow-100 text-yellow-600' : darkMode ? 'bg-gray-600 text-gray-400' : 'bg-gray-200 text-gray-400'}`}>
+                          <Icon className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className={`font-semibold mb-1 ${achievement.unlocked ? (darkMode ? 'text-white' : 'text-gray-800') : (darkMode ? 'text-gray-400' : 'text-gray-500')}`}>
+                            {achievement.title}
+                          </h3>
+                          <p className={`text-sm mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                            {achievement.description}
+                          </p>
+                          <div className={`w-full bg-gray-200 rounded-full h-2 ${darkMode ? 'bg-gray-600' : ''}`}>
+                            <div 
+                              className={`h-2 rounded-full transition-all duration-500 ${achievement.unlocked ? 'bg-yellow-500' : 'bg-gray-300'}`}
+                              style={{ width: `${achievement.progress}%` }}
+                            />
+                          </div>
+                          <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {achievement.progress.toFixed(0)}% Complete
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Goals Modal */}
+      <AnimatePresence>
+        {showGoalModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowGoalModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className={`max-w-md w-full rounded-xl shadow-2xl p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className={`text-xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-800'}`}>Set Weekly Goals</h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Weekly Focus Time (minutes)
+                  </label>
+                  <input
+                    type="number"
+                    value={goals.weeklyFocus}
+                    onChange={(e) => setGoals({...goals, weeklyFocus: parseInt(e.target.value) || 0})}
+                    className={`w-full p-3 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+                  />
+                </div>
+                
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Weekly Tasks
+                  </label>
+                  <input
+                    type="number"
+                    value={goals.weeklyTasks}
+                    onChange={(e) => setGoals({...goals, weeklyTasks: parseInt(e.target.value) || 0})}
+                    className={`w-full p-3 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex space-x-3 mt-6">
+                <button
+                  onClick={() => setShowGoalModal(false)}
+                  className={`flex-1 py-2 px-4 rounded-lg border transition-colors ${darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-300 hover:bg-gray-50'}`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => setShowGoalModal(false)}
+                  className="flex-1 py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  Save Goals
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Floating AI Assistant - Always Visible */}
       <motion.div

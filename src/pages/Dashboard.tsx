@@ -19,7 +19,9 @@ import {
   BookOpen,
   MessageCircle,
   Loader,
-  RefreshCw
+  RefreshCw,
+  Activity,
+  Calendar
 } from 'lucide-react';
 import AnimatedPage from '../components/AnimatedPage';
 import FloatingCard from '../components/FloatingCard';
@@ -29,6 +31,102 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import firestoreService from '../services/FirestoreService';
 import aiService from '../services/AIService';
+import { analyticsService } from '../services/AnalyticsService';
+
+// Recent Activity Component
+const RecentActivity: React.FC = () => {
+  const { darkMode } = useTheme();
+  const { user } = useAuth();
+  const [weeklyData, setWeeklyData] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const loadWeeklyData = async () => {
+      if (!user) return;
+      try {
+        const data = await analyticsService.getAnalyticsData('week');
+        setWeeklyData(data);
+      } catch (error) {
+        console.error('Failed to load weekly data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadWeeklyData();
+  }, [user]);
+
+  if (loading) {
+    return (
+      <FloatingCard className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700" delay={0.8}>
+        <div className="flex items-center justify-center h-32">
+          <Loader className="w-6 h-6 animate-spin text-indigo-600" />
+        </div>
+      </FloatingCard>
+    );
+  }
+
+  const totalCompleted = weeklyData?.totalCompletedTasks || 0;
+  const totalFocusMinutes = weeklyData?.totalFocusMinutes || 0;
+  const totalSessions = weeklyData?.totalSessions || 0;
+  const focusHours = Math.floor(totalFocusMinutes / 60);
+  const focusMinutes = totalFocusMinutes % 60;
+
+  return (
+    <FloatingCard className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700" delay={0.8}>
+      <div className="flex items-center space-x-3 mb-4">
+        <Activity className="w-5 h-5 text-indigo-600" />
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Recent Activity</h3>
+      </div>
+      
+      <div className="space-y-4">
+        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.0 }}>
+          <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
+            <span>Tasks Completed This Week</span>
+            <span>{totalCompleted}</span>
+          </div>
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <motion.div 
+              className="bg-indigo-600 dark:bg-indigo-500 h-2 rounded-full"
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.min((totalCompleted / 10) * 100, 100)}%` }}
+              transition={{ delay: 1.2, duration: 1, ease: "easeOut" }}
+            />
+          </div>
+        </motion.div>
+        
+        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.1 }}>
+          <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
+            <span>Focus Time This Week</span>
+            <span>{focusHours}h {focusMinutes}m</span>
+          </div>
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <motion.div 
+              className="bg-purple-600 dark:bg-purple-500 h-2 rounded-full"
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.min((totalFocusMinutes / 600) * 100, 100)}%` }}
+              transition={{ delay: 1.3, duration: 1, ease: "easeOut" }}
+            />
+          </div>
+        </motion.div>
+        
+        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.2 }}>
+          <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
+            <span>Focus Sessions</span>
+            <span>{totalSessions}</span>
+          </div>
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <motion.div 
+              className="bg-green-600 dark:bg-green-500 h-2 rounded-full"
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.min((totalSessions / 20) * 100, 100)}%` }}
+              transition={{ delay: 1.4, duration: 1, ease: "easeOut" }}
+            />
+          </div>
+        </motion.div>
+      </div>
+    </FloatingCard>
+  );
+};
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -586,51 +684,8 @@ const Dashboard: React.FC = () => {
                 </StaggeredList>
               </FloatingCard>
 
-              {/* Weekly Progress */}
-              <FloatingCard 
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700"
-                delay={0.8}
-              >
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">This Week</h3>
-                <div className="space-y-4">
-                  <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 1.0 }}
-                  >
-                    <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
-                      <span>Tasks Completed</span>
-                      <span>12/15</span>
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <motion.div 
-                        className="bg-indigo-600 dark:bg-indigo-500 h-2 rounded-full"
-                        initial={{ width: 0 }}
-                        animate={{ width: "80%" }}
-                        transition={{ delay: 1.2, duration: 1, ease: "easeOut" }}
-                      ></motion.div>
-                    </div>
-                  </motion.div>
-                  <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 1.1 }}
-                  >
-                    <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
-                      <span>Focus Time</span>
-                      <span>18h / 25h</span>
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <motion.div 
-                        className="bg-purple-600 dark:bg-purple-500 h-2 rounded-full"
-                        initial={{ width: 0 }}
-                        animate={{ width: "75%" }}
-                        transition={{ delay: 1.3, duration: 1, ease: "easeOut" }}
-                      ></motion.div>
-                    </div>
-                  </motion.div>
-                </div>
-              </FloatingCard>
+              {/* Recent Activity */}
+              <RecentActivity />
             </div>
           </div>
         </div>
