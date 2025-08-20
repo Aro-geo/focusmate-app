@@ -264,7 +264,7 @@ const Journal: React.FC = () => {
       setCurrentAttachments([]);
       setIsPrivateEntry(false);
 
-      // Auto-generate insight from entry
+      // Auto-generate and save insight from entry
       const insightData = journalInsightsService.generateInsightFromEntry(currentEntry, entryId);
       if (insightData) {
         try {

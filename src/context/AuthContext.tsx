@@ -61,6 +61,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           };
           setUser(userData);
           setIsAuthenticated(true);
+          
+          // Initialize subscription for new users
+          try {
+            const { default: subscriptionService } = await import('../services/SubscriptionService');
+            await subscriptionService.getUserSubscription(firebaseUser.uid);
+          } catch (subError) {
+            console.error('Error initializing subscription:', subError);
+          }
         } catch (error) {
           console.error('Error loading user profile:', error);
           // Use Firebase user data as fallback
@@ -78,6 +86,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           };
           setUser(userData);
           setIsAuthenticated(true);
+          
+          // Initialize subscription for new users
+          try {
+            const { default: subscriptionService } = await import('../services/SubscriptionService');
+            await subscriptionService.getUserSubscription(firebaseUser.uid);
+          } catch (subError) {
+            console.error('Error initializing subscription:', subError);
+          }
         }
       } else {
         console.log('User signed out or email not verified');

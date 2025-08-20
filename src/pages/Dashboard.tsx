@@ -27,17 +27,20 @@ import AnimatedPage from '../components/AnimatedPage';
 import FloatingCard from '../components/FloatingCard';
 import StaggeredList from '../components/StaggeredList';
 import FloatingAssistant from '../components/FloatingAssistant';
+import SubscriptionStatus from '../components/SubscriptionStatus';
+import UpgradePrompt from '../components/UpgradePrompt';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import firestoreService from '../services/FirestoreService';
 import aiService from '../services/AIService';
+import subscriptionService from '../services/SubscriptionService';
 import { analyticsService } from '../services/AnalyticsService';
+import { taskAnalysisService } from '../services/TaskAnalysisService';
 
-// Recent Activity Component
-const RecentActivity: React.FC = () => {
-  const { darkMode } = useTheme();
+// Daily Activity Overview Component
+const DailyActivityOverview: React.FC = () => {
   const { user } = useAuth();
-  const [weeklyData, setWeeklyData] = React.useState<any>(null);
+  const [weeklyData, setWeeklyData] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -45,7 +48,40 @@ const RecentActivity: React.FC = () => {
       if (!user) return;
       try {
         const data = await analyticsService.getAnalyticsData('week');
-        setWeeklyData(data);
+        
+        // Generate all 7 days of current week with real data
+        const today = new Date();
+        const dayOfWeek = today.getDay();
+        const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - daysFromMonday);
+        weekStart.setHours(0, 0, 0, 0);
+        
+        const weekData = [];
+        const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        
+        for (let i = 0; i < 7; i++) {
+          const currentDay = new Date(weekStart);
+          currentDay.setDate(weekStart.getDate() + i);
+          
+          const dayData = data.dailyStats?.find(stat => {
+            const statDate = new Date();
+            statDate.setDate(today.getDate() - daysFromMonday + i);
+            return stat.date === dayNames[i];
+          });
+          
+          weekData.push({
+            date: dayNames[i] + ', ' + currentDay.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            focusMinutes: dayData?.focusMinutes || 0,
+            sessions: dayData?.sessions || 0,
+            completedTasks: dayData?.completedTasks || 0,
+            mood: dayData?.mood || 'Inactive',
+            isToday: i === daysFromMonday
+          });
+        }
+        
+        setWeeklyData(weekData);
       } catch (error) {
         console.error('Failed to load weekly data:', error);
       } finally {
@@ -54,6 +90,13 @@ const RecentActivity: React.FC = () => {
     };
     loadWeeklyData();
   }, [user]);
+
+  const getStatusInfo = (focusMinutes: number, sessions: number) => {
+    if (focusMinutes >= 60) return { status: 'Active', color: 'border-green-500', icon: '💪', label: 'Productive' };
+    if (focusMinutes >= 25) return { status: 'Active', color: 'border-orange-500', icon: '☕', label: 'Getting Started' };
+    if (sessions > 0) return { status: 'Active', color: 'border-blue-500', icon: '🎯', label: 'Active' };
+    return { status: 'Rest', color: 'border-gray-600', icon: '😴', label: 'Inactive' };
+  };
 
   if (loading) {
     return (
@@ -65,64 +108,67 @@ const RecentActivity: React.FC = () => {
     );
   }
 
-  const totalCompleted = weeklyData?.totalCompletedTasks || 0;
-  const totalFocusMinutes = weeklyData?.totalFocusMinutes || 0;
-  const totalSessions = weeklyData?.totalSessions || 0;
-  const focusHours = Math.floor(totalFocusMinutes / 60);
-  const focusMinutes = totalFocusMinutes % 60;
-
   return (
     <FloatingCard className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700" delay={0.8}>
-      <div className="flex items-center space-x-3 mb-4">
-        <Activity className="w-5 h-5 text-indigo-600" />
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Recent Activity</h3>
+      <div className="flex items-center space-x-3 mb-6">
+        <TrendingUp className="w-5 h-5 text-green-500" />
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Daily Activity Overview</h3>
       </div>
       
-      <div className="space-y-4">
-        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.0 }}>
-          <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
-            <span>Tasks Completed This Week</span>
-            <span>{totalCompleted}</span>
-          </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-            <motion.div 
-              className="bg-indigo-600 dark:bg-indigo-500 h-2 rounded-full"
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.min((totalCompleted / 10) * 100, 100)}%` }}
-              transition={{ delay: 1.2, duration: 1, ease: "easeOut" }}
-            />
-          </div>
-        </motion.div>
-        
-        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.1 }}>
-          <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
-            <span>Focus Time This Week</span>
-            <span>{focusHours}h {focusMinutes}m</span>
-          </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-            <motion.div 
-              className="bg-purple-600 dark:bg-purple-500 h-2 rounded-full"
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.min((totalFocusMinutes / 600) * 100, 100)}%` }}
-              transition={{ delay: 1.3, duration: 1, ease: "easeOut" }}
-            />
-          </div>
-        </motion.div>
-        
-        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.2 }}>
-          <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
-            <span>Focus Sessions</span>
-            <span>{totalSessions}</span>
-          </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-            <motion.div 
-              className="bg-green-600 dark:bg-green-500 h-2 rounded-full"
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.min((totalSessions / 20) * 100, 100)}%` }}
-              transition={{ delay: 1.4, duration: 1, ease: "easeOut" }}
-            />
-          </div>
-        </motion.div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+        {weeklyData.map((day, index) => {
+          const statusInfo = getStatusInfo(day.focusMinutes, day.sessions);
+          return (
+            <div
+              key={index}
+              className={`p-4 rounded-lg border-2 bg-gray-50 dark:bg-gray-700/50 ${
+                day.isToday ? 'border-orange-500' : statusInfo.color
+              } transition-all hover:shadow-md`}
+            >
+              <div className="flex justify-between items-start mb-3">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                  {day.date}
+                </span>
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  statusInfo.status === 'Active' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-600 dark:text-gray-300'
+                }`}>
+                  {statusInfo.status}
+                </span>
+              </div>
+              
+              <div className="flex items-center justify-center mb-4">
+                <div className={`w-16 h-16 rounded-full border-4 flex items-center justify-center ${
+                  statusInfo.status === 'Active' ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-600'
+                }`}>
+                  <span className="text-2xl">{statusInfo.icon}</span>
+                </div>
+              </div>
+              
+              <div className="text-center mb-3">
+                <p className="text-sm font-semibold text-gray-800 dark:text-white">
+                  {statusInfo.label}
+                </p>
+              </div>
+              
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-500 dark:text-gray-400">Focus</span>
+                  <span className="font-medium text-gray-700 dark:text-gray-200">
+                    {day.focusMinutes > 0 ? `${Math.floor(day.focusMinutes / 60)}h ${day.focusMinutes % 60}m` : '0m'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500 dark:text-gray-400">Sessions</span>
+                  <span className="font-medium text-gray-700 dark:text-gray-200">{day.sessions}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500 dark:text-gray-400">Tasks</span>
+                  <span className="font-medium text-gray-700 dark:text-gray-200">{day.completedTasks}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </FloatingCard>
   );
@@ -145,6 +191,9 @@ const Dashboard: React.FC = () => {
   const [aiMessage, setAiMessage] = React.useState("Welcome! I'm here to help you stay focused and productive.");
   const [isAiLoading, setIsAiLoading] = React.useState(false);
   const [aiChatInput, setAiChatInput] = React.useState('');
+  const [taskSuggestions, setTaskSuggestions] = React.useState<Record<string, string[]>>({});
+  const [showUpgradePrompt, setShowUpgradePrompt] = React.useState(false);
+  const [upgradeReason, setUpgradeReason] = React.useState<'ai_limit' | 'feature_limit' | 'trial_expired'>('ai_limit');
 
   const moods = [
     { id: 'great', icon: Smile, label: 'Great', color: 'text-green-500' },
@@ -199,8 +248,30 @@ const Dashboard: React.FC = () => {
           priority: 'medium'
         };
         setTasks(prev => [...prev, newTaskObj]);
+        
+        // Analyze task with AI (if subscription allows)
+        try {
+          const canAccess = await subscriptionService.canAccessAIFeatures(user.id);
+          if (canAccess) {
+            const analysis = await taskAnalysisService.analyzeTask(newTask.trim());
+            await subscriptionService.recordAIRequest(user.id);
+            if (analysis.suggestions.length > 0) {
+              setTaskSuggestions(prev => ({
+                ...prev,
+                [taskId]: analysis.suggestions
+              }));
+              setAiMessage(`Added "${newTask}"! AI suggests: ${analysis.suggestions[0]}`);
+            } else {
+              setAiMessage(`Great! I added "${newTask}" to your tasks. Let's get it done!`);
+            }
+          } else {
+            setAiMessage(`Great! I added "${newTask}" to your tasks. Let's get it done!`);
+          }
+        } catch (error) {
+          setAiMessage(`Great! I added "${newTask}" to your tasks. Let's get it done!`);
+        }
+        
         setNewTask('');
-        setAiMessage(`Great! I added "${newTask}" to your tasks. Let's get it done!`);
       } catch (error) {
         console.error('Error adding task:', error);
         setAiMessage('Sorry, there was an error adding that task. Please try again.');
@@ -248,6 +319,15 @@ const Dashboard: React.FC = () => {
   const handleAskAI = async () => {
     if (!aiChatInput.trim() || !user) return;
     
+    // Check subscription limits
+    const canAccess = await subscriptionService.canAccessAIFeatures(user.id);
+    if (!canAccess) {
+      setUpgradeReason('ai_limit');
+      setShowUpgradePrompt(true);
+      setAiMessage("You've reached your daily AI request limit. Upgrade to Pro for unlimited access!");
+      return;
+    }
+    
     setIsAiLoading(true);
     try {
       const incompleteTasks = tasks.filter(task => task.status === 'pending');
@@ -255,6 +335,7 @@ const Dashboard: React.FC = () => {
       const context = `User: ${user.name}. Current tasks: ${incompleteTasks.map(t => t.title).join(', ')}. Completed: ${completedTasks.length}/${tasks.length} tasks. Mood: ${selectedMood || 'not set'}.`;
       
       const response = await aiService.chat(aiChatInput, context);
+      await subscriptionService.recordAIRequest(user.id);
       setAiMessage(response.response);
       setAiChatInput('');
     } catch (error) {
@@ -268,13 +349,44 @@ const Dashboard: React.FC = () => {
   const handleGetTip = async () => {
     if (!user) return;
     
+    // Check subscription limits
+    const canAccess = await subscriptionService.canAccessAIFeatures(user.id);
+    if (!canAccess) {
+      setUpgradeReason('ai_limit');
+      setShowUpgradePrompt(true);
+      setAiMessage("You've reached your daily AI request limit. Upgrade to Pro for unlimited access!");
+      return;
+    }
+    
     setIsAiLoading(true);
     try {
       const incompleteTasks = tasks.filter(task => task.status === 'pending');
-      const currentActivity = incompleteTasks.length > 0 ? incompleteTasks[0].title : undefined;
       
-      const tip = await aiService.getProductivityTip(currentActivity);
-      setAiMessage(tip);
+      if (incompleteTasks.length > 0) {
+        // Analyze the first incomplete task
+        const analysis = await taskAnalysisService.analyzeTask(incompleteTasks[0].title);
+        const suggestion = analysis.suggestions[0] || 'Break this task into smaller steps';
+        await subscriptionService.recordAIRequest(user.id);
+        setAiMessage(`💡 For "${incompleteTasks[0].title}": ${suggestion}`);
+        
+        // Auto-save the tip
+        try {
+          const { aiFocusTipsService } = await import('../services/AIFocusTipsService');
+          const tipData = aiFocusTipsService.extractTipFromAIMessage(suggestion);
+          if (tipData) {
+            await aiFocusTipsService.saveTip({
+              ...tipData,
+              source: 'ai-coach'
+            });
+          }
+        } catch (saveError) {
+          console.error('Failed to auto-save tip:', saveError);
+        }
+      } else {
+        const tip = await aiService.getProductivityTip();
+        await subscriptionService.recordAIRequest(user.id);
+        setAiMessage(tip);
+      }
     } catch (error) {
       console.error('AI tip error:', error);
       setAiMessage("Here's a quick tip: Break your next task into smaller 15-minute chunks for better focus!");
@@ -387,6 +499,9 @@ const Dashboard: React.FC = () => {
             </motion.div>
           </div>
         </motion.header>
+
+        {/* Subscription Status */}
+        <SubscriptionStatus compact={false} />
 
         {/* Main Dashboard Content */}
         <div className="p-4 md:p-8">
@@ -684,8 +799,8 @@ const Dashboard: React.FC = () => {
                 </StaggeredList>
               </FloatingCard>
 
-              {/* Recent Activity */}
-              <RecentActivity />
+              {/* Daily Activity Overview */}
+              <DailyActivityOverview />
             </div>
           </div>
         </div>
@@ -698,6 +813,13 @@ const Dashboard: React.FC = () => {
           setAiChatInput={setAiChatInput}
           onAskAI={handleAskAI}
           onGetTip={handleGetTip}
+        />
+
+        {/* Upgrade Prompt */}
+        <UpgradePrompt
+          isOpen={showUpgradePrompt}
+          onClose={() => setShowUpgradePrompt(false)}
+          reason={upgradeReason}
         />
       </div>
     </AnimatedPage>

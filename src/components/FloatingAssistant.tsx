@@ -278,7 +278,24 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
               <MessageCircle className="w-4 h-4" />
             </motion.button>
             <motion.button 
-              onClick={onGetTip}
+              onClick={async () => {
+                await onGetTip();
+                // Auto-save tip after generation
+                setTimeout(async () => {
+                  try {
+                    const tipData = aiFocusTipsService.extractTipFromAIMessage(aiMessage);
+                    if (tipData) {
+                      await aiFocusTipsService.saveTip({
+                        ...tipData,
+                        source: 'ai-coach',
+                        sessionId
+                      });
+                    }
+                  } catch (error) {
+                    console.error('Failed to auto-save tip:', error);
+                  }
+                }, 1000);
+              }}
               className={`px-2 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center ${
                 darkMode 
                   ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'

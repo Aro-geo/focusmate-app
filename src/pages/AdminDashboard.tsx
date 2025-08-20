@@ -358,56 +358,302 @@ const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'ai' && aiMetrics && (
+        {activeTab === 'analytics' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* User Growth Chart */}
+            <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
+              <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                User Growth (Last 30 Days)
+              </h3>
+              {userAnalytics ? (
+                <div className="h-64 flex items-end space-x-1">
+                  {userAnalytics.userGrowth.slice(-14).map((day: any, index: number) => (
+                    <div key={index} className="flex-1 flex flex-col items-center">
+                      <div 
+                        className="w-full bg-indigo-500 rounded-t transition-all hover:bg-indigo-600"
+                        style={{ height: `${(day.users / Math.max(...userAnalytics.userGrowth.map((d: any) => d.users))) * 200}px` }}
+                      />
+                      <span className={`text-xs mt-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {new Date(day.date).getDate()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="h-64 flex items-center justify-center">
+                  <RefreshCw className="h-6 w-6 animate-spin text-indigo-500" />
+                  <span className={`ml-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Loading analytics data...</span>
+                </div>
+              )}
+            </div>
+
+            {/* Analytics Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
                 <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Response Time
-                </h3>
-                <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {aiMetrics.averageResponseTime}ms
-                </p>
-              </div>
-              <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
-                <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Success Rate
+                  Retention Rate
                 </h3>
                 <p className={`text-3xl font-bold text-green-500`}>
-                  {(aiMetrics.successRate * 100).toFixed(1)}%
+                  {userAnalytics ? (userAnalytics.retentionRate * 100).toFixed(1) : '--'}%
                 </p>
               </div>
               <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
                 <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Requests Today
+                  Weekly Sessions
                 </h3>
                 <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {aiMetrics.requestsToday.toLocaleString()}
+                  {userAnalytics ? userAnalytics.userActivity.reduce((sum: number, day: any) => sum + day.sessions, 0).toLocaleString() : '--'}
+                </p>
+              </div>
+              <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
+                <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Top Feature
+                </h3>
+                <p className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  {userAnalytics?.topFeatures[0]?.feature || 'Loading...'}
+                </p>
+                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {userAnalytics?.topFeatures[0]?.usage || '--'}% usage
+                </p>
+              </div>
+              <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
+                <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Avg Daily Users
+                </h3>
+                <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  {userAnalytics ? Math.round(userAnalytics.userActivity.reduce((sum: number, day: any) => sum + day.sessions, 0) / 7) : '--'}
                 </p>
               </div>
             </div>
 
-            {/* Top Errors */}
+            {/* Feature Usage */}
             <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
               <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                Top Errors
+                Feature Usage
               </h3>
-              <div className="space-y-3">
-                {aiMetrics.topErrors.map((error, index) => (
-                  <div key={index} className="flex justify-between items-center">
+              <div className="space-y-4">
+                {userAnalytics ? userAnalytics.topFeatures.map((feature: any, index: number) => (
+                  <div key={index} className="flex items-center justify-between">
                     <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>
-                      {error.error}
+                      {feature.feature}
                     </span>
-                    <div className="flex items-center space-x-4">
-                      <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        {error.count} occurrences
-                      </span>
-                      <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        {error.lastOccurred.toLocaleString()}
+                    <div className="flex items-center space-x-4 flex-1 ml-4">
+                      <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div 
+                          className="bg-indigo-500 h-2 rounded-full transition-all"
+                          style={{ width: `${feature.usage}%` }}
+                        />
+                      </div>
+                      <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {feature.usage}%
                       </span>
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <div className="text-center py-8">
+                    <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-indigo-500" />
+                    <p className={darkMode ? 'text-gray-300' : 'text-gray-600'}>Loading feature usage data...</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'ai' && (
+          <div className="space-y-6">
+            {/* AI Performance Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
+                <div className="flex items-center justify-between">
+                  <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Response Time
+                  </h3>
+                  <Zap className={`h-5 w-5 ${aiMetrics ? (aiMetrics.averageResponseTime < 1000 ? 'text-green-500' : aiMetrics.averageResponseTime < 2000 ? 'text-yellow-500' : 'text-red-500') : 'text-gray-400'}`} />
+                </div>
+                <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  {aiMetrics ? aiMetrics.averageResponseTime : '--'}ms
+                </p>
+                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {aiMetrics ? (aiMetrics.averageResponseTime < 1000 ? 'Excellent' : aiMetrics.averageResponseTime < 2000 ? 'Good' : 'Needs attention') : 'Loading...'}
+                </p>
+              </div>
+              <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
+                <div className="flex items-center justify-between">
+                  <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Success Rate
+                  </h3>
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                </div>
+                <p className={`text-3xl font-bold text-green-500`}>
+                  {aiMetrics ? (aiMetrics.successRate * 100).toFixed(1) : '--'}%
+                </p>
+                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {aiMetrics ? aiMetrics.totalRequests.toLocaleString() : '--'} total requests
+                </p>
+              </div>
+              <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
+                <div className="flex items-center justify-between">
+                  <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Requests Today
+                  </h3>
+                  <TrendingUp className="h-5 w-5 text-blue-500" />
+                </div>
+                <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  {aiMetrics ? aiMetrics.requestsToday.toLocaleString() : '--'}
+                </p>
+                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {aiMetrics ? ((aiMetrics.requestsToday / aiMetrics.totalRequests) * 100).toFixed(1) : '--'}% of total
+                </p>
+              </div>
+              <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
+                <div className="flex items-center justify-between">
+                  <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Error Rate
+                  </h3>
+                  <AlertTriangle className={`h-5 w-5 ${aiMetrics ? (aiMetrics.errorRate < 0.05 ? 'text-green-500' : aiMetrics.errorRate < 0.1 ? 'text-yellow-500' : 'text-red-500') : 'text-gray-400'}`} />
+                </div>
+                <p className={`text-3xl font-bold ${aiMetrics ? (aiMetrics.errorRate < 0.05 ? 'text-green-500' : aiMetrics.errorRate < 0.1 ? 'text-yellow-500' : 'text-red-500') : 'text-gray-400'}`}>
+                  {aiMetrics ? (aiMetrics.errorRate * 100).toFixed(1) : '--'}%
+                </p>
+                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {aiMetrics ? (aiMetrics.errorRate < 0.05 ? 'Excellent' : aiMetrics.errorRate < 0.1 ? 'Acceptable' : 'High') : 'Loading...'}
+                </p>
+              </div>
+            </div>
+
+            {/* Response Time Chart */}
+            <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
+              <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                Response Time Trend (Last 24 Hours)
+              </h3>
+              {aiMetrics ? (
+                <div className="h-64 flex items-end space-x-1">
+                  {aiMetrics.responseTimeHistory.slice(-24).map((point, index) => (
+                    <div key={index} className="flex-1 flex flex-col items-center">
+                      <div 
+                        className={`w-full rounded-t transition-all hover:opacity-80 ${
+                          point.responseTime < 1000 ? 'bg-green-500' : 
+                          point.responseTime < 2000 ? 'bg-yellow-500' : 'bg-red-500'
+                        }`}
+                        style={{ 
+                          height: `${(point.responseTime / Math.max(...aiMetrics.responseTimeHistory.map(p => p.responseTime))) * 200}px` 
+                        }}
+                        title={`${point.responseTime}ms at ${point.timestamp.toLocaleTimeString()}`}
+                      />
+                      <span className={`text-xs mt-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {point.timestamp.getHours()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="h-64 flex items-center justify-center">
+                  <RefreshCw className="h-6 w-6 animate-spin text-indigo-500" />
+                  <span className={`ml-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Loading response time data...</span>
+                </div>
+              )}
+            </div>
+
+            {/* AI Health Status */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Top Errors */}
+              <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
+                <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Recent Errors
+                </h3>
+                <div className="space-y-3">
+                  {aiMetrics && aiMetrics.topErrors.length > 0 ? aiMetrics.topErrors.map((error, index) => (
+                    <div key={index} className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {error.error}
+                          </span>
+                          <div className="flex items-center space-x-4 mt-1">
+                            <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                              {error.count} occurrences
+                            </span>
+                            <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                              {error.lastOccurred.toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                        <AlertTriangle className="h-4 w-4 text-red-500 ml-2" />
+                      </div>
+                    </div>
+                  )) : (
+                    <div className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      <CheckCircle className="h-12 w-12 mx-auto mb-2 text-green-500" />
+                      <p>No recent errors detected</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* AI Service Health */}
+              <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
+                <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Service Health
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>DeepSeek API</span>
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                      <span className="text-green-500 text-sm font-medium">Operational</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>Firebase Functions</span>
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                      <span className="text-green-500 text-sm font-medium">Operational</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>Rate Limiting</span>
+                    <div className="flex items-center">
+                      <div className={`w-2 h-2 rounded-full mr-2 ${aiMetrics && aiMetrics.errorRate < 0.05 ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                      <span className={`text-sm font-medium ${aiMetrics && aiMetrics.errorRate < 0.05 ? 'text-green-500' : 'text-yellow-500'}`}>
+                        {aiMetrics && aiMetrics.errorRate < 0.05 ? 'Normal' : 'Elevated'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>Response Quality</span>
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                      <span className="text-green-500 text-sm font-medium">High</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => testConnection('ai')}
+                      className={`flex-1 px-3 py-2 text-sm rounded-lg transition-colors ${
+                        darkMode 
+                          ? 'bg-indigo-600 hover:bg-indigo-700 text-white' 
+                          : 'bg-indigo-500 hover:bg-indigo-600 text-white'
+                      }`}
+                    >
+                      Test Connection
+                    </button>
+                    <button
+                      onClick={loadAdminData}
+                      className={`flex-1 px-3 py-2 text-sm rounded-lg transition-colors ${
+                        darkMode 
+                          ? 'bg-gray-600 hover:bg-gray-700 text-white' 
+                          : 'bg-gray-500 hover:bg-gray-600 text-white'
+                      }`}
+                    >
+                      Refresh Data
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

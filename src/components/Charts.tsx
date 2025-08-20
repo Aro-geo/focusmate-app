@@ -4,9 +4,16 @@
 
 import React from 'react';
 
-// Line chart component for focus time
+// Line chart component for focus time comparison
 export const FocusTimeBarChart: React.FC<{
-  data: Array<{
+  currentWeekData: Array<{
+    date: string;
+    focusMinutes: number;
+    sessions: number;
+    completedTasks: number;
+    mood: string;
+  }>;
+  lastWeekData: Array<{
     date: string;
     focusMinutes: number;
     sessions: number;
@@ -14,11 +21,11 @@ export const FocusTimeBarChart: React.FC<{
     mood: string;
   }>;
   formatMinutes: (minutes: number) => string;
-}> = ({ data, formatMinutes }) => {
-  const maxFocusMinutes = Math.max(...data.map(day => day.focusMinutes), 60); // Minimum 60 for scale
-  const chartHeight = 192; // 48 * 4 = 192px
+}> = ({ currentWeekData, lastWeekData, formatMinutes }) => {
+  const allData = [...currentWeekData, ...lastWeekData];
+  const maxFocusMinutes = Math.max(...allData.map(day => day.focusMinutes), 60);
   
-  if (data.length === 0) {
+  if (currentWeekData.length === 0 && lastWeekData.length === 0) {
     return (
       <div className="h-64 flex items-center justify-center text-gray-500">
         <div className="text-center">
@@ -29,11 +36,13 @@ export const FocusTimeBarChart: React.FC<{
     );
   }
   
-  // Create SVG path for the line
-  const createPath = () => {
-    const width = 100; // percentage
-    const points = data.map((day, index) => {
-      const x = (index / (data.length - 1)) * width;
+  const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  
+  // Create SVG path for a week's data
+  const createPath = (weekData: typeof currentWeekData) => {
+    if (weekData.length === 0) return '';
+    const points = weekData.map((day, index) => {
+      const x = (index / 6) * 100; // 7 days = 0 to 100%
       const y = 100 - (day.focusMinutes / maxFocusMinutes) * 100;
       return `${x},${y}`;
     }).join(' ');
@@ -42,6 +51,18 @@ export const FocusTimeBarChart: React.FC<{
   
   return (
     <div className="h-64 relative">
+      {/* Legend */}
+      <div className="flex justify-center space-x-6 mb-4">
+        <div className="flex items-center space-x-2">
+          <div className="w-3 h-0.5 bg-indigo-600"></div>
+          <span className="text-xs text-gray-600 dark:text-gray-400">Current Week</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-3 h-0.5 bg-purple-600"></div>
+          <span className="text-xs text-gray-600 dark:text-gray-400">Last Week</span>
+        </div>
+      </div>
+      
       {/* Chart area */}
       <div className="h-48 relative mb-4">
         {/* Grid lines */}
@@ -57,51 +78,75 @@ export const FocusTimeBarChart: React.FC<{
         
         {/* Line chart */}
         <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-          {/* Area under the line */}
           <defs>
-            <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="rgb(99, 102, 241)" stopOpacity="0.3" />
+            <linearGradient id="currentWeekGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgb(99, 102, 241)" stopOpacity="0.2" />
               <stop offset="100%" stopColor="rgb(99, 102, 241)" stopOpacity="0.05" />
+            </linearGradient>
+            <linearGradient id="lastWeekGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgb(147, 51, 234)" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="rgb(147, 51, 234)" stopOpacity="0.05" />
             </linearGradient>
           </defs>
           
-          {data.length > 1 && (
+          {/* Last week line */}
+          {lastWeekData.length > 0 && (
             <>
-              {/* Area fill */}
               <path
-                d={`${createPath()} L 100,100 L 0,100 Z`}
-                fill="url(#areaGradient)"
-              />
-              
-              {/* Line */}
-              <path
-                d={createPath()}
+                d={createPath(lastWeekData)}
                 fill="none"
-                stroke="rgb(99, 102, 241)"
+                stroke="rgb(147, 51, 234)"
                 strokeWidth="0.5"
+                strokeDasharray="2,2"
                 vectorEffect="non-scaling-stroke"
               />
+              {lastWeekData.map((day, index) => {
+                const x = (index / 6) * 100;
+                const y = 100 - (day.focusMinutes / maxFocusMinutes) * 100;
+                return (
+                  <circle
+                    key={`last-${index}`}
+                    cx={x}
+                    cy={y}
+                    r="1"
+                    fill="rgb(147, 51, 234)"
+                    vectorEffect="non-scaling-stroke"
+                  >
+                    <title>{`Last ${dayLabels[index]}: ${formatMinutes(day.focusMinutes)}`}</title>
+                  </circle>
+                );
+              })}
             </>
           )}
           
-          {/* Data points */}
-          {data.map((day, index) => {
-            const x = (index / (data.length - 1)) * 100;
-            const y = 100 - (day.focusMinutes / maxFocusMinutes) * 100;
-            return (
-              <circle
-                key={index}
-                cx={x}
-                cy={y}
-                r="1"
-                fill="rgb(99, 102, 241)"
+          {/* Current week line */}
+          {currentWeekData.length > 0 && (
+            <>
+              <path
+                d={createPath(currentWeekData)}
+                fill="none"
+                stroke="rgb(99, 102, 241)"
+                strokeWidth="0.7"
                 vectorEffect="non-scaling-stroke"
-                className="hover:r-2 transition-all cursor-pointer"
-              >
-                <title>{`${day.date}: ${formatMinutes(day.focusMinutes)}`}</title>
-              </circle>
-            );
-          })}
+              />
+              {currentWeekData.map((day, index) => {
+                const x = (index / 6) * 100;
+                const y = 100 - (day.focusMinutes / maxFocusMinutes) * 100;
+                return (
+                  <circle
+                    key={`current-${index}`}
+                    cx={x}
+                    cy={y}
+                    r="1.2"
+                    fill="rgb(99, 102, 241)"
+                    vectorEffect="non-scaling-stroke"
+                  >
+                    <title>{`${dayLabels[index]}: ${formatMinutes(day.focusMinutes)}`}</title>
+                  </circle>
+                );
+              })}
+            </>
+          )}
         </svg>
         
         {/* Y-axis labels */}
@@ -116,9 +161,9 @@ export const FocusTimeBarChart: React.FC<{
       
       {/* X-axis labels */}
       <div className="flex justify-between px-2">
-        {data.map((day, index) => (
+        {dayLabels.map((day, index) => (
           <div key={index} className="text-xs text-gray-600 dark:text-gray-400">
-            {day.date}
+            {day}
           </div>
         ))}
       </div>

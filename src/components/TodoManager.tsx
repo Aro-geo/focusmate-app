@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import taskNotificationService from '../services/TaskNotificationService';
 import NotificationSettings from './NotificationSettings';
+import { taskAnalysisService } from '../services/TaskAnalysisService';
 
 // Enhanced TodoManager with new features
 export default function TodoManager() {
@@ -54,7 +55,7 @@ export default function TodoManager() {
     setError(todoError);
   }, [todoError]);
 
-  // Generate AI suggestions for tasks using only the stable chat() function
+  // Generate AI suggestions for tasks using real AI analysis
   const generateAiSuggestions = React.useCallback(async () => {
     if (todos.length === 0) return;
     
@@ -64,87 +65,55 @@ export default function TodoManager() {
 
       const suggestions = [];
 
-      // Generate smart suggestions using only chat() function
+      // Analyze tasks with real AI service
       for (const task of incompleteTasks.slice(0, 3)) {
-        const taskSuggestions = [];
-        
-        // Use chat() for AI-powered suggestions
         try {
-          const aiResponse = await chat(
-            `Analyze this task and suggest 1-2 improvements: "${task.title}". 
-            Priority: ${task.priority || 'medium'}. 
-            Due date: ${task.due_date || 'not set'}.
-            
-            Consider: splitting large tasks, scheduling unscheduled tasks, adjusting priority.
-            Respond with: TYPE: suggestion | reason`,
-            `task_suggestion_${task.id}`
-          );
-
-          // Parse AI response
-          const lines = aiResponse.split('\n').filter(line => line.includes(':') && line.includes('|'));
-          for (const line of lines.slice(0, 2)) {
-            const [typeAndText, reason] = line.split('|').map(s => s.trim());
-            const [type, text] = typeAndText.split(':').map(s => s.trim());
-
+          const analysis = await taskAnalysisService.analyzeTask(task.title, task.description);
+          const taskSuggestions = [];
+          
+          // Convert AI suggestions to UI format
+          analysis.suggestions.forEach((suggestion, index) => {
             let suggestionType = 'general';
             let icon = Lightbulb;
-
-            if (type.toLowerCase().includes('split')) {
+            
+            if (suggestion.toLowerCase().includes('break') || suggestion.toLowerCase().includes('split')) {
               suggestionType = 'split';
               icon = Split;
-            } else if (type.toLowerCase().includes('schedule')) {
+            } else if (suggestion.toLowerCase().includes('schedule') || suggestion.toLowerCase().includes('time')) {
               suggestionType = 'schedule';
               icon = Clock;
-            } else if (type.toLowerCase().includes('priority')) {
+            } else if (suggestion.toLowerCase().includes('priority') || suggestion.toLowerCase().includes('urgent')) {
               suggestionType = 'priority';
               icon = Zap;
             }
-
+            
             taskSuggestions.push({
               type: suggestionType,
               icon: icon,
-              text: text || 'Improve task',
-              reason: reason || 'AI recommendation'
+              text: suggestion,
+              reason: `AI analyzed complexity: ${analysis.complexity}/10, estimated ${analysis.estimatedDuration}min`
             });
-          }
-        } catch (aiError) {
-          console.error('AI suggestion error:', aiError);
+          });
           
-          // Fallback to rule-based suggestions
-          if (task.title.length > 50) {
-            taskSuggestions.push({
-              type: 'split',
-              icon: Split,
-              text: 'Split task',
-              reason: 'Large tasks are easier when broken down'
-            });
-          }
-
-          if (!task.due_date) {
-            taskSuggestions.push({
-              type: 'schedule',
-              icon: Clock,
-              text: 'Schedule',
-              reason: 'Tasks with deadlines get done faster'
-            });
-          }
-
-          if (task.priority === 'low' && task.title.toLowerCase().includes('urgent')) {
+          // Add priority suggestion if AI suggests different priority
+          if (analysis.priority !== task.priority) {
             taskSuggestions.push({
               type: 'priority',
               icon: Zap,
-              text: 'Increase priority',
-              reason: 'Task seems urgent based on content'
+              text: `Change priority to ${analysis.priority}`,
+              reason: `AI recommends ${analysis.priority} priority based on task analysis`
             });
           }
-        }
-
-        if (taskSuggestions.length > 0) {
-          suggestions.push({
-            taskId: task.id,
-            taskTitle: task.title,
-            suggestions: taskSuggestions
-          });
+          
+          if (taskSuggestions.length > 0) {
+            suggestions.push({
+              taskId: task.id,
+              taskTitle: task.title,
+              suggestions: taskSuggestions.slice(0, 2) // Limit to 2 suggestions per task
+            });
+          }
+        } catch (error) {
+          console.error('AI analysis error for task:', task.title, error);
         }
       }
 
@@ -155,7 +124,7 @@ export default function TodoManager() {
     } catch (error) {
       console.error('Error generating AI suggestions:', error);
     }
-  }, [todos, chat]);
+  }, [todos]);
 
   // Voice input support
   const startVoiceInput = () => {

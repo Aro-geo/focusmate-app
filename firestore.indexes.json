@@ -1,22 +1,6 @@
 {
   "indexes": [
     {
-      "collectionGroup": "tasks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "completed", "order": "ASCENDING" },
-        { "fieldPath": "dueDate", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "tasks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "completed", "order": "ASCENDING" },
-        { "fieldPath": "priority", "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "journal",
       "queryScope": "COLLECTION",
       "fields": [
@@ -38,8 +22,24 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "completed", "order": "ASCENDING" },
+        { "fieldPath": "dueDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "completed", "order": "ASCENDING" },
         { "fieldPath": "priority", "order": "DESCENDING" },
         { "fieldPath": "dueDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "completed", "order": "ASCENDING" },
+        { "fieldPath": "priority", "order": "ASCENDING" }
       ]
     }
   ],

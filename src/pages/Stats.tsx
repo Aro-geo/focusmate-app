@@ -17,25 +17,10 @@ import aiService from '../services/AIService';
 // Enhanced Mood & Energy Levels Component
 const EnhancedMoodEnergyLevels: React.FC<{ dailyStats: any[], darkMode: boolean }> = ({ dailyStats, darkMode }) => {
   const getMoodIcon = (mood: string, focusMinutes: number) => {
-    // Generate mood based on activity if not set
-    if (!mood || mood === 'Neutral') {
-      if (focusMinutes >= 120) return { icon: Zap, color: 'amber', label: 'Energetic' };
-      if (focusMinutes >= 60) return { icon: Smile, color: 'green', label: 'Productive' };
-      if (focusMinutes >= 25) return { icon: Meh, color: 'blue', label: 'Focused' };
-      if (focusMinutes > 0) return { icon: Coffee, color: 'orange', label: 'Getting Started' };
-      return { icon: Frown, color: 'gray', label: 'Inactive' };
-    }
-    
-    const moodMap: any = {
-      'productive': { icon: Smile, color: 'green', label: 'Productive' },
-      'energetic': { icon: Zap, color: 'amber', label: 'Energetic' },
-      'creative': { icon: Lightbulb, color: 'purple', label: 'Creative' },
-      'focused': { icon: Target, color: 'blue', label: 'Focused' },
-      'tired': { icon: Frown, color: 'red', label: 'Tired' },
-      'neutral': { icon: Meh, color: 'gray', label: 'Neutral' }
-    };
-    
-    return moodMap[mood.toLowerCase()] || { icon: Meh, color: 'gray', label: 'Neutral' };
+    if (focusMinutes >= 60) return { icon: '💪', color: 'green', label: 'Productive' };
+    if (focusMinutes >= 25) return { icon: '☕', color: 'orange', label: 'Getting Started' };
+    if (focusMinutes > 0) return { icon: '🎯', color: 'blue', label: 'Active' };
+    return { icon: '😴', color: 'gray', label: 'Inactive' };
   };
   
   const getColorClasses = (color: string) => {
@@ -98,10 +83,11 @@ const EnhancedMoodEnergyLevels: React.FC<{ dailyStats: any[], darkMode: boolean 
         </h2>
       </div>
       
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-7 gap-3">
         {dailyStats.map((day: any, idx: number) => {
           const moodData = getMoodIcon(day.mood, day.focusMinutes);
-          const MoodIcon = moodData.icon;
+          const statusColor = day.focusMinutes >= 60 ? 'border-green-500' : day.focusMinutes >= 25 ? 'border-orange-500' : 'border-gray-600';
+          const statusLabel = day.focusMinutes >= 25 ? 'Active' : 'Rest';
           
           return (
             <motion.div
@@ -109,10 +95,9 @@ const EnhancedMoodEnergyLevels: React.FC<{ dailyStats: any[], darkMode: boolean 
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: idx * 0.1 }}
-              whileHover={{ scale: 1.05, y: -2 }}
-              className={`p-3 rounded-xl border transition-all duration-200 ${
-                darkMode ? 'bg-gray-700/50 border-gray-600 hover:bg-gray-700' : 'bg-gray-50 border-gray-200 hover:bg-white'
-              } hover:shadow-lg cursor-pointer`}
+              className={`p-3 rounded-xl border-2 transition-all duration-200 ${
+                darkMode ? 'bg-gray-700/50 hover:bg-gray-700' : 'bg-gray-50 hover:bg-white'
+              } ${statusColor} hover:shadow-lg cursor-pointer`}
             >
               <div className="text-center">
                 <div className={`text-xs font-medium mb-2 ${
@@ -121,30 +106,48 @@ const EnhancedMoodEnergyLevels: React.FC<{ dailyStats: any[], darkMode: boolean 
                   {day.date}
                 </div>
                 
-                <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-2 relative ${
-                  darkMode ? 'bg-gray-600/30' : 'bg-gray-100'
+                <div className={`text-xs mb-2 px-2 py-1 rounded-full ${
+                  statusLabel === 'Active' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'
                 }`}>
-                  <MoodIcon className={`h-6 w-6 ${moodData.color === 'green' ? 'text-green-500' : 
-                    moodData.color === 'amber' ? 'text-amber-500' : 
-                    moodData.color === 'blue' ? 'text-blue-500' : 
-                    moodData.color === 'purple' ? 'text-purple-500' : 
-                    moodData.color === 'red' ? 'text-red-500' : 
-                    moodData.color === 'orange' ? 'text-orange-500' : 'text-gray-500'}`} />
+                  {statusLabel}
+                </div>
+                
+                <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-3 relative ${
+                  darkMode ? 'bg-gray-600/30' : 'bg-gray-100'
+                } border-2 ${statusColor}`}>
+                  <span className="text-2xl">
+                    {day.focusMinutes >= 60 ? '💪' : day.focusMinutes >= 25 ? '☕' : day.sessions > 0 ? '🎯' : '😴'}
+                  </span>
                   
                   {day.focusMinutes > 0 && (
                     <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-                      {Math.floor(day.focusMinutes / 60) || Math.ceil(day.focusMinutes / 60)}
+                      {Math.floor(day.focusMinutes / 60) || 1}
                     </div>
                   )}
                 </div>
                 
-                <div className="space-y-1">
-                  <div className={`text-xs font-medium text-blue-600`}>
-                    {day.focusMinutes > 0 ? `${Math.floor(day.focusMinutes / 60)}h ${day.focusMinutes % 60}m` : '0m'}
+                <div className={`text-xs font-medium mb-1 ${
+                  day.focusMinutes >= 60 ? 'text-green-500' : day.focusMinutes >= 25 ? 'text-orange-500' : day.sessions > 0 ? 'text-blue-500' : 'text-gray-500'
+                }`}>
+                  {day.focusMinutes >= 60 ? 'Productive' : day.focusMinutes >= 25 ? 'Getting Started' : day.sessions > 0 ? 'Active' : 'Inactive'}
+                </div>
+                
+                <div className="space-y-1 text-xs">
+                  <div className={`flex justify-between ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <span>Focus</span>
+                    <span className="text-orange-500">
+                      {day.focusMinutes > 0 ? `${Math.floor(day.focusMinutes / 60)}h ${day.focusMinutes % 60}m` : '0m'}
+                    </span>
                   </div>
                   
-                  <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    {day.sessions}s • {day.completedTasks}t
+                  <div className={`flex justify-between ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <span>Sessions</span>
+                    <span>{day.sessions}</span>
+                  </div>
+                  
+                  <div className={`flex justify-between ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <span>Tasks</span>
+                    <span>{day.completedTasks}</span>
                   </div>
                 </div>
               </div>
@@ -194,6 +197,7 @@ const Stats: React.FC = () => {
   const { user, firebaseUser } = useAuth();
   const [timePeriod, setTimePeriod] = useState<'week' | 'month' | 'quarter'>('week');
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [weeklyComparison, setWeeklyComparison] = useState<{ currentWeek: any[], lastWeek: any[] } | null>(null);
   const [userTasks, setUserTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAchievements, setShowAchievements] = useState(false);
@@ -221,6 +225,10 @@ const Stats: React.FC = () => {
         // Load analytics data
         const data = await analyticsService.getAnalyticsData(timePeriod);
         setAnalyticsData(data);
+        
+        // Load weekly comparison data for the chart
+        const comparison = await analyticsService.getWeeklyComparison();
+        setWeeklyComparison(comparison);
       } catch (error) {
         console.error('Failed to load analytics:', error);
       } finally {
@@ -415,6 +423,20 @@ const Stats: React.FC = () => {
     try {
       const tip = await aiService.getProductivityTip(`Focus time: ${totalFocusMinutes}min, Tasks: ${totalCompletedTasks}, Sessions: ${totalSessions}`);
       setAiMessage(tip);
+      
+      // Auto-save the tip
+      try {
+        const { aiFocusTipsService } = await import('../services/AIFocusTipsService');
+        const tipData = aiFocusTipsService.extractTipFromAIMessage(tip);
+        if (tipData) {
+          await aiFocusTipsService.saveTip({
+            ...tipData,
+            source: 'ai-coach'
+          });
+        }
+      } catch (saveError) {
+        console.error('Failed to auto-save tip:', saveError);
+      }
     } catch (error) {
       setAiMessage("💡 Tip: Try the Pomodoro technique - 25 minutes of focused work followed by a 5-minute break. This rhythm helps maintain high concentration while preventing burnout.");
     } finally {
@@ -951,7 +973,8 @@ const Stats: React.FC = () => {
             </div>
             
             <FocusTimeBarChart 
-              data={dailyStats} 
+              currentWeekData={weeklyComparison?.currentWeek || []}
+              lastWeekData={weeklyComparison?.lastWeek || []}
               formatMinutes={formatMinutes} 
             />
           </motion.div>

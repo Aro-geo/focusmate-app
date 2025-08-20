@@ -116,7 +116,7 @@ const EnhancedDashboardDesktop: React.FC = () => {
           completedAt: task.completedAt || null
         })));
         
-        // Generate activity data for user
+        // Initialize activity data
         generateMockUserActivity();
         
         // Calculate completion rate
@@ -145,43 +145,12 @@ const EnhancedDashboardDesktop: React.FC = () => {
     loadTasks();
   }, [user]);
 
-  // Generate mock user activity for the dashboard
+  // Generate user activity for the dashboard
   const generateMockUserActivity = () => {
-    // Simulate a realistic user activity history
-    const now = new Date();
-    const activities = [];
-    
-    // Set a realistic streak (3-5 days)
-    const streak = Math.floor(Math.random() * 3) + 3;
-    setFocusStreak(streak);
-    
-    // Set a realistic focus time (60-180 minutes)
-    const totalFocusTime = Math.floor(Math.random() * 120) + 60;
-    setFocusTime(totalFocusTime);
-    
-    // Create a few recent activities
-    for (let i = 0; i < 5; i++) {
-      const hoursAgo = i * 2;
-      const timestamp = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000).toISOString();
-      
-      if (i % 2 === 0) {
-        // Task completion
-        activities.push({
-          type: 'task_complete',
-          timestamp,
-          taskTitle: `Sample task ${i + 1}`,
-        });
-      } else {
-        // Focus session
-        activities.push({
-          type: 'session_complete',
-          timestamp,
-          duration: 25,
-        });
-      }
-    }
-    
-    setUserActivity(activities);
+    // Set initial values to 0 - no mock data
+    setFocusStreak(0);
+    setFocusTime(0);
+    setUserActivity([]);
   };
 
   // Generate realistic AI insights based on user behavior
@@ -1122,53 +1091,107 @@ const EnhancedDashboardDesktop: React.FC = () => {
                 </StaggeredList>
               </FloatingCard>
               
-              {/* Recent Activity */}
+              {/* Daily Activity Overview */}
               <FloatingCard 
                 className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700"
                 delay={0.5}
               >
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Recent Activity</h3>
-                {userActivity.length === 0 ? (
-                  <div className="text-center p-4">
-                    <p className="text-gray-500 dark:text-gray-400">No activity recorded yet</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {userActivity.slice(0, 5).map((activity, index) => (
-                      <div key={index} className="flex items-start space-x-3">
-                        <div className={`p-1.5 rounded-full ${
-                          activity.type === 'session_complete' || activity.type === 'session_start'
-                            ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
-                            : activity.type === 'task_complete'
-                            ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                            : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                        }`}>
-                          {activity.type.includes('session') ? (
-                            <Clock size={16} />
-                          ) : activity.type.includes('task') ? (
-                            <CheckSquare size={16} />
-                          ) : (
-                            <Circle size={16} />
-                          )}
+                <div className="flex items-center space-x-3 mb-6">
+                  <TrendingUp className="w-5 h-5 text-green-500" />
+                  <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Daily Activity Overview</h3>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  {(() => {
+                    const today = new Date();
+                    const dayOfWeek = today.getDay();
+                    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                    const weekStart = new Date(today);
+                    weekStart.setDate(today.getDate() - daysFromMonday);
+                    
+                    const weekData = [];
+                    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                    
+                    for (let i = 0; i < 7; i++) {
+                      const currentDay = new Date(weekStart);
+                      currentDay.setDate(weekStart.getDate() + i);
+                      
+                      const isToday = i === daysFromMonday;
+                      const focusMinutes = isToday && focusTime > 0 ? focusTime : 0;
+                      const sessions = isToday && focusStreak > 0 ? 1 : 0;
+                      const completedTasksToday = isToday ? completedTasks : 0;
+                      
+                      weekData.push({
+                        date: dayNames[i] + ', ' + currentDay.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                        focusMinutes,
+                        sessions,
+                        completedTasks: completedTasksToday,
+                        isToday
+                      });
+                    }
+                    
+                    return weekData.map((day, index) => {
+                      const getStatusInfo = (focusMinutes: number, sessions: number) => {
+                        if (focusMinutes >= 60) return { status: 'Active', color: 'border-green-500', icon: '💪', label: 'Productive' };
+                        if (focusMinutes >= 25) return { status: 'Active', color: 'border-orange-500', icon: '☕', label: 'Getting Started' };
+                        if (sessions > 0) return { status: 'Active', color: 'border-blue-500', icon: '🎯', label: 'Active' };
+                        return { status: 'Rest', color: 'border-gray-600', icon: '😴', label: 'Inactive' };
+                      };
+                      
+                      const statusInfo = getStatusInfo(day.focusMinutes, day.sessions);
+                      
+                      return (
+                        <div
+                          key={index}
+                          className={`p-4 rounded-lg border-2 bg-gray-50 dark:bg-gray-700/50 ${
+                            day.isToday ? 'border-orange-500' : statusInfo.color
+                          } transition-all hover:shadow-md`}
+                        >
+                          <div className="flex justify-between items-start mb-3">
+                            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                              {day.date}
+                            </span>
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                              statusInfo.status === 'Active' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-600 dark:text-gray-300'
+                            }`}>
+                              {statusInfo.status}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center justify-center mb-4">
+                            <div className={`w-16 h-16 rounded-full border-4 flex items-center justify-center ${
+                              statusInfo.status === 'Active' ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-600'
+                            }`}>
+                              <span className="text-2xl">{statusInfo.icon}</span>
+                            </div>
+                          </div>
+                          
+                          <div className="text-center mb-3">
+                            <p className="text-sm font-semibold text-gray-800 dark:text-white">
+                              {statusInfo.label}
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-2 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-gray-500 dark:text-gray-400">Focus</span>
+                              <span className="font-medium text-gray-700 dark:text-gray-200">
+                                {day.focusMinutes > 0 ? `${Math.floor(day.focusMinutes / 60)}h ${day.focusMinutes % 60}m` : '0m'}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-500 dark:text-gray-400">Sessions</span>
+                              <span className="font-medium text-gray-700 dark:text-gray-200">{day.sessions}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-500 dark:text-gray-400">Tasks</span>
+                              <span className="font-medium text-gray-700 dark:text-gray-200">{day.completedTasks}</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800 dark:text-white truncate">
-                            {activity.type === 'session_complete' 
-                              ? `Completed a ${activity.duration} min focus session`
-                              : activity.type === 'session_start'
-                              ? 'Started a focus session'
-                              : activity.type === 'task_complete'
-                              ? `Completed "${activity.taskTitle}"`
-                              : `Created task "${activity.taskTitle}"`
-                            }
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      );
+                    });
+                  })()
                 )}
               </FloatingCard>
             </div>

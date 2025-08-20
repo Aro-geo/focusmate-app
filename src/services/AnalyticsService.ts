@@ -113,40 +113,34 @@ class AnalyticsService {
     
     return {
       productivity: {
-        daily: [65, 72, 58, 81, 76, 69, 84],
-        weekly: [68, 72, 75, 79],
-        monthly: [70, 73, 76, 78, 75, 80],
+        daily: new Array(7).fill(0),
+        weekly: new Array(4).fill(0),
+        monthly: new Array(6).fill(0),
         labels: last7Days
       },
       pomodoro: {
-        sessionsCompleted: [4, 6, 3, 8, 5, 4, 7],
-        averageFocusTime: [23, 25, 20, 27, 24, 22, 26],
-        breakTimeUsed: [15, 18, 12, 20, 16, 14, 19],
+        sessionsCompleted: new Array(7).fill(0),
+        averageFocusTime: new Array(7).fill(0),
+        breakTimeUsed: new Array(7).fill(0),
         labels: last7Days
       },
       mood: {
-        data: [
-          { mood: 'Energetic', count: 12, percentage: 30 },
-          { mood: 'Productive', count: 15, percentage: 37.5 },
-          { mood: 'Focused', count: 8, percentage: 20 },
-          { mood: 'Neutral', count: 3, percentage: 7.5 },
-          { mood: 'Tired', count: 2, percentage: 5 }
-        ],
-        trends: [3.2, 3.8, 3.5, 4.1, 3.9, 3.7, 4.2],
+        data: [],
+        trends: new Array(7).fill(0),
         labels: last7Days
       },
       tasks: {
-        completed: [8, 12, 6, 15, 10, 8, 14],
-        created: [10, 14, 8, 16, 12, 10, 15],
-        overdue: [1, 2, 2, 1, 2, 2, 1],
+        completed: new Array(7).fill(0),
+        created: new Array(7).fill(0),
+        overdue: new Array(7).fill(0),
         labels: last7Days
       },
       insights: {
-        mostProductiveTime: '9:00 AM - 11:00 AM',
-        averageSessionLength: 24.5,
-        totalFocusTime: 1250, // minutes this week
-        streakDays: 5,
-        improvementPercentage: 12.5
+        mostProductiveTime: 'No data yet',
+        averageSessionLength: 0,
+        totalFocusTime: 0,
+        streakDays: 0,
+        improvementPercentage: 0
       }
     };
   }
@@ -246,35 +240,43 @@ class AnalyticsService {
     // Generate task categories based on real data
     const taskCategories = this.generateTaskCategories(tasksInPeriod, sessions);
     
-    // Build and return the analytics data structure
-    const baseData = this.generateMockData(); // Use as a template
-    
+    // Build and return the analytics data structure with real data only
     return {
-      ...baseData,
-      // Override with real data
+      productivity: {
+        daily: new Array(labels.length).fill(0),
+        weekly: new Array(Math.ceil(labels.length/7)).fill(0),
+        monthly: new Array(Math.ceil(labels.length/30)).fill(0),
+        labels
+      },
+      pomodoro: {
+        sessionsCompleted: this.aggregateSessionsByDay(sessions, labels),
+        averageFocusTime: new Array(labels.length).fill(0),
+        breakTimeUsed: new Array(labels.length).fill(0),
+        labels
+      },
+      mood: {
+        data: [],
+        trends: new Array(labels.length).fill(0),
+        labels
+      },
+      tasks: {
+        completed: this.aggregateTasksByDay(completedTasks, labels, 'completed'),
+        created: this.aggregateTasksByDay(tasksInPeriod, labels, 'created'),
+        overdue: new Array(labels.length).fill(0),
+        labels
+      },
+      insights: {
+        mostProductiveTime: 'No data yet',
+        averageSessionLength: totalSessions > 0 ? totalFocusMinutes / totalSessions : 0,
+        totalFocusTime: totalFocusMinutes,
+        streakDays: 0,
+        improvementPercentage: 0
+      },
       dailyStats,
       totalCompletedTasks: completedTasks.length,
       totalFocusMinutes,
       totalSessions,
-      taskCategories,
-      insights: {
-        ...baseData.insights,
-        totalFocusTime: totalFocusMinutes,
-        averageSessionLength: totalSessions > 0 ? totalFocusMinutes / totalSessions : 0,
-        // Other insights could be calculated from real data as well
-      },
-      // Update chart data with real data
-      pomodoro: {
-        ...baseData.pomodoro,
-        sessionsCompleted: this.aggregateSessionsByDay(sessions, labels),
-        labels
-      },
-      tasks: {
-        ...baseData.tasks,
-        completed: this.aggregateTasksByDay(completedTasks, labels, 'completed'),
-        created: this.aggregateTasksByDay(tasksInPeriod, labels, 'created'),
-        labels
-      }
+      taskCategories
     };
   }
   
@@ -284,6 +286,11 @@ class AnalyticsService {
     startDate: Date, 
     endDate: Date
   ) {
+    // Return empty array if no real data exists
+    if (tasks.length === 0 && sessions.length === 0) {
+      return [];
+    }
+    
     const dailyStats: Array<{
       date: string;
       focusMinutes: number;
@@ -346,12 +353,16 @@ class AnalyticsService {
       }
     });
     
-    // Convert map to array in correct order
+    // Only return days that have actual activity
     const weekStartDate = new Date(weekStart);
     for (let i = 0; i < 7; i++) {
       const dateString = weekStartDate.toISOString().split('T')[0];
       if (dateMap.has(dateString)) {
-        dailyStats.push(dateMap.get(dateString));
+        const dayData = dateMap.get(dateString);
+        // Only include days with actual activity
+        if (dayData.focusMinutes > 0 || dayData.sessions > 0 || dayData.completedTasks > 0) {
+          dailyStats.push(dayData);
+        }
       }
       weekStartDate.setDate(weekStartDate.getDate() + 1);
     }
@@ -483,6 +494,130 @@ class AnalyticsService {
     const data = await this.getAnalyticsData(timeRange);
     const avgProductivity = data.productivity.daily.reduce((a, b) => a + b, 0) / data.productivity.daily.length;
     return Math.round(avgProductivity);
+  }
+
+  async getWeeklyComparison(): Promise<{
+    currentWeek: Array<{
+      date: string;
+      focusMinutes: number;
+      sessions: number;
+      completedTasks: number;
+      mood: string;
+    }>;
+    lastWeek: Array<{
+      date: string;
+      focusMinutes: number;
+      sessions: number;
+      completedTasks: number;
+      mood: string;
+    }>;
+  }> {
+    try {
+      const today = new Date();
+      const dayOfWeek = today.getDay();
+      const daysFromSunday = dayOfWeek;
+      
+      // Current week (Sunday to Saturday)
+      const currentWeekStart = new Date(today);
+      currentWeekStart.setDate(today.getDate() - daysFromSunday);
+      currentWeekStart.setHours(0, 0, 0, 0);
+      
+      const currentWeekEnd = new Date(currentWeekStart);
+      currentWeekEnd.setDate(currentWeekStart.getDate() + 6);
+      currentWeekEnd.setHours(23, 59, 59, 999);
+      
+      // Last week (Sunday to Saturday)
+      const lastWeekStart = new Date(currentWeekStart);
+      lastWeekStart.setDate(currentWeekStart.getDate() - 7);
+      
+      const lastWeekEnd = new Date(currentWeekEnd);
+      lastWeekEnd.setDate(currentWeekEnd.getDate() - 7);
+      
+      // Fetch data for both weeks
+      const [tasks, focusSessions, pomodoroSessions] = await Promise.all([
+        FirestoreService.getTasks().catch(() => []),
+        DatabaseFocusSessionService.getSessionsForPeriod(lastWeekStart, currentWeekEnd).catch(() => []),
+        DatabasePomodoroService.getSessionsForPeriod(lastWeekStart, currentWeekEnd).catch(() => [])
+      ]);
+      
+      const allSessions = [
+        ...focusSessions,
+        ...pomodoroSessions.map(ps => ({
+          id: ps.id,
+          userId: ps.userId,
+          sessionType: 'focus',
+          durationMinutes: ps.durationMinutes,
+          startedAt: ps.startTime,
+          completedAt: ps.endTime,
+          notes: ps.notes,
+          taskId: '',
+          createdAt: ps.createdAt
+        }))
+      ];
+      
+      const currentWeek = this.generateWeeklyStats(tasks, allSessions, currentWeekStart, currentWeekEnd);
+      const lastWeek = this.generateWeeklyStats(tasks, allSessions, lastWeekStart, lastWeekEnd);
+      
+      return { currentWeek, lastWeek };
+    } catch (error) {
+      console.error('Error fetching weekly comparison:', error);
+      return {
+        currentWeek: this.generateEmptyWeek(),
+        lastWeek: this.generateEmptyWeek()
+      };
+    }
+  }
+  
+  private generateWeeklyStats(
+    tasks: any[],
+    sessions: any[],
+    weekStart: Date,
+    weekEnd: Date
+  ) {
+    const weeklyStats = [];
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    
+    for (let i = 0; i < 7; i++) {
+      const dayStart = new Date(weekStart);
+      dayStart.setDate(weekStart.getDate() + i);
+      dayStart.setHours(0, 0, 0, 0);
+      
+      const dayEnd = new Date(dayStart);
+      dayEnd.setHours(23, 59, 59, 999);
+      
+      const daySessions = sessions.filter(session => {
+        const sessionDate = new Date(session.startedAt);
+        return sessionDate >= dayStart && sessionDate <= dayEnd;
+      });
+      
+      const dayTasks = tasks.filter(task => {
+        const taskDate = new Date(task.updatedAt);
+        return task.completed && taskDate >= dayStart && taskDate <= dayEnd;
+      });
+      
+      const focusMinutes = daySessions.reduce((total, session) => total + session.durationMinutes, 0);
+      
+      weeklyStats.push({
+        date: dayNames[i],
+        focusMinutes,
+        sessions: daySessions.length,
+        completedTasks: dayTasks.length,
+        mood: 'Neutral'
+      });
+    }
+    
+    return weeklyStats;
+  }
+  
+  private generateEmptyWeek() {
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return dayNames.map(day => ({
+      date: day,
+      focusMinutes: 0,
+      sessions: 0,
+      completedTasks: 0,
+      mood: 'Neutral'
+    }));
   }
 
   async getWeeklyReport(): Promise<{

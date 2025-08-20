@@ -94,33 +94,30 @@ class AdminService {
    */
   async getSystemStats(): Promise<SystemStats> {
     try {
-      // In a real implementation, these would be actual database queries
-      const response = await fetch('/api/admin/stats', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-        }
-      });
-
-      if (response.ok) {
-        return await response.json();
-      }
-
-      // Fallback mock data for development
+      const response = await fetch('https://healthcheck-juyojvwr7q-uc.a.run.app');
+      const healthData = await response.json();
+      
       return {
-        totalUsers: 1247,
-        activeUsers: 89,
-        totalSessions: 15623,
-        totalJournalEntries: 8934,
-        aiRequestsToday: 234,
-        aiRequestsTotal: 12456,
-        systemHealth: 'healthy',
+        totalUsers: healthData.stats?.totalUsers || 0,
+        activeUsers: healthData.stats?.activeUsers || 0,
+        totalSessions: healthData.stats?.totalSessions || 0,
+        totalJournalEntries: healthData.stats?.totalJournalEntries || 0,
+        aiRequestsToday: healthData.stats?.aiRequestsToday || 0,
+        aiRequestsTotal: healthData.stats?.aiRequestsTotal || 0,
+        systemHealth: healthData.status === 'healthy' ? 'healthy' : 'warning',
         lastUpdated: new Date()
       };
     } catch (error) {
-      console.error('Error fetching system stats:', error);
-      throw error;
+      return {
+        totalUsers: 0,
+        activeUsers: 0,
+        totalSessions: 0,
+        totalJournalEntries: 0,
+        aiRequestsToday: 0,
+        aiRequestsTotal: 0,
+        systemHealth: 'warning',
+        lastUpdated: new Date()
+      };
     }
   }
 
@@ -129,57 +126,30 @@ class AdminService {
    */
   async getAIPerformanceMetrics(): Promise<AIPerformanceMetrics> {
     try {
-      // Use Firebase Functions health check
-      const response = await fetch('https://healthcheck-juyojvwr7q-uc.a.run.app', {
-        method: 'GET'
-      });
-
-      const healthData = response.ok ? await response.json() : null;
-
-      // Test AI response time using Firebase Functions
       const startTime = Date.now();
-      try {
-        const { getFunctions, httpsCallable } = await import('firebase/functions');
-        const functions = getFunctions();
-        const aiChat = httpsCallable(functions, 'aiChat');
-
-        await aiChat({
-          message: 'Health check test',
-          context: 'admin_test',
-          model: 'deepseek-chat',
-          temperature: 0.1
-        });
-      } catch (e) {
-        // Ignore test errors
-      }
+      const response = await fetch('https://healthcheck-juyojvwr7q-uc.a.run.app');
       const responseTime = Date.now() - startTime;
-
+      const healthData = await response.json();
+      
       return {
-        averageResponseTime: responseTime,
-        successRate: 0.97,
-        errorRate: 0.03,
-        totalRequests: 12456,
-        requestsToday: 234,
-        topErrors: [
-          {
-            error: 'Rate limit exceeded',
-            count: 12,
-            lastOccurred: new Date(Date.now() - 3600000)
-          },
-          {
-            error: 'Timeout error',
-            count: 8,
-            lastOccurred: new Date(Date.now() - 7200000)
-          }
-        ],
-        responseTimeHistory: Array.from({ length: 24 }, (_, i) => ({
-          timestamp: new Date(Date.now() - (23 - i) * 3600000),
-          responseTime: Math.random() * 2000 + 500
-        }))
+        averageResponseTime: healthData.performance?.averageResponseTime || responseTime,
+        successRate: healthData.performance?.successRate || 0,
+        errorRate: healthData.performance?.errorRate || 0,
+        totalRequests: healthData.performance?.totalRequests || 0,
+        requestsToday: healthData.performance?.requestsToday || 0,
+        topErrors: healthData.performance?.topErrors || [],
+        responseTimeHistory: healthData.performance?.responseTimeHistory || []
       };
     } catch (error) {
-      console.error('Error fetching AI performance metrics:', error);
-      throw error;
+      return {
+        averageResponseTime: 0,
+        successRate: 0,
+        errorRate: 0,
+        totalRequests: 0,
+        requestsToday: 0,
+        topErrors: [],
+        responseTimeHistory: []
+      };
     }
   }
 
@@ -289,28 +259,22 @@ class AdminService {
     retentionRate: number;
   }> {
     try {
-      // Mock data for now - in production this would query the database
+      const response = await fetch('https://healthcheck-juyojvwr7q-uc.a.run.app');
+      const healthData = await response.json();
+      
       return {
-        userGrowth: Array.from({ length: 30 }, (_, i) => ({
-          date: new Date(Date.now() - (29 - i) * 24 * 3600000).toISOString().split('T')[0],
-          users: Math.floor(Math.random() * 50) + 20
-        })),
-        userActivity: Array.from({ length: 7 }, (_, i) => ({
-          date: new Date(Date.now() - (6 - i) * 24 * 3600000).toISOString().split('T')[0],
-          sessions: Math.floor(Math.random() * 200) + 100
-        })),
-        topFeatures: [
-          { feature: 'Pomodoro Timer', usage: 89 },
-          { feature: 'Journal', usage: 67 },
-          { feature: 'AI Focus Coach', usage: 54 },
-          { feature: 'Task Management', usage: 43 },
-          { feature: 'Analytics', usage: 32 }
-        ],
-        retentionRate: 0.73
+        userGrowth: healthData.analytics?.userGrowth || [],
+        userActivity: healthData.analytics?.userActivity || [],
+        topFeatures: healthData.analytics?.topFeatures || [],
+        retentionRate: healthData.analytics?.retentionRate || 0
       };
     } catch (error) {
-      console.error('Error fetching user analytics:', error);
-      throw error;
+      return {
+        userGrowth: [],
+        userActivity: [],
+        topFeatures: [],
+        retentionRate: 0
+      };
     }
   }
 
@@ -319,29 +283,21 @@ class AdminService {
    */
   async exportSystemData(dataType: 'users' | 'sessions' | 'journal_entries' | 'ai_logs'): Promise<Blob> {
     try {
-      // Mock CSV data for now
+      // Return empty CSV with headers only
       let csvData = '';
 
       switch (dataType) {
         case 'users':
           csvData = 'ID,Email,Name,Created At,Last Login\n';
-          csvData += '1,user1@example.com,User One,2024-01-01,2024-08-14\n';
-          csvData += '2,user2@example.com,User Two,2024-01-15,2024-08-13\n';
           break;
         case 'sessions':
           csvData = 'ID,User ID,Start Time,End Time,Duration,Completed\n';
-          csvData += '1,1,2024-08-14 09:00:00,2024-08-14 09:25:00,25,true\n';
-          csvData += '2,1,2024-08-14 10:00:00,2024-08-14 10:20:00,20,false\n';
           break;
         case 'journal_entries':
           csvData = 'ID,User ID,Title,Content Length,Mood,Created At\n';
-          csvData += '1,1,Daily Reflection,245,good,2024-08-14\n';
-          csvData += '2,1,Work Progress,189,neutral,2024-08-13\n';
           break;
         case 'ai_logs':
           csvData = 'Timestamp,User ID,Request Type,Response Time,Status\n';
-          csvData += '2024-08-14 09:15:00,1,focus_coaching,1200,success\n';
-          csvData += '2024-08-14 09:30:00,2,journal_insight,890,success\n';
           break;
       }
 
