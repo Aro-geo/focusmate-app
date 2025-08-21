@@ -68,7 +68,6 @@ const EnhancedDashboardDesktop: React.FC = () => {
   const { darkMode } = useTheme();
   const { user, firebaseUser } = useAuth();
   const [tasks, setTasks] = React.useState<any[]>([]);
-  React.useState<any[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const prefersReducedMotion = useReducedMotion();
@@ -116,8 +115,8 @@ const EnhancedDashboardDesktop: React.FC = () => {
           completedAt: task.completedAt || null
         })));
         
-        // Initialize activity data
-        generateMockUserActivity();
+        // Load real activity data
+        await loadUserActivity();
         
         // Calculate completion rate
         const totalCreated = userTasks.length;
@@ -145,12 +144,46 @@ const EnhancedDashboardDesktop: React.FC = () => {
     loadTasks();
   }, [user]);
 
-  // Generate user activity for the dashboard
-  const generateMockUserActivity = () => {
-    // Set initial values to 0 - no mock data
-    setFocusStreak(0);
-    setFocusTime(0);
-    setUserActivity([]);
+  // Load real user activity data
+  const loadUserActivity = async () => {
+    if (!user) return;
+    
+    try {
+      // Get today's sessions
+      const today = new Date().toISOString().split('T')[0];
+      const sessions = await firebaseService.getPomodoroSessions(today);
+      const completedSessions = sessions.filter(s => s.completed);
+      
+      // Calculate real focus time and streak
+      const todayFocusTime = completedSessions.reduce((total, session) => total + (session.duration || 25), 0);
+      setFocusTime(todayFocusTime);
+      
+      // Get streak from last 7 days
+      const last7Days = [];
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dayStr = date.toISOString().split('T')[0];
+        const daySessions = await firebaseService.getPomodoroSessions(dayStr);
+        last7Days.push({
+          date: dayStr,
+          sessions: daySessions.filter(s => s.completed).length,
+          focusTime: daySessions.filter(s => s.completed).reduce((total, s) => total + (s.duration || 25), 0)
+        });
+      }
+      
+      // Calculate streak
+      let streak = 0;
+      for (let i = last7Days.length - 1; i >= 0; i--) {
+        if (last7Days[i].sessions > 0) streak++;
+        else break;
+      }
+      setFocusStreak(streak);
+      
+      setUserActivity(last7Days);
+    } catch (error) {
+      console.error('Error loading user activity:', error);
+    }
   };
 
   // Generate realistic AI insights based on user behavior
@@ -413,28 +446,12 @@ const EnhancedDashboardDesktop: React.FC = () => {
   // Pomodoro timer functions
   const startPomodoro = React.useCallback(() => {
     setPomodoroActive(true);
-    // Log session start for activity tracking
-    setUserActivity(prev => [{
-      type: 'session_start',
-      timestamp: new Date().toISOString(),
-      duration: 0
-    }, ...prev.slice(0, 9)]);
   }, []);
 
   const pausePomodoro = React.useCallback(() => {
     setPomodoroActive(false);
-    // Log session pause for activity tracking
-    const elapsedMinutes = Math.round((25 * 60 - pomodoroTime) / 60);
-    if (elapsedMinutes > 0) {
-      setUserActivity(prev => [{
-        type: 'session_pause',
-        timestamp: new Date().toISOString(),
-        duration: elapsedMinutes
-      }, ...prev.slice(0, 9)]);
-      // Add to total focus time
-      setFocusTime(prev => prev + elapsedMinutes);
-    }
-  }, [pomodoroTime]);
+    // Don't record paused/incomplete sessions
+  }, []);
 
   const resetPomodoro = React.useCallback(() => {
     setPomodoroActive(false);
@@ -448,19 +465,24 @@ const EnhancedDashboardDesktop: React.FC = () => {
     const id = setInterval(() => {
       setPomodoroTime(t => {
         if (t <= 1) {
-          // Timer complete
+          // Timer complete - save to Firebase
           clearInterval(id);
           setPomodoroActive(false);
           
-          // Log completed session and increase streak
-          setUserActivity(prev => [{
-            type: 'session_complete',
-            timestamp: new Date().toISOString(),
-            duration: 25
-          }, ...prev.slice(0, 9)]);
+          // Save completed session to Firebase
+          if (user) {
+            firebaseService.savePomodoroSession({
+              userId: user.id,
+              duration: 25,
+              completed: true,
+              startTime: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
+              endTime: new Date().toISOString(),
+              date: new Date().toISOString().split('T')[0]
+            });
+          }
           
           setFocusTime(prev => prev + 25);
-          setFocusStreak(prev => prev + 1);
+          loadUserActivity(); // Refresh activity data
           
           return 0;
         }
@@ -469,7 +491,7 @@ const EnhancedDashboardDesktop: React.FC = () => {
     }, 1000);
     
     return () => clearInterval(id);
-  }, [pomodoroActive]);
+  }, [pomodoroActive, user]);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -520,14 +542,27 @@ const EnhancedDashboardDesktop: React.FC = () => {
         "Remove distractions and create a dedicated workspace."
       ];
       
+      let tipMessage;
       if (highPriorityTasks.length > 0) {
-        setAiMessage(`You have ${highPriorityTasks.length} high priority tasks. Focus on these first: ${highPriorityTasks.map(t => t.title).join(', ')}`);
+        tipMessage = `You have ${highPriorityTasks.length} high priority tasks. Focus on these first: ${highPriorityTasks.map(t => t.title).join(', ')}`;
       } else {
-        setAiMessage(tips[Math.floor(Math.random() * tips.length)]);
+        tipMessage = tips[Math.floor(Math.random() * tips.length)];
       }
+      
+      setAiMessage(tipMessage);
+      
+      // Auto-save the tip
+      await firebaseService.saveTip(tipMessage);
     } catch (error) {
       console.error('AI tip error:', error);
-      setAiMessage("Here's a quick tip: Break your next task into smaller 15-minute chunks for better focus!");
+      const fallbackTip = "Here's a quick tip: Break your next task into smaller 15-minute chunks for better focus!";
+      setAiMessage(fallbackTip);
+      // Save fallback tip too
+      try {
+        await firebaseService.saveTip(fallbackTip);
+      } catch (saveError) {
+        console.error('Error saving fallback tip:', saveError);
+      }
     } finally {
       setIsAiLoading(false);
     }
@@ -978,7 +1013,7 @@ const EnhancedDashboardDesktop: React.FC = () => {
                     </motion.div>
                   ))}
                 </StaggeredList>
-              )}
+                )}
               </FloatingCard>
             </div>
 
@@ -1101,98 +1136,65 @@ const EnhancedDashboardDesktop: React.FC = () => {
                   <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Daily Activity Overview</h3>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3">
-                  {(() => {
-                    const today = new Date();
-                    const dayOfWeek = today.getDay();
-                    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-                    const weekStart = new Date(today);
-                    weekStart.setDate(today.getDate() - daysFromMonday);
+                <div className="space-y-3">
+                  {userActivity.length > 0 ? userActivity.map((day, index) => {
+                    const dayDate = new Date(day.date);
+                    const isToday = day.date === new Date().toISOString().split('T')[0];
+                    const dayName = dayDate.toLocaleDateString('en-US', { weekday: 'short' });
+                    const dateStr = dayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                     
-                    const weekData = [];
-                    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                    const dayData = {
+                      date: `${dayName}, ${dateStr}`,
+                      focusMinutes: day.focusTime,
+                      sessions: day.sessions,
+                      completedTasks: isToday ? completedTasks : 0,
+                      isToday
+                    };
                     
-                    for (let i = 0; i < 7; i++) {
-                      const currentDay = new Date(weekStart);
-                      currentDay.setDate(weekStart.getDate() + i);
-                      
-                      const isToday = i === daysFromMonday;
-                      const focusMinutes = isToday && focusTime > 0 ? focusTime : 0;
-                      const sessions = isToday && focusStreak > 0 ? 1 : 0;
-                      const completedTasksToday = isToday ? completedTasks : 0;
-                      
-                      weekData.push({
-                        date: dayNames[i] + ', ' + currentDay.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                        focusMinutes,
-                        sessions,
-                        completedTasks: completedTasksToday,
-                        isToday
-                      });
-                    }
+                    const getStatusInfo = (focusMinutes: number, sessions: number) => {
+                      if (focusMinutes >= 60) return { status: 'Active', color: 'border-green-500', icon: '💪', label: 'Productive' };
+                      if (focusMinutes >= 25) return { status: 'Active', color: 'border-orange-500', icon: '☕', label: 'Getting Started' };
+                      if (sessions > 0) return { status: 'Active', color: 'border-blue-500', icon: '🎯', label: 'Active' };
+                      return { status: 'Rest', color: 'border-gray-600', icon: '😴', label: 'Inactive' };
+                    };
                     
-                    return weekData.map((day, index) => {
-                      const getStatusInfo = (focusMinutes: number, sessions: number) => {
-                        if (focusMinutes >= 60) return { status: 'Active', color: 'border-green-500', icon: '💪', label: 'Productive' };
-                        if (focusMinutes >= 25) return { status: 'Active', color: 'border-orange-500', icon: '☕', label: 'Getting Started' };
-                        if (sessions > 0) return { status: 'Active', color: 'border-blue-500', icon: '🎯', label: 'Active' };
-                        return { status: 'Rest', color: 'border-gray-600', icon: '😴', label: 'Inactive' };
-                      };
-                      
-                      const statusInfo = getStatusInfo(day.focusMinutes, day.sessions);
-                      
-                      return (
-                        <div
-                          key={index}
-                          className={`p-4 rounded-lg border-2 bg-gray-50 dark:bg-gray-700/50 ${
-                            day.isToday ? 'border-orange-500' : statusInfo.color
-                          } transition-all hover:shadow-md`}
-                        >
-                          <div className="flex justify-between items-start mb-3">
-                            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
-                              {day.date}
-                            </span>
-                            <span className={`text-xs px-2 py-1 rounded-full ${
-                              statusInfo.status === 'Active' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-600 dark:text-gray-300'
-                            }`}>
-                              {statusInfo.status}
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center justify-center mb-4">
-                            <div className={`w-16 h-16 rounded-full border-4 flex items-center justify-center ${
-                              statusInfo.status === 'Active' ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-600'
-                            }`}>
-                              <span className="text-2xl">{statusInfo.icon}</span>
-                            </div>
-                          </div>
-                          
-                          <div className="text-center mb-3">
-                            <p className="text-sm font-semibold text-gray-800 dark:text-white">
-                              {statusInfo.label}
-                            </p>
-                          </div>
-                          
-                          <div className="space-y-2 text-xs">
-                            <div className="flex justify-between">
-                              <span className="text-gray-500 dark:text-gray-400">Focus</span>
-                              <span className="font-medium text-gray-700 dark:text-gray-200">
-                                {day.focusMinutes > 0 ? `${Math.floor(day.focusMinutes / 60)}h ${day.focusMinutes % 60}m` : '0m'}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-500 dark:text-gray-400">Sessions</span>
-                              <span className="font-medium text-gray-700 dark:text-gray-200">{day.sessions}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-500 dark:text-gray-400">Tasks</span>
-                              <span className="font-medium text-gray-700 dark:text-gray-200">{day.completedTasks}</span>
-                            </div>
+                    const statusInfo = getStatusInfo(dayData.focusMinutes, dayData.sessions);
+                    
+                    return (
+                      <div
+                        key={index}
+                        className={`flex items-center justify-between p-3 rounded-lg border transition-all hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
+                          dayData.isToday ? 'border-orange-200 bg-orange-50 dark:border-orange-700 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <span className="text-lg">{statusInfo.icon}</span>
+                          <div>
+                            <p className="font-medium text-gray-800 dark:text-white">{dayData.date}</p>
+                            <p className={`text-sm ${
+                              statusInfo.status === 'Active' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'
+                            }`}>{statusInfo.label}</p>
                           </div>
                         </div>
-                      );
-                    });
-                  })()
-                )}
+                        
+                        <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-300">
+                          <div className="text-center">
+                            <p className="font-medium">{dayData.focusMinutes > 0 ? `${Math.floor(dayData.focusMinutes / 60)}h ${dayData.focusMinutes % 60}m` : '0m'}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Focus</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="font-medium">{dayData.sessions}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Sessions</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="font-medium">{dayData.completedTasks}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Tasks</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }) : <div className="text-center text-gray-500 dark:text-gray-400 py-4">Loading activity data...</div>}
+                </div>
               </FloatingCard>
             </div>
           </div>

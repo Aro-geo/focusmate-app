@@ -99,7 +99,7 @@ export class FirebaseService {
     }
   }
   
-  async getPomodoroSessions() {
+  async getPomodoroSessions(date?: string) {
     const user = auth.currentUser;
     if (!user) throw new Error('User not authenticated');
     
@@ -110,24 +110,57 @@ export class FirebaseService {
       
       for (const doc of querySnapshot.docs) {
         const data = doc.data();
-        sessions.push({
-          id: doc.id,
-          userId: data.userId,
-          taskName: data.taskName,
-          startTime: data.startTime?.toDate() || new Date(),
-          endTime: data.endTime?.toDate() || null,
-          durationMinutes: data.durationMinutes || 0,
-          sessionType: data.sessionType || 'pomodoro',
-          completed: data.completed || false,
-          notes: data.notes || '',
-          createdAt: data.createdAt?.toDate() || new Date()
-        });
+        const sessionDate = data.date || data.createdAt?.toDate()?.toISOString().split('T')[0];
+        
+        if (!date || sessionDate === date) {
+          sessions.push({
+            id: doc.id,
+            userId: data.userId,
+            duration: data.duration || data.durationMinutes || 25,
+            completed: data.completed || false,
+            date: sessionDate,
+            startTime: data.startTime,
+            endTime: data.endTime,
+            createdAt: data.createdAt?.toDate() || new Date()
+          });
+        }
       }
       
       return sessions;
     } catch (e) {
       console.error("Error getting pomodoro sessions: ", SecurityUtils.sanitizeForLog(String(e)));
-      return []; // Return empty array instead of throwing to prevent app crashes
+      return [];
+    }
+  }
+
+  async savePomodoroSession(sessionData: any) {
+    const user = auth.currentUser;
+    if (!user) throw new Error('User not authenticated');
+    
+    try {
+      const userSessionsCollection = collection(db, 'users', user.uid, 'pomodoroSessions');
+      await addDoc(userSessionsCollection, {
+        ...sessionData,
+        createdAt: new Date()
+      });
+    } catch (e) {
+      console.error("Error saving pomodoro session: ", SecurityUtils.sanitizeForLog(String(e)));
+    }
+  }
+
+  async saveTip(tip: string) {
+    const user = auth.currentUser;
+    if (!user) throw new Error('User not authenticated');
+    
+    try {
+      const userTipsCollection = collection(db, 'users', user.uid, 'savedTips');
+      await addDoc(userTipsCollection, {
+        tip,
+        createdAt: new Date(),
+        source: 'ai_coach'
+      });
+    } catch (e) {
+      console.error("Error saving tip: ", SecurityUtils.sanitizeForLog(String(e)));
     }
   }
 

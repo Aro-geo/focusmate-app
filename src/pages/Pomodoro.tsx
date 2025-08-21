@@ -35,6 +35,7 @@ import aiService from '../services/AIService';
 import useResponsive from '../hooks/useResponsive';
 import DatabasePomodoroService from '../services/DatabasePomodoroService';
 import { useAuth } from '../context/AuthContext';
+import { aiFocusTipsService } from '../services/AIFocusTipsService';
 
 // Types
 type PomodoroMode = 'work' | 'shortBreak' | 'longBreak';
@@ -279,7 +280,27 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
 
   const skipToBreak = () => {
     if (mode === 'work') {
-      completeSession();
+      // Skip session without marking as completed
+      setIsActive(false);
+      
+      // Clear session data without saving
+      setCurrentSession(null);
+      setSessionNotes("");
+      setDistractions([]);
+      
+      // Determine next break type based on completed sessions (not skipped ones)
+      if (completedSessions % settings.longBreakInterval === 0 && completedSessions > 0) {
+        setMode('longBreak');
+        setTimeRemaining(settings.longBreakDuration * 60);
+      } else {
+        setMode('shortBreak');
+        setTimeRemaining(settings.shortBreakDuration * 60);
+      }
+      
+      // Auto-start break if enabled
+      if (settings.autoStartBreaks) {
+        setTimeout(() => setIsActive(true), 500);
+      }
     }
   };
 
@@ -535,6 +556,18 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
       const response = await aiService.chat(prompt);
       setAiMessage(response.response);
       setAiChatInput('');
+      
+      // Auto-save tip if it contains bullet points
+      if (response.response.includes('*') || response.response.includes('•')) {
+        const tipData = aiFocusTipsService.extractTipFromAIMessage(response.response);
+        if (tipData) {
+          await aiFocusTipsService.saveTip({
+            ...tipData,
+            source: 'ai-coach',
+            sessionId: currentSession?.id
+          });
+        }
+      }
     } catch (error) {
       console.error('Failed to send AI message:', error);
       setAiMessage("## Focus Assistant\n\nI'm having trouble connecting right now, but I'm here to help you stay focused!\n\nTry again in a moment or use the 'Get Tip' button for quick advice.");
@@ -562,6 +595,18 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
       
       const response = await aiService.chat(prompt);
       setAiMessage(response.response);
+      
+      // Auto-save tip if it contains bullet points
+      if (response.response.includes('*') || response.response.includes('•')) {
+        const tipData = aiFocusTipsService.extractTipFromAIMessage(response.response);
+        if (tipData) {
+          await aiFocusTipsService.saveTip({
+            ...tipData,
+            source: 'ai-coach',
+            sessionId: currentSession?.id
+          });
+        }
+      }
     } catch (error) {
       console.error('Failed to get tip:', error);
       const tips = [
@@ -570,7 +615,18 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
         "## Strategic Breaks ⏰\n\nTake your breaks seriously - they help prevent mental fatigue and maintain peak performance.\n\n* Stand up and stretch\n* Look away from screens\n* Take deep breaths\n\nRest is a crucial part of productivity!",
         "## 2-Minute Rule 🧠\n\nIf you're struggling to focus, try the 2-minute rule: do quick tasks immediately.\n\n* Eliminate small distractions first\n* Build momentum with easy wins\n* Save complex tasks for deep work sessions\n\nSmall steps lead to big results!"
       ];
-      setAiMessage(tips[Math.floor(Math.random() * tips.length)]);
+      const selectedTip = tips[Math.floor(Math.random() * tips.length)];
+      setAiMessage(selectedTip);
+      
+      // Auto-save fallback tip
+      const tipData = aiFocusTipsService.extractTipFromAIMessage(selectedTip);
+      if (tipData) {
+        await aiFocusTipsService.saveTip({
+          ...tipData,
+          source: 'ai-coach',
+          sessionId: currentSession?.id
+        });
+      }
     } finally {
       setIsAiLoading(false);
     }

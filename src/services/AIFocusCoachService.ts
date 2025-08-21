@@ -1,5 +1,4 @@
-import { firebaseService } from './FirebaseService';
-import { PomodoroSession } from './DatabasePomodoroService';
+import DatabasePomodoroService, { PomodoroSession } from './DatabasePomodoroService';
 
 interface FocusInsight {
   id: string;
@@ -42,7 +41,7 @@ class AIFocusCoachService {
   async loadUserData(userId: string): Promise<void> {
     try {
       // Load past sessions
-      this.sessionHistory = await firebaseService.getPomodoroSessions() || [];
+      this.sessionHistory = await DatabasePomodoroService.getSessions() || [];
       
       // Calculate analytics
       this.calculateAnalytics();
