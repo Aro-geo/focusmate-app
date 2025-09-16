@@ -12,6 +12,7 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import FormattedMessage from './FormattedMessage';
 import { aiFocusTipsService } from '../services/AIFocusTipsService';
+import { useDeepSeek } from '../hooks/useDeepSeek';
 
 interface FloatingAssistantProps {
   isAiLoading: boolean;
@@ -38,6 +39,9 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
   const [position, setPosition] = useState({ x: 20, y: 20 });
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { isLoading: deepSeekLoading, streamContent, generateStreamResponse, clearStream } = useDeepSeek();
+  const [currentMessage, setCurrentMessage] = useState(aiMessage);
+  const [isStreaming, setIsStreaming] = useState(false);
 
   // Initialize position to bottom-right corner
   useEffect(() => {
@@ -70,26 +74,64 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
 
   };
 
-  const handleSendMessage = useCallback(() => {
-    if (aiChatInput.trim() && !isAiLoading) {
-      onAskAI();
+  const handleSendMessage = useCallback(async () => {
+    if (aiChatInput.trim() && !isAiLoading && !deepSeekLoading) {
+      setIsStreaming(true);
+      clearStream();
+      setCurrentMessage('');
+      
+      try {
+        await generateStreamResponse(aiChatInput, 'chat', (chunk) => {
+          setCurrentMessage(prev => prev + chunk);
+        });
+      } catch (error) {
+        console.error('Streaming error:', error);
+        onAskAI();
+      } finally {
+        setIsStreaming(false);
+        setAiChatInput('');
+      }
     }
-  }, [aiChatInput, isAiLoading, onAskAI]);
+  }, [aiChatInput, isAiLoading, deepSeekLoading, generateStreamResponse, clearStream, onAskAI, setAiChatInput]);
 
   const handleSaveTip = useCallback(async () => {
     try {
-      const tipData = aiFocusTipsService.extractTipFromAIMessage(aiMessage);
+      const messageToSave = currentMessage || aiMessage;
+      const tipData = aiFocusTipsService.extractTipFromAIMessage(messageToSave);
       if (tipData) {
         await aiFocusTipsService.saveTip({
           ...tipData,
           source: 'ai-coach',
-          sessionId
+          ...(sessionId && { sessionId }) // Only include sessionId if it's defined
         });
       }
     } catch (error) {
       console.error('Error saving tip:', error);
     }
-  }, [aiMessage, sessionId]);
+  }, [currentMessage, aiMessage, sessionId]);
+
+  const handleGetTip = useCallback(async () => {
+    setIsStreaming(true);
+    clearStream();
+    setCurrentMessage('');
+    
+    try {
+      await generateStreamResponse('Give me a productivity tip to help me stay focused.', 'chat', (chunk) => {
+        setCurrentMessage(prev => prev + chunk);
+      });
+    } catch (error) {
+      console.error('Streaming error:', error);
+      onGetTip();
+    } finally {
+      setIsStreaming(false);
+    }
+  }, [generateStreamResponse, clearStream, onGetTip]);
+
+  useEffect(() => {
+    if (aiMessage && !isStreaming) {
+      setCurrentMessage(aiMessage);
+    }
+  }, [aiMessage, isStreaming]);
 
   if (isMinimized) {
     return (
@@ -196,7 +238,7 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
           <div className={`flex-1 mb-4 p-3 rounded-lg ${
             darkMode ? 'bg-gray-700/50' : 'bg-gray-50'
           }`}>
-            {isAiLoading ? (
+            {(isAiLoading || deepSeekLoading || isStreaming) && !currentMessage ? (
               <motion.div
                 className={`text-sm leading-relaxed ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}
                 initial={{ opacity: 0, y: 10 }}
@@ -205,7 +247,7 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
               >
                 <span className="flex items-center space-x-2">
                   <Loader className="w-4 h-4 animate-spin" />
-                  <span>Thinking...</span>
+                  <span>{isStreaming ? 'Streaming response...' : 'Thinking...'}</span>
                 </span>
               </motion.div>
             ) : (
@@ -216,9 +258,16 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
                 transition={{ duration: 0.3 }}
               >
                 <FormattedMessage
-                  message={aiMessage || "## Hello! 👋\n\nI'm here to help you stay focused and productive. Ask me anything or get a quick tip!"}
+                  message={currentMessage || aiMessage || "## Hello! 👋\n\nI'm here to help you stay focused and productive. Ask me anything or get a quick tip!"}
                   className={`text-sm leading-relaxed ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}
                 />
+                {isStreaming && (
+                  <motion.div
+                    className="inline-block w-2 h-4 bg-current ml-1"
+                    animate={{ opacity: [1, 0] }}
+                    transition={{ duration: 0.8, repeat: Infinity }}
+                  />
+                )}
               </motion.div>
             )}
           </div>
@@ -243,11 +292,11 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
                       : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:ring-indigo-500 focus:border-indigo-500'
                   }`}
                   onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                  disabled={isAiLoading}
+                  disabled={isAiLoading || deepSeekLoading || isStreaming}
                 />
                 <motion.button
                   onClick={handleSendMessage}
-                  disabled={isAiLoading || !aiChatInput.trim()}
+                  disabled={isAiLoading || deepSeekLoading || isStreaming || !aiChatInput.trim()}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                     darkMode
                       ? 'bg-purple-600 hover:bg-purple-700 text-white'
@@ -278,24 +327,7 @@ const FloatingAssistant: React.FC<FloatingAssistantProps> = memo(({
               <MessageCircle className="w-4 h-4" />
             </motion.button>
             <motion.button 
-              onClick={async () => {
-                await onGetTip();
-                // Auto-save tip after generation
-                setTimeout(async () => {
-                  try {
-                    const tipData = aiFocusTipsService.extractTipFromAIMessage(aiMessage);
-                    if (tipData) {
-                      await aiFocusTipsService.saveTip({
-                        ...tipData,
-                        source: 'ai-coach',
-                        sessionId
-                      });
-                    }
-                  } catch (error) {
-                    console.error('Failed to auto-save tip:', error);
-                  }
-                }, 1000);
-              }}
+              onClick={handleGetTip}
               className={`px-2 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center ${
                 darkMode 
                   ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'

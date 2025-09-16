@@ -1,7 +1,7 @@
 import { firebaseService } from './FirebaseService';
 import { PomodoroSession } from './DatabasePomodoroService';
 
-interface ConversationContext {
+export interface ConversationContext {
   sessionType: 'start' | 'pause' | 'distraction' | 'completion' | 'break' | 'reflection';
   currentTask?: string;
   timeElapsed?: number;
@@ -18,7 +18,7 @@ interface ConversationContext {
   };
 }
 
-interface AIResponse {
+export interface AIResponse {
   message: string;
   followUpQuestions?: string[];
   suggestions?: string[];
@@ -164,6 +164,107 @@ Respond as the AI Focus Coach:`;
     } catch (error) {
       console.error('Error calling AI service:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Stream AI response for real-time interaction
+   */
+  async *generateStreamResponse(
+    context: ConversationContext,
+    userInput?: string
+  ): AsyncGenerator<{ chunk: string; isComplete: boolean; fullResponse?: AIResponse }> {
+    const contextPrompt = this.buildConversationContext(context, userInput);
+    
+    try {
+      const response = await fetch(`https://us-central1-focusmate-ai-8cad6.cloudfunctions.net/aiChatStream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: contextPrompt,
+          context: 'focus_coaching',
+          model: 'deepseek-chat',
+          temperature: 0.7
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response stream available');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullContent = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) break;
+          
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.trim() === '') continue;
+            
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              
+              if (data === '[DONE]') {
+                // Stream complete, yield final response
+                yield {
+                  chunk: '',
+                  isComplete: true,
+                  fullResponse: this.parseAIResponse(fullContent)
+                };
+                return;
+              }
+
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.error) {
+                  console.error('Streaming error:', parsed.error);
+                  continue;
+                }
+
+                if (parsed.choices?.[0]?.delta?.content) {
+                  const chunk = parsed.choices[0].delta.content;
+                  fullContent += chunk;
+                  
+                  yield {
+                    chunk,
+                    isComplete: false
+                  };
+                }
+              } catch (parseError) {
+                console.warn('Failed to parse SSE data:', data);
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    } catch (error) {
+      console.error('AI coaching stream error:', error);
+      yield {
+        chunk: 'I apologize, but I\'m having trouble connecting right now. Let me help you with some general focus advice instead.',
+        isComplete: true,
+        fullResponse: {
+          message: 'I apologize, but I\'m having trouble connecting right now. Let me help you with some general focus advice instead.',
+          followUpQuestions: ['How are you feeling about your current task?'],
+          suggestions: ['Try taking a short break and coming back with fresh perspective.']
+        }
+      };
     }
   }
 
@@ -333,4 +434,3 @@ Respond as the AI Focus Coach:`;
 }
 
 export const enhancedAIFocusCoachService = new EnhancedAIFocusCoachService();
-export type { ConversationContext, AIResponse };

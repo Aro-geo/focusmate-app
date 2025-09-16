@@ -40,6 +40,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Handle redirect result on app load
+    const handleRedirectResult = async () => {
+      try {
+        await AuthService.handleRedirectResult();
+      } catch (error) {
+        console.error('Error handling redirect result:', error);
+      }
+    };
+    
+    handleRedirectResult();
+
     const unsubscribe = AuthService.onAuthStateChanged(async (firebaseUser) => {
       console.log('Auth state changed:', firebaseUser?.email, 'Email verified:', firebaseUser?.emailVerified);
       setFirebaseUser(firebaseUser);
@@ -138,7 +149,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const user = await AuthService.signInWithGoogle();
       // User state will be updated automatically by onAuthStateChanged
       return true;
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message === 'REDIRECT_INITIATED') {
+        // Redirect has been initiated, don't treat as error
+        return true;
+      }
       console.error('Google sign-in error:', error);
       return false;
     }

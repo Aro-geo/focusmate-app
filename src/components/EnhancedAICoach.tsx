@@ -64,6 +64,8 @@ const EnhancedAICoach: React.FC<EnhancedAICoachProps> = ({
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [currentStreamingMessage, setCurrentStreamingMessage] = useState('');
   const [showInsights, setShowInsights] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
@@ -108,6 +110,8 @@ const EnhancedAICoach: React.FC<EnhancedAICoachProps> = ({
     userMessage?: string
   ) => {
     setIsLoading(true);
+    setIsStreaming(true);
+    setCurrentStreamingMessage('');
 
     try {
       const context: ConversationContext = {
@@ -125,8 +129,6 @@ const EnhancedAICoach: React.FC<EnhancedAICoachProps> = ({
         }
       };
 
-      const aiResponse = await enhancedAIFocusCoachService.generateIntelligentResponse(context, userMessage);
-
       // Add user message if provided
       if (userMessage) {
         const userMsg: ChatMessage = {
@@ -138,18 +140,51 @@ const EnhancedAICoach: React.FC<EnhancedAICoachProps> = ({
         setChatMessages(prev => [...prev, userMsg]);
       }
 
-      // Add AI response
+      // Create placeholder AI message for streaming
+      const aiMessageId = `ai-${Date.now()}`;
       const aiMsg: ChatMessage = {
-        id: `ai-${Date.now()}`,
+        id: aiMessageId,
         type: 'ai',
-        content: aiResponse.message,
+        content: '',
         timestamp: new Date(),
         context: contextType,
-        suggestions: aiResponse.suggestions,
-        followUpQuestions: aiResponse.followUpQuestions
+        suggestions: [],
+        followUpQuestions: []
       };
-
       setChatMessages(prev => [...prev, aiMsg]);
+
+      // Stream the response
+      let fullContent = '';
+      const streamGenerator = enhancedAIFocusCoachService.generateStreamResponse(context, userMessage);
+
+      for await (const chunk of streamGenerator) {
+        if (chunk.isComplete) {
+          // Update final message with parsed response
+          if (chunk.fullResponse) {
+            setChatMessages(prev => prev.map(msg => 
+              msg.id === aiMessageId 
+                ? {
+                    ...msg,
+                    content: chunk.fullResponse!.message,
+                    suggestions: chunk.fullResponse!.suggestions,
+                    followUpQuestions: chunk.fullResponse!.followUpQuestions
+                  }
+                : msg
+            ));
+          }
+          setCurrentStreamingMessage('');
+          break;
+        } else {
+          // Update streaming content
+          fullContent += chunk.chunk;
+          setCurrentStreamingMessage(fullContent);
+          setChatMessages(prev => prev.map(msg => 
+            msg.id === aiMessageId 
+              ? { ...msg, content: fullContent }
+              : msg
+          ));
+        }
+      }
 
     } catch (error) {
       console.error('Error in AI interaction:', error);
@@ -166,6 +201,7 @@ const EnhancedAICoach: React.FC<EnhancedAICoachProps> = ({
       setChatMessages(prev => [...prev, fallbackMsg]);
     } finally {
       setIsLoading(false);
+      setIsStreaming(false);
     }
   };
 
@@ -335,7 +371,16 @@ const EnhancedAICoach: React.FC<EnhancedAICoachProps> = ({
                     ? 'bg-gray-700 text-gray-100' 
                     : 'bg-gray-100 text-gray-800'
               }`}>
-                <p className="text-sm">{message.content}</p>
+                <p className="text-sm">
+                  {message.content}
+                  {isStreaming && message.type === 'ai' && message.id === chatMessages[chatMessages.length - 1]?.id && (
+                    <motion.span
+                      className="inline-block w-2 h-4 bg-current ml-1"
+                      animate={{ opacity: [1, 0] }}
+                      transition={{ duration: 0.8, repeat: Infinity }}
+                    />
+                  )}
+                </p>
                 
                 {/* Suggestions */}
                 {message.suggestions && message.suggestions.length > 0 && (
@@ -372,14 +417,16 @@ const EnhancedAICoach: React.FC<EnhancedAICoachProps> = ({
           </div>
         ))}
         
-        {isLoading && (
+        {(isLoading || isStreaming) && (
           <div className="flex justify-start">
             <div className={`p-3 rounded-lg ${
               darkMode ? 'bg-gray-700' : 'bg-gray-100'
             }`}>
               <div className="flex items-center space-x-2">
                 <Loader className="h-4 w-4 animate-spin text-indigo-500" />
-                <span className="text-sm opacity-60">AI is thinking...</span>
+                <span className="text-sm opacity-60">
+                  {isStreaming ? 'AI is responding...' : 'AI is thinking...'}
+                </span>
               </div>
             </div>
           </div>
@@ -402,13 +449,13 @@ const EnhancedAICoach: React.FC<EnhancedAICoachProps> = ({
                 ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
                 : 'bg-white border-gray-300 text-gray-800 placeholder-gray-500'
             } focus:outline-none focus:ring-2 focus:ring-indigo-500`}
-            disabled={isLoading}
+            disabled={isLoading || isStreaming}
           />
           <button
             onClick={handleSendMessage}
-            disabled={!userInput.trim() || isLoading}
+            disabled={!userInput.trim() || isLoading || isStreaming}
             className={`p-2 rounded-lg ${
-              !userInput.trim() || isLoading
+              !userInput.trim() || isLoading || isStreaming
                 ? darkMode 
                   ? 'bg-gray-700 text-gray-500' 
                   : 'bg-gray-200 text-gray-400'

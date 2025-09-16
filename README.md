@@ -73,6 +73,11 @@ focusmate-ai/
 - **Firebase Firestore** for real-time NoSQL database
 - **Firebase Analytics** for user behavior tracking
 
+### AI Integration
+- **DeepSeek AI API** with dual-role architecture
+- **Real-time streaming** for live AI responses
+- **OpenAI API** as fallback option
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -134,6 +139,10 @@ firebase deploy
 
 ### ✅ Complete Implementation
 - **📊 Dashboard**: Interactive 3-column layout with real-time data and AI insights
+- **🤖 DeepSeek AI Integration**: Dual-role AI system with streaming responses
+  - Creative assistant for engaging productivity tips
+  - Analytical expert for data-driven insights
+  - Real-time streaming for live AI responses
 - **🍅 Pomodoro Timer**: Advanced timer with session tracking and mood logging
 - **📝 Todo Management**: Firebase-connected CRUD operations with real-time updates
 - **📈 Analytics**: Advanced charts showing productivity trends and insights
@@ -143,11 +152,14 @@ firebase deploy
 - **📱 Responsive Design**: Mobile-optimized layouts throughout
 
 ### 🤖 Advanced AI Features
-- **🧠 Intelligent Task Analysis**: AI-powered task complexity scoring and duration estimation
-- **🎯 Smart Prioritization**: Multi-factor task prioritization with contextual reasoning
-- **💡 Context-Aware Insights**: Personalized productivity recommendations based on time, mood, and patterns
-- **⚡ Real-time Suggestions**: Dynamic focus tips and optimization strategies
-- **📊 Pattern Recognition**: Learning from user behavior to improve recommendations
+- **🧠 DeepSeek AI Integration**: Dual-role AI system with specialized models
+  - **deepseek-chat**: Creative assistant (temperature 1.3) for engaging, motivational content
+  - **deepseek-reasoner**: Analytical expert (temperature 1.0) for data-driven insights
+- **⚡ Real-time Streaming**: Live AI responses with streaming support
+- **🎯 Smart Task Analysis**: AI-powered task complexity scoring and duration estimation
+- **💡 Context-Aware Insights**: Personalized productivity recommendations
+- **📊 AI Analytics**: Automated analysis of productivity patterns and trends
+- **🔄 Intelligent Suggestions**: Dynamic focus tips and optimization strategies
 
 ### 📱 Progressive Web App (PWA)
 - **🌐 Offline Functionality**: Core features work without internet connection
@@ -267,6 +279,46 @@ firebase deploy          # Deploy to Firebase Hosting
 ---
 
 *Built with ❤️ for productivity enthusiasts using modern React, Firebase, and AI*
+
+## 🤖 DeepSeek AI Configuration
+
+The app uses DeepSeek AI with two specialized roles:
+
+### deepseek-chat (Creative Role)
+- **Temperature**: 1.3 (high creativity)
+- **Use Case**: Engaging productivity tips, motivational content
+- **Max Tokens**: 300
+- **Features**: Real-time streaming, creative suggestions
+
+### deepseek-reasoner (Analytical Role)
+- **Temperature**: 1.0 (balanced analysis)
+- **Use Case**: Data analysis, logical insights, pattern recognition
+- **Max Tokens**: 500
+- **Features**: Real-time streaming, data-driven recommendations
+
+### API Configuration
+```typescript
+// Environment variables
+REACT_APP_DEEPSEEK_API_KEY=your_deepseek_api_key_here
+
+// Usage in components
+import { useDeepSeek } from '../hooks/useDeepSeek';
+
+const { generateStreamResponse } = useDeepSeek();
+await generateStreamResponse(prompt, 'chat'); // or 'analysis'
+```
+
+## 🔑 API Keys Setup
+
+### DeepSeek AI (Recommended)
+1. Visit [DeepSeek AI Platform](https://platform.deepseek.com)
+2. Create an account and generate an API key
+3. Add to `.env`: `REACT_APP_DEEPSEEK_API_KEY=your_key_here`
+
+### OpenAI (Optional Fallback)
+1. Visit [OpenAI Platform](https://platform.openai.com)
+2. Create an account and generate an API key
+3. Add to `.env`: `REACT_APP_OPENAI_API_KEY=your_key_here`
 
 ## 📄 License
 

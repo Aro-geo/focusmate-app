@@ -72,10 +72,17 @@ const FloatingAuthModal: React.FC<FloatingAuthModalProps> = ({ isOpen, onClose, 
           navigate('/app/dashboard');
         }, 100);
       } else {
-        setError('Google sign-in failed');
+        setError('Google sign-in failed. Please try again.');
       }
     } catch (err: any) {
-      setError(err.message || 'Google sign-in failed');
+      if (err.message === 'REDIRECT_INITIATED') {
+        // Redirect is happening, show appropriate message
+        setError('Redirecting to Google for authentication...');
+        // Close modal since redirect will handle the flow
+        setTimeout(() => onClose(), 1000);
+      } else {
+        setError(err.message || 'Google sign-in failed. Please check your popup blocker settings.');
+      }
     } finally {
       setIsLoading(false);
     }

@@ -26,26 +26,43 @@ type UseCase = 'coding' | 'analysis' | 'conversation' | 'translation' | 'creativ
 
 class SecureDeepSeekService {
   private functions = getFunctions();
+  private firebaseRegion = 'us-central1';
+  private firebaseProjectId = 'focusmate-ai-8cad6';
+
+  private get functionsUrl() {
+    return `https://${this.firebaseRegion}-${this.firebaseProjectId}.cloudfunctions.net`;
+  }
+
+  private getModelConfig(useCase: UseCase): {model: string; temperature: number} {
+    switch (useCase) {
+      case 'coding':
+        return {model: 'deepseek-reasoner', temperature: 0.0};
+      case 'analysis':
+        return {model: 'deepseek-reasoner', temperature: 1.0};
+      case 'conversation':
+        return {model: 'deepseek-chat', temperature: 1.3};
+      case 'translation':
+        return {model: 'deepseek-chat', temperature: 1.3};
+      case 'creative':
+        return {model: 'deepseek-chat', temperature: 1.5};
+      default:
+        return {model: 'deepseek-chat', temperature: 1.3};
+    }
+  }
 
   private getTemperature(useCase: UseCase): number {
-    const temperatures = {
-      coding: 0.0,      // Coding / Math
-      analysis: 1.0,    // Data Analysis
-      conversation: 1.3, // General Conversation
-      translation: 1.3, // Translation
-      creative: 1.5     // Creative Writing
-    };
-    return temperatures[useCase];
+    return this.getModelConfig(useCase).temperature;
   }
 
   async chat(message: string, context?: string, useCase: UseCase = 'conversation'): Promise<AIResponse> {
     try {
+      const config = this.getModelConfig(useCase);
       const aiChat = httpsCallable(this.functions, 'aiChat');
       const result = await aiChat({
         message,
         context,
-        model: 'deepseek-chat',
-        temperature: this.getTemperature(useCase)
+        model: config.model,
+        temperature: config.temperature
       });
       return result.data as AIResponse;
     } catch (error) {
@@ -54,13 +71,88 @@ class SecureDeepSeekService {
     }
   }
 
+  async *chatStream(
+    message: string, 
+    context?: string, 
+    useCase: UseCase = 'conversation'
+  ): AsyncGenerator<{content: string; done: boolean; error?: string}> {
+    try {
+      const config = this.getModelConfig(useCase);
+      const response = await fetch(`${this.functionsUrl}/aiChatStream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message,
+          context,
+          model: config.model,
+          temperature: config.temperature
+        })
+      });
+
+      if (!response.ok) {
+        yield { content: 'Sorry, I encountered an error. Please try again.', done: true };
+        return;
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        yield { content: 'Sorry, I encountered an error. Please try again.', done: true };
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (!data.trim()) continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              
+              if (parsed.error) {
+                yield { content: '', done: true, error: parsed.error };
+                return;
+              }
+              
+              if (parsed.done) {
+                yield { content: '', done: true };
+                return;
+              }
+
+              if (parsed.content) {
+                yield { content: parsed.content, done: false };
+              }
+            } catch (e) {
+              // Skip invalid JSON
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('AI chat stream error:', error);
+      yield { content: 'Sorry, I encountered an error. Please try again.', done: true };
+    }
+  }
+
   async analyzeTask(task: string): Promise<TaskAnalysis> {
     try {
       const analyzeTask = httpsCallable(this.functions, 'analyzeTask');
       const result = await analyzeTask({
         task,
-        model: 'deepseek-chat',
-        temperature: this.getTemperature('analysis')
+        model: 'deepseek-reasoner', // Use analytical model for task analysis
+        temperature: 1.0 // Balanced analytical temperature
       });
       return result.data as TaskAnalysis;
     } catch (error) {

@@ -8,6 +8,8 @@ import {
   sendEmailVerification,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   sendPasswordResetEmail
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -72,19 +74,59 @@ class AuthService {
     provider.setCustomParameters({
       prompt: 'select_account'
     });
-    const userCredential = await signInWithPopup(auth, provider);
-    const user = userCredential.user;
     
-    const userProfile: UserProfile = {
-      uid: user.uid,
-      email: user.email!,
-      displayName: user.displayName || 'User',
-      createdAt: new Date(),
-      lastLogin: new Date()
-    };
-    
-    await setDoc(doc(db, 'users', user.uid), userProfile, { merge: true });
-    return user;
+    try {
+      // Try popup first
+      const userCredential = await signInWithPopup(auth, provider);
+      const user = userCredential.user;
+      
+      const userProfile: UserProfile = {
+        uid: user.uid,
+        email: user.email!,
+        displayName: user.displayName || 'User',
+        createdAt: new Date(),
+        lastLogin: new Date()
+      };
+      
+      await setDoc(doc(db, 'users', user.uid), userProfile, { merge: true });
+      return user;
+    } catch (error: any) {
+      // If popup is blocked or COOP error, fallback to redirect
+      if (error.code === 'auth/popup-blocked' || 
+          error.code === 'auth/popup-closed-by-user' ||
+          error.message?.includes('Cross-Origin-Opener-Policy') ||
+          error.message?.includes('window.closed') ||
+          error.toString().includes('popup')) {
+        console.log('Popup blocked or COOP error, falling back to redirect authentication');
+        await signInWithRedirect(auth, provider);
+        throw new Error('REDIRECT_INITIATED');
+      }
+      console.error('Google sign-in error:', error);
+      throw error;
+    }
+  }
+
+  async handleRedirectResult(): Promise<User | null> {
+    try {
+      const result = await getRedirectResult(auth);
+      if (result?.user) {
+        const user = result.user;
+        const userProfile: UserProfile = {
+          uid: user.uid,
+          email: user.email!,
+          displayName: user.displayName || 'User',
+          createdAt: new Date(),
+          lastLogin: new Date()
+        };
+        
+        await setDoc(doc(db, 'users', user.uid), userProfile, { merge: true });
+        return user;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error handling redirect result:', error);
+      throw error;
+    }
   }
 
   async getCurrentUser(): Promise<{ success: boolean; data?: any; message?: string }> {

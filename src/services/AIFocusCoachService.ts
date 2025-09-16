@@ -359,6 +359,148 @@ class AIFocusCoachService {
     const options = messages[messageType as keyof typeof messages] || messages['encouragement'];
     return options[Math.floor(Math.random() * options.length)];
   }
+
+  /**
+   * Stream AI-generated insights and coaching messages
+   */
+  async *generateStreamingInsight(
+    context: {
+      messageType: string;
+      sessionData?: any;
+      userPerformance?: any;
+      currentTime?: string;
+    }
+  ): AsyncGenerator<{ chunk: string; isComplete: boolean; fullResponse?: string }> {
+    const { messageType, sessionData, userPerformance, currentTime } = context;
+    
+    // Build context for AI insight generation
+    let prompt = `As a focus coach, provide personalized advice for the following situation:
+    
+Context: ${messageType}
+User's analytics: ${JSON.stringify(this.analytics)}
+Recent patterns: ${JSON.stringify(Object.keys(this.distractions).slice(0, 3))}
+Time: ${currentTime || new Date().toLocaleTimeString()}`;
+
+    if (sessionData) {
+      prompt += `\nCurrent session: ${JSON.stringify(sessionData)}`;
+    }
+
+    if (userPerformance) {
+      prompt += `\nPerformance data: ${JSON.stringify(userPerformance)}`;
+    }
+
+    prompt += `\n\nProvide a brief, encouraging, and actionable insight (2-3 sentences max). Be specific and personal based on the data provided.`;
+
+    try {
+      const response = await fetch(`https://us-central1-focusmate-ai-8cad6.cloudfunctions.net/aiChatStream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: prompt,
+          context: 'focus_insights',
+          model: 'deepseek-chat',
+          temperature: 0.8
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response stream available');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullContent = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) break;
+          
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.trim() === '') continue;
+            
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              
+              if (data === '[DONE]') {
+                yield {
+                  chunk: '',
+                  isComplete: true,
+                  fullResponse: fullContent
+                };
+                return;
+              }
+
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.error) {
+                  console.error('Streaming error:', parsed.error);
+                  continue;
+                }
+
+                if (parsed.choices?.[0]?.delta?.content) {
+                  const chunk = parsed.choices[0].delta.content;
+                  fullContent += chunk;
+                  
+                  yield {
+                    chunk,
+                    isComplete: false
+                  };
+                }
+              } catch (parseError) {
+                console.warn('Failed to parse SSE data:', data);
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    } catch (error) {
+      console.error('AI insights streaming error:', error);
+      // Fallback to static message
+      const fallbackMessage = this.generateCoachMessage(messageType);
+      yield {
+        chunk: fallbackMessage,
+        isComplete: true,
+        fullResponse: fallbackMessage
+      };
+    }
+  }
+
+  /**
+   * Stream personalized coaching advice
+   */
+  async *streamCoachingAdvice(userQuery: string): AsyncGenerator<{ chunk: string; isComplete: boolean; fullResponse?: string }> {
+    const prompt = `As an AI focus coach, respond to this user query with personalized advice:
+
+User Query: "${userQuery}"
+
+User's Focus Analytics:
+- Average session length: ${this.analytics.averageSessionLength} minutes
+- Completion rate: ${Math.round(this.analytics.completionRate * 100)}%
+- Current streak: ${this.analytics.streak} days
+- Common distractions: ${Object.keys(this.distractions).join(', ') || 'None tracked yet'}
+
+Provide encouraging, actionable advice in 2-3 sentences. Be specific and reference their data when relevant.`;
+
+    yield* this.generateStreamingInsight({
+      messageType: 'coaching_advice',
+      userPerformance: { query: userQuery }
+    });
+  }
 }
 
 export const aiFocusCoachService = new AIFocusCoachService();

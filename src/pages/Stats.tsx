@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import FirestoreService from '../services/FirestoreService';
 import FloatingAssistant from '../components/FloatingAssistant';
 import aiService from '../services/AIService';
+import { aiFocusCoachService } from '../services/AIFocusCoachService';
 
 // Enhanced Mood & Energy Levels Component
 const EnhancedMoodEnergyLevels: React.FC<{ dailyStats: any[], darkMode: boolean }> = ({ dailyStats, darkMode }) => {
@@ -266,139 +267,119 @@ const Stats: React.FC = () => {
     if (isLoadingInsights) return;
     
     setIsLoadingInsights(true);
+    setAiInsights(['Analyzing your productivity patterns...']); // Show loading state
+    
     try {
-      // Generate contextual insights based on real data
-      const contextualInsights = [];
-      
       // Check if we have any data
       if (totalSessions === 0 && totalCompletedTasks === 0) {
-        contextualInsights.push(
+        setAiInsights([
           'Start your productivity journey by completing your first focus session or task to unlock personalized insights.'
-        );
-        setAiInsights(contextualInsights);
+        ]);
         return;
       }
+
+      // Prepare context for AI analysis
+      const analyticsContext = {
+        messageType: 'productivity_analysis',
+        sessionData: {
+          totalSessions,
+          totalCompletedTasks,
+          totalFocusMinutes,
+          dailyStats: dailyStats.slice(-7), // Last 7 days
+          taskCategories: taskCategories.slice(0, 3) // Top 3 categories
+        },
+        userPerformance: {
+          avgFocusMinutesPerDay,
+          productivityScore,
+          streakData: {
+            currentStreak: Math.floor(Math.random() * 5) + 1, // Mock data
+            longestStreak: Math.floor(Math.random() * 10) + 5
+          }
+        },
+        currentTime: new Date().toISOString()
+      };
+
+      // Generate streaming insights
+      const currentInsights: string[] = [];
+      let streamedContent = '';
       
-      // Most productive day insight
-      if (dailyStats.length > 0) {
-        const daysWithActivity = dailyStats.filter(day => day.focusMinutes > 0);
-        if (daysWithActivity.length > 0) {
-          const mostProductiveDay = daysWithActivity.reduce((max, day) => 
-            day.focusMinutes > max.focusMinutes ? day : max
-          );
-          const dayName = new Date(mostProductiveDay.date).toLocaleDateString('en-US', { weekday: 'long' });
-          contextualInsights.push(
-            `Your most productive day was ${dayName} with ${formatMinutes(mostProductiveDay.focusMinutes)} of focus time. Try to replicate the conditions that made this day successful.`
-          );
+      const streamGenerator = aiFocusCoachService.generateStreamingInsight(analyticsContext);
+
+      for await (const chunk of streamGenerator) {
+        if (chunk.isComplete && chunk.fullResponse) {
+          // Parse the final response into individual insights
+          const finalMessage = chunk.fullResponse;
+          const insights = finalMessage.split('\n')
+            .filter(line => line.trim().length > 0)
+            .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
+            .filter(insight => insight.length > 20); // Filter out very short insights
+          
+          setAiInsights(insights.slice(0, 5)); // Limit to 5 insights
+          break;
+        } else if (chunk.chunk) {
+          // Update with streaming content
+          streamedContent += chunk.chunk;
+          
+          // Try to extract partial insights from the stream
+          const partialInsights = streamedContent.split('\n')
+            .filter(line => line.trim().length > 0)
+            .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
+            .filter(insight => insight.length > 15);
+          
+          if (partialInsights.length > 0) {
+            setAiInsights([...partialInsights, '...analyzing more patterns']);
+          }
         }
       }
-      
-      // Task completion efficiency
-      if (totalSessions > 0 && totalCompletedTasks > 0) {
-        const tasksPerSession = (totalCompletedTasks / totalSessions).toFixed(1);
-        if (parseFloat(tasksPerSession) >= 1.5) {
-          contextualInsights.push(
-            `Excellent efficiency! You complete ${tasksPerSession} tasks per focus session on average. This shows great task management skills.`
-          );
-        } else if (parseFloat(tasksPerSession) >= 1.0) {
-          contextualInsights.push(
-            `Good progress with ${tasksPerSession} tasks per session. Consider breaking larger tasks into smaller, more manageable chunks to increase completion rates.`
-          );
-        } else {
-          contextualInsights.push(
-            `You're completing ${tasksPerSession} tasks per session. Try breaking down complex tasks into smaller subtasks to boost your completion rate and motivation.`
-          );
-        }
-      }
-      
-      // Focus time analysis
-      if (avgFocusMinutesPerDay > 0) {
-        const dailyHours = (avgFocusMinutesPerDay / 60).toFixed(1);
-        if (parseFloat(dailyHours) >= 2) {
-          contextualInsights.push(
-            `Outstanding commitment! Your daily average of ${dailyHours} hours shows strong dedication to deep work. Maintain this momentum for continued success.`
-          );
-        } else if (parseFloat(dailyHours) >= 1) {
-          contextualInsights.push(
-            `Good foundation with ${dailyHours} hours of daily focus time. Consider gradually increasing to 2+ hours for even better productivity outcomes.`
-          );
-        } else {
-          contextualInsights.push(
-            `Your current ${dailyHours} hours of daily focus time is a good start. Aim to gradually increase this to at least 1-2 hours for optimal productivity.`
-          );
-        }
-      }
-      
-      // Consistency analysis
-      const activeDays = dailyStats.filter(day => day.focusMinutes > 0).length;
-      const totalDays = dailyStats.length;
-      const consistencyRate = totalDays > 0 ? (activeDays / totalDays) * 100 : 0;
-      
-      if (consistencyRate >= 80) {
-        contextualInsights.push(
-          `Exceptional consistency! You've been active ${activeDays} out of ${totalDays} days (${consistencyRate.toFixed(0)}%). This regular habit is key to long-term success.`
-        );
-      } else if (consistencyRate >= 50) {
-        contextualInsights.push(
-          `Good consistency with activity on ${activeDays} out of ${totalDays} days. Try to establish a daily routine to reach 80%+ consistency.`
-        );
-      } else if (activeDays > 0) {
-        contextualInsights.push(
-          `You've been active ${activeDays} out of ${totalDays} days. Focus on building a consistent daily habit - even 15-20 minutes daily is better than longer, irregular sessions.`
-        );
-      }
-      
-      // Productivity score insight
-      if (productivityScore > 0) {
-        if (productivityScore >= 80) {
-          contextualInsights.push(
-            `Excellent productivity score of ${productivityScore}! You're in the top tier. Keep maintaining this consistency and consider mentoring others.`
-          );
-        } else if (productivityScore >= 60) {
-          contextualInsights.push(
-            `Good productivity score of ${productivityScore}. You're on the right track! Try extending focus sessions or reducing distractions to reach the 80+ range.`
-          );
-        } else {
-          contextualInsights.push(
-            `Your productivity score of ${productivityScore} shows room for improvement. Consider using the Pomodoro technique and setting specific daily goals to boost your score.`
-          );
-        }
-      }
-      
-      // Task category insights
-      if (taskCategories.length > 0) {
-        const topCategory = taskCategories.reduce((max, cat) => 
-          cat.percentage > max.percentage ? cat : max
-        );
-        if (topCategory.percentage > 50) {
-          contextualInsights.push(
-            `You're heavily focused on ${topCategory.name} tasks (${topCategory.percentage.toFixed(0)}% of your time). Consider diversifying your activities for better work-life balance.`
-          );
-        }
-      }
-      
-      // Fallback insights if no specific data
-      if (contextualInsights.length === 0) {
-        contextualInsights.push(
-          'Continue building your productivity habits. Consistency is more important than perfection.',
-          'Try the Pomodoro technique: 25 minutes of focused work followed by 5-minute breaks.',
-          'Set specific, achievable daily goals to maintain motivation and track progress.'
-        );
-      }
-      
-      setAiInsights(contextualInsights.slice(0, 5)); // Limit to 5 insights
+
     } catch (error) {
       console.error('Failed to generate AI insights:', error);
-      setAiInsights([
-        'Focus on maintaining consistent daily habits for better productivity.',
-        'Try the Pomodoro technique: 25 minutes of focused work followed by 5-minute breaks.',
-        'Schedule your most important tasks during your peak energy hours.',
-        'Break large tasks into smaller, manageable chunks to improve completion rates.',
-        'Regular breaks between focus sessions help maintain mental clarity throughout the day.'
-      ]);
+      // Fallback to static insights based on actual data
+      const fallbackInsights = generateFallbackInsights();
+      setAiInsights(fallbackInsights);
     } finally {
       setIsLoadingInsights(false);
     }
+  };
+
+  // Generate fallback insights based on user data
+  const generateFallbackInsights = (): string[] => {
+    const insights = [];
+    
+    // Most productive day insight
+    if (dailyStats.length > 0) {
+      const daysWithActivity = dailyStats.filter(day => day.focusMinutes > 0);
+      if (daysWithActivity.length > 0) {
+        const mostProductiveDay = daysWithActivity.reduce((max, day) => 
+          day.focusMinutes > max.focusMinutes ? day : max
+        );
+        const dayName = new Date(mostProductiveDay.date).toLocaleDateString('en-US', { weekday: 'long' });
+        insights.push(
+          `Your most productive day was ${dayName} with ${formatMinutes(mostProductiveDay.focusMinutes)} of focus time.`
+        );
+      }
+    }
+    
+    // Focus time analysis
+    if (avgFocusMinutesPerDay > 0) {
+      const dailyHours = (avgFocusMinutesPerDay / 60).toFixed(1);
+      if (parseFloat(dailyHours) >= 2) {
+        insights.push(`Outstanding commitment with ${dailyHours} hours of daily focus time!`);
+      } else {
+        insights.push(`Your current ${dailyHours} hours of daily focus time is a good foundation.`);
+      }
+    }
+    
+    // Productivity score insight
+    if (productivityScore >= 80) {
+      insights.push(`Excellent productivity score of ${productivityScore}! You're in the top tier.`);
+    } else if (productivityScore >= 60) {
+      insights.push(`Good productivity score of ${productivityScore}. You're on the right track!`);
+    } else if (productivityScore > 0) {
+      insights.push(`Your productivity score of ${productivityScore} shows room for improvement.`);
+    }
+    
+    return insights.slice(0, 5);
   };
 
   // AI Assistant handlers
@@ -406,11 +387,40 @@ const Stats: React.FC = () => {
     if (!aiChatInput.trim()) return;
     
     setIsAiLoading(true);
+    setAiMessage(''); // Clear previous message
+    
     try {
-      const context = `User stats: ${totalFocusMinutes} minutes focus time, ${totalCompletedTasks} tasks completed, ${totalSessions} sessions, productivity score: ${productivityScore}`;
-      const response = await aiService.chat(aiChatInput, context);
-      setAiMessage(response.response);
+      const analyticsContext = {
+        messageType: 'user_question',
+        sessionData: {
+          totalFocusMinutes,
+          totalCompletedTasks,
+          totalSessions,
+          productivityScore,
+          avgFocusMinutesPerDay,
+          userQuestion: aiChatInput
+        },
+        userPerformance: {
+          recentActivity: dailyStats.slice(-3)
+        },
+        currentTime: new Date().toISOString()
+      };
+      
+      let streamedResponse = '';
+      const streamGenerator = aiFocusCoachService.generateStreamingInsight(analyticsContext);
+
+      for await (const chunk of streamGenerator) {
+        if (chunk.isComplete && chunk.fullResponse) {
+          setAiMessage(chunk.fullResponse);
+          break;
+        } else if (chunk.chunk) {
+          streamedResponse += chunk.chunk;
+          setAiMessage(streamedResponse);
+        }
+      }
+      
     } catch (error) {
+      console.error('AI chat error:', error);
       setAiMessage(`Based on your ${formatMinutes(totalFocusMinutes)} of focus time and ${totalCompletedTasks} completed tasks, you're making good progress! Keep up the consistent effort.`);
     } finally {
       setAiChatInput('');
@@ -420,24 +430,54 @@ const Stats: React.FC = () => {
 
   const handleGetTip = async () => {
     setIsAiLoading(true);
+    setAiMessage(''); // Clear previous message
+    
     try {
-      const tip = await aiService.getProductivityTip(`Focus time: ${totalFocusMinutes}min, Tasks: ${totalCompletedTasks}, Sessions: ${totalSessions}`);
-      setAiMessage(tip);
+      const tipContext = {
+        messageType: 'productivity_tip',
+        sessionData: {
+          totalFocusMinutes,
+          totalCompletedTasks,
+          totalSessions,
+          productivityScore
+        },
+        userPerformance: {
+          avgFocusMinutesPerDay,
+          recentTrends: dailyStats.slice(-5)
+        },
+        currentTime: new Date().toISOString()
+      };
       
-      // Auto-save the tip
-      try {
-        const { aiFocusTipsService } = await import('../services/AIFocusTipsService');
-        const tipData = aiFocusTipsService.extractTipFromAIMessage(tip);
-        if (tipData) {
-          await aiFocusTipsService.saveTip({
-            ...tipData,
-            source: 'ai-coach'
-          });
+      let streamedTip = '';
+      const streamGenerator = aiFocusCoachService.generateStreamingInsight(tipContext);
+
+      for await (const chunk of streamGenerator) {
+        if (chunk.isComplete && chunk.fullResponse) {
+          const finalTip = chunk.fullResponse;
+          setAiMessage(finalTip);
+          
+          // Auto-save the tip
+          try {
+            const { aiFocusTipsService } = await import('../services/AIFocusTipsService');
+            const tipData = aiFocusTipsService.extractTipFromAIMessage(finalTip);
+            if (tipData) {
+              await aiFocusTipsService.saveTip({
+                ...tipData,
+                source: 'ai-coach'
+              });
+            }
+          } catch (saveError) {
+            console.error('Failed to auto-save tip:', saveError);
+          }
+          break;
+        } else if (chunk.chunk) {
+          streamedTip += chunk.chunk;
+          setAiMessage(streamedTip);
         }
-      } catch (saveError) {
-        console.error('Failed to auto-save tip:', saveError);
       }
+      
     } catch (error) {
+      console.error('Error getting tip:', error);
       setAiMessage("💡 Tip: Try the Pomodoro technique - 25 minutes of focused work followed by a 5-minute break. This rhythm helps maintain high concentration while preventing burnout.");
     } finally {
       setIsAiLoading(false);

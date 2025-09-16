@@ -40,6 +40,8 @@ const AICoach: React.FC<AICoachProps> = ({
   const [newDistraction, setNewDistraction] = useState('');
   const [coachMessage, setCoachMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isStreamingInsight, setIsStreamingInsight] = useState(false);
+  const [streamingInsightContent, setStreamingInsightContent] = useState('');
   
   // Initialize coach with user data
   useEffect(() => {
@@ -86,19 +88,62 @@ const AICoach: React.FC<AICoachProps> = ({
     generateInsights();
   }, [user, mode, duration, cycles, todayPomodoros, distractions]);
   
-  // Generate coach messages based on session state
+  // Generate coach messages based on session state with streaming support
   useEffect(() => {
+    const generateStreamingCoachMessage = async (messageType: string) => {
+      if (Math.random() < 0.7) { // 70% chance for streaming, 30% for static
+        setIsStreamingInsight(true);
+        setStreamingInsightContent('');
+        setCoachMessage('');
+        
+        try {
+          const streamGenerator = aiFocusCoachService.generateStreamingInsight({
+            messageType,
+            sessionData: {
+              isActive,
+              isPaused,
+              mode,
+              duration,
+              todayPomodoros,
+              distractions: distractions.length
+            },
+            currentTime: new Date().toLocaleTimeString()
+          });
+
+          let fullContent = '';
+          for await (const chunk of streamGenerator) {
+            if (chunk.isComplete) {
+              setCoachMessage(chunk.fullResponse || fullContent);
+              setStreamingInsightContent('');
+              break;
+            } else {
+              fullContent += chunk.chunk;
+              setStreamingInsightContent(fullContent);
+            }
+          }
+        } catch (error) {
+          console.error('Streaming coach message error:', error);
+          setCoachMessage(aiFocusCoachService.generateCoachMessage(messageType));
+        } finally {
+          setIsStreamingInsight(false);
+        }
+      } else {
+        // Use static message
+        setCoachMessage(aiFocusCoachService.generateCoachMessage(messageType));
+      }
+    };
+
     if (!isActive && !isPaused) {
-      setCoachMessage(aiFocusCoachService.generateCoachMessage('session-start'));
+      generateStreamingCoachMessage('session-start');
     } else if (mode !== 'work') {
-      setCoachMessage(aiFocusCoachService.generateCoachMessage('break-start'));
+      generateStreamingCoachMessage('break-start');
     } else if (isPaused) {
-      setCoachMessage(aiFocusCoachService.generateCoachMessage('distraction'));
+      generateStreamingCoachMessage('distraction');
     } else if (isActive) {
       // Randomly show encouragement during session
       if (Math.random() < 0.3) { // 30% chance
-        setCoachMessage(aiFocusCoachService.generateCoachMessage('encouragement'));
         setIsTyping(true);
+        generateStreamingCoachMessage('encouragement');
         
         // Simulate typing effect
         setTimeout(() => {
@@ -106,7 +151,7 @@ const AICoach: React.FC<AICoachProps> = ({
         }, 1500);
       }
     }
-  }, [isActive, isPaused, mode]);
+  }, [isActive, isPaused, mode, duration, todayPomodoros, distractions.length]);
   
   const handleInsightAction = (insight: FocusInsight) => {
     switch (insight.id) {
@@ -134,6 +179,33 @@ const AICoach: React.FC<AICoachProps> = ({
       onAddDistraction(newDistraction.trim());
       aiFocusCoachService.trackDistraction(newDistraction.trim());
       setNewDistraction('');
+    }
+  };
+
+  const handleStreamingCoachingAdvice = async (query: string) => {
+    setIsStreamingInsight(true);
+    setStreamingInsightContent('');
+    setCoachMessage('');
+    
+    try {
+      const streamGenerator = aiFocusCoachService.streamCoachingAdvice(query);
+      
+      let fullContent = '';
+      for await (const chunk of streamGenerator) {
+        if (chunk.isComplete) {
+          setCoachMessage(chunk.fullResponse || fullContent);
+          setStreamingInsightContent('');
+          break;
+        } else {
+          fullContent += chunk.chunk;
+          setStreamingInsightContent(fullContent);
+        }
+      }
+    } catch (error) {
+      console.error('Streaming coaching advice error:', error);
+      setCoachMessage('I apologize, but I\'m having trouble providing personalized advice right now. Try taking a short break and refocusing on your current task.');
+    } finally {
+      setIsStreamingInsight(false);
     }
   };
   
@@ -264,8 +336,8 @@ const AICoach: React.FC<AICoachProps> = ({
                     </div>
                     <div className="flex-1">
                       <p className={`text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                        {coachMessage}
-                        {isTyping && (
+                        {isStreamingInsight ? streamingInsightContent : coachMessage}
+                        {(isTyping || isStreamingInsight) && (
                           <span className="inline-flex ml-1">
                             <span className="animate-ping">.</span>
                             <span className="animate-ping delay-100">.</span>
@@ -305,27 +377,40 @@ const AICoach: React.FC<AICoachProps> = ({
                   </form>
                 )}
                 
-                {/* Quick Responses */}
+                {/* Quick Responses with Streaming AI */}
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button 
-                    onClick={() => onStartSession && onStartSession()}
+                    onClick={() => handleStreamingCoachingAdvice("I'm feeling distracted and need help focusing")}
                     className={`text-xs px-3 py-1 rounded-full ${
                       darkMode 
                         ? 'bg-gray-700 text-white hover:bg-gray-600' 
                         : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                     }`}
+                    disabled={isStreamingInsight}
                   >
-                    Ready to focus
+                    🧠 Focus Help
                   </button>
                   <button 
-                    onClick={() => onAddDistraction('Need a break')}
+                    onClick={() => handleStreamingCoachingAdvice("What's the best way to improve my productivity today?")}
                     className={`text-xs px-3 py-1 rounded-full ${
                       darkMode 
                         ? 'bg-gray-700 text-white hover:bg-gray-600' 
                         : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                     }`}
+                    disabled={isStreamingInsight}
                   >
-                    Need a break
+                    💡 Productivity Tips
+                  </button>
+                  <button 
+                    onClick={() => handleStreamingCoachingAdvice("How can I maintain my motivation throughout the day?")}
+                    className={`text-xs px-3 py-1 rounded-full ${
+                      darkMode 
+                        ? 'bg-gray-700 text-white hover:bg-gray-600' 
+                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                    }`}
+                    disabled={isStreamingInsight}
+                  >
+                    🚀 Motivation
                   </button>
                   <button 
                     onClick={() => onAddDistraction('Feeling distracted')}

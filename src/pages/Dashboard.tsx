@@ -29,6 +29,7 @@ import StaggeredList from '../components/StaggeredList';
 import FloatingAssistant from '../components/FloatingAssistant';
 import SubscriptionStatus from '../components/SubscriptionStatus';
 import UpgradePrompt from '../components/UpgradePrompt';
+import AIAnalytics from '../components/AIAnalytics';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import firestoreService from '../services/FirestoreService';
@@ -194,6 +195,8 @@ const Dashboard: React.FC = () => {
   const [taskSuggestions, setTaskSuggestions] = React.useState<Record<string, string[]>>({});
   const [showUpgradePrompt, setShowUpgradePrompt] = React.useState(false);
   const [upgradeReason, setUpgradeReason] = React.useState<'ai_limit' | 'feature_limit' | 'trial_expired'>('ai_limit');
+  const [pomodoroSessions, setPomodoroSessions] = React.useState<any[]>([]);
+  const [journalEntries, setJournalEntries] = React.useState<any[]>([]);
 
   const moods = [
     { id: 'great', icon: Smile, label: 'Great', color: 'text-green-500' },
@@ -798,6 +801,13 @@ const Dashboard: React.FC = () => {
                   </motion.button>
                 </StaggeredList>
               </FloatingCard>
+
+              {/* AI Analytics */}
+              <AIAnalytics 
+                tasks={tasks}
+                pomodoroSessions={pomodoroSessions}
+                journalEntries={journalEntries}
+              />
 
               {/* Daily Activity Overview */}
               <DailyActivityOverview />

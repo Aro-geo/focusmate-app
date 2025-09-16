@@ -32,6 +32,7 @@ import FormattedMessage from '../components/FormattedMessage';
 import MobilePomodoro from '../components/MobilePomodoro';
 import SavedTipsModal from '../components/SavedTipsModal';
 import aiService from '../services/AIService';
+import { enhancedAIFocusCoachService } from '../services/EnhancedAIFocusCoachService';
 import useResponsive from '../hooks/useResponsive';
 import DatabasePomodoroService from '../services/DatabasePomodoroService';
 import { useAuth } from '../context/AuthContext';
@@ -544,27 +545,53 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
     
     try {
       setIsAiLoading(true);
-      const context = `User is in ${mode} mode with ${timeRemaining} seconds remaining. They have completed ${completedSessions} sessions today. Current task: ${selectedTask || 'none selected'}. Timer is ${isActive ? 'running' : 'paused'}.`;
-      const prompt = `${context} User asks: ${aiChatInput}. 
       
-      Provide helpful, contextual advice formatted with clear structure:
-      1. Use markdown ## for a brief engaging header related to their question
-      2. Break your response into 2-3 short paragraphs with line breaks between them
-      3. If appropriate, include a bullet point list of 2-3 actionable tips
-      4. Be encouraging and personalized, but concise (max 120 words total)`;
+      // Use the enhanced AI service with streaming
+      const context = {
+        sessionType: 'reflection' as const,
+        currentTask: selectedTask || undefined,
+        timeElapsed: (settings.workDuration * 60) - timeRemaining,
+        totalDuration: settings.workDuration * 60,
+        distractionCount: distractions.length,
+        streakCount: completedSessions,
+        timeOfDay: new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening',
+        recentPerformance: {
+          completionRate: completedSessions > 0 ? 0.8 : 0,
+          averageDistractions: distractions.length,
+          preferredTimes: [new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening']
+        }
+      };
+
+      // Clear previous message and show loading
+      setAiMessage('');
       
-      const response = await aiService.chat(prompt);
-      setAiMessage(response.response);
+      // Stream the response
+      let fullContent = '';
+      const streamGenerator = enhancedAIFocusCoachService.generateStreamResponse(context, aiChatInput);
+
+      for await (const chunk of streamGenerator) {
+        if (chunk.isComplete) {
+          if (chunk.fullResponse) {
+            setAiMessage(chunk.fullResponse.message);
+            fullContent = chunk.fullResponse.message;
+          }
+          break;
+        } else {
+          fullContent += chunk.chunk;
+          setAiMessage(fullContent);
+        }
+      }
+      
       setAiChatInput('');
       
       // Auto-save tip if it contains bullet points
-      if (response.response.includes('*') || response.response.includes('•')) {
-        const tipData = aiFocusTipsService.extractTipFromAIMessage(response.response);
+      if (fullContent.includes('*') || fullContent.includes('•')) {
+        const tipData = aiFocusTipsService.extractTipFromAIMessage(fullContent);
         if (tipData) {
           await aiFocusTipsService.saveTip({
             ...tipData,
             source: 'ai-coach',
-            sessionId: currentSession?.id
+            ...(currentSession?.id && { sessionId: currentSession.id })
           });
         }
       }
@@ -583,27 +610,53 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
   const handleGetTip = async () => {
     try {
       setIsAiLoading(true);
-      const context = `User has completed ${completedSessions} Pomodoro sessions today. Current mode: ${mode}. Time remaining: ${Math.floor(timeRemaining/60)} minutes. Task: ${selectedTask || 'none selected'}.`;
-      const prompt = `${context} Give a personalized productivity tip based on their current situation.
       
-      Format your response with:
-      1. A brief, engaging header with markdown ## syntax
-      2. A short paragraph explaining the tip (2-3 sentences)
-      3. If appropriate, include 2-3 bullet points with actionable advice
-      4. End with a short encouraging sentence
-      5. Total response should be under 100 words`;
+      // Use the enhanced AI service with streaming
+      const context = {
+        sessionType: 'reflection' as const,
+        currentTask: selectedTask || undefined,
+        timeElapsed: (settings.workDuration * 60) - timeRemaining,
+        totalDuration: settings.workDuration * 60,
+        distractionCount: distractions.length,
+        streakCount: completedSessions,
+        timeOfDay: new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening',
+        recentPerformance: {
+          completionRate: completedSessions > 0 ? 0.8 : 0,
+          averageDistractions: distractions.length,
+          preferredTimes: [new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening']
+        }
+      };
+
+      const promptText = `Generate a personalized productivity tip based on current situation - completed ${completedSessions} sessions, mode: ${mode}, time remaining: ${Math.floor(timeRemaining/60)} minutes, task: ${selectedTask || 'none selected'}`;
       
-      const response = await aiService.chat(prompt);
-      setAiMessage(response.response);
+      // Clear previous message and show loading
+      setAiMessage('');
+      
+      // Stream the response
+      let fullContent = '';
+      const streamGenerator = enhancedAIFocusCoachService.generateStreamResponse(context, promptText);
+
+      for await (const chunk of streamGenerator) {
+        if (chunk.isComplete) {
+          if (chunk.fullResponse) {
+            setAiMessage(chunk.fullResponse.message);
+            fullContent = chunk.fullResponse.message;
+          }
+          break;
+        } else {
+          fullContent += chunk.chunk;
+          setAiMessage(fullContent);
+        }
+      }
       
       // Auto-save tip if it contains bullet points
-      if (response.response.includes('*') || response.response.includes('•')) {
-        const tipData = aiFocusTipsService.extractTipFromAIMessage(response.response);
+      if (fullContent && (fullContent.includes('*') || fullContent.includes('•'))) {
+        const tipData = aiFocusTipsService.extractTipFromAIMessage(fullContent);
         if (tipData) {
           await aiFocusTipsService.saveTip({
             ...tipData,
             source: 'ai-coach',
-            sessionId: currentSession?.id
+            ...(currentSession?.id && { sessionId: currentSession.id })
           });
         }
       }
@@ -624,7 +677,7 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
         await aiFocusTipsService.saveTip({
           ...tipData,
           source: 'ai-coach',
-          sessionId: currentSession?.id
+          ...(currentSession?.id && { sessionId: currentSession.id })
         });
       }
     } finally {
