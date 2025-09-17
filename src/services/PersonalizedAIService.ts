@@ -1,4 +1,5 @@
 import { SecurityUtils } from '../utils/security';
+import { httpsCallable, getFunctions } from 'firebase/functions';
 
 interface UserHabits {
   userId: string;
@@ -28,7 +29,7 @@ interface ProductivityRecommendation {
 }
 
 class PersonalizedAIService {
-  private apiKey = process.env.REACT_APP_OPENAI_API_KEY;
+  private functions = getFunctions();
 
   async analyzeUserHabits(userId: string, tasks: any[], sessions: any[]): Promise<UserHabits> {
     const completedTasks = tasks.filter(t => t.completed).length;
@@ -102,22 +103,21 @@ class PersonalizedAIService {
       
       Return JSON with: category, priority (low/medium/high), estimatedDuration (minutes), deadline (if mentioned), subtasks (array), tags (array)`;
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 300,
-          temperature: 0.3
-        })
+      const analyzeTask = httpsCallable(this.functions, 'aiChat');
+      const result = await analyzeTask({
+        data: {
+          message: prompt,
+          model: 'deepseek-reasoner',
+          temperature: 1.0
+        }
       });
 
-      const data = await response.json();
-      const analysis = JSON.parse(data.choices[0].message.content);
+      const response = result.data as any;
+      if (!response || !response.result || !response.result.response) {
+        throw new Error('Invalid response structure from DeepSeek API');
+      }
+
+      const analysis = JSON.parse(response.result.response);
 
       return {
         category: analysis.category || 'General',
@@ -148,22 +148,21 @@ class PersonalizedAIService {
       
       Provide insights and encouragement in 2-3 sentences.`;
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 150,
-          temperature: 0.7
-        })
+      const generateSummary = httpsCallable(this.functions, 'aiChat');
+      const result = await generateSummary({
+        data: {
+          message: prompt,
+          model: 'deepseek-chat',
+          temperature: 1.3
+        }
       });
 
-      const data = await response.json();
-      return data.choices[0].message.content;
+      const response = result.data as any;
+      if (!response || !response.result || !response.result.response) {
+        throw new Error('Invalid response from DeepSeek API');
+      }
+
+      return response.result.response;
     } catch (error) {
       console.error('Summary generation error:', SecurityUtils.sanitizeForLog(String(error)));
       return this.fallbackSessionSummary(sessionData);
@@ -177,22 +176,21 @@ class PersonalizedAIService {
       
       Highlight key achievements, patterns, and suggest areas for improvement. Be supportive and constructive.`;
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 200,
-          temperature: 0.6
-        })
+      const generateInsights = httpsCallable(this.functions, 'aiChat');
+      const result = await generateInsights({
+        data: {
+          message: prompt,
+          model: 'deepseek-chat',
+          temperature: 1.3
+        }
       });
 
-      const data = await response.json();
-      return data.choices[0].message.content;
+      const response = result.data as any;
+      if (!response || !response.result || !response.result.response) {
+        throw new Error('Invalid response from DeepSeek API');
+      }
+
+      return response.result.response;
     } catch (error) {
       console.error('Journal insights error:', SecurityUtils.sanitizeForLog(String(error)));
       return "Great reflection! Keep journaling to track your progress and maintain self-awareness.";

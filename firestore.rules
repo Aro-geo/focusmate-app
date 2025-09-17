@@ -33,6 +33,16 @@ service cloud.firestore {
         allow read, write: if isOwner(userId);
       }
 
+      // Focus sessions subcollection
+      match /sessions/{sessionId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // AI Focus Tips subcollection
+      match /focusTips/{tipId} {
+        allow read, write: if isOwner(userId);
+      }
+
       // Journal entries subcollection
       match /journal_entries/{entryId} {
         allow read, write: if isOwner(userId);
