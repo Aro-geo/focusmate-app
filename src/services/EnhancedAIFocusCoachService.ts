@@ -1,4 +1,3 @@
-import { firebaseService } from './FirebaseService';
 import { PomodoroSession } from './DatabasePomodoroService';
 
 export interface ConversationContext {
@@ -76,7 +75,7 @@ class EnhancedAIFocusCoachService {
 
   private buildConversationContext(context: ConversationContext, userInput?: string): string {
     const timeOfDay = this.getTimeOfDay();
-    const recentHistory = this.conversationHistory.slice(-5); // Last 5 interactions
+  const recentHistory = this.conversationHistory.slice(-10); // Last 10 interactions
     
     let contextPrompt = `You are an intelligent AI Focus Coach helping a user with their Pomodoro session. 
 
@@ -127,14 +126,15 @@ Current Context:
       contextPrompt += `\nUser's Current Input: "${userInput}"\n`;
     }
 
-    contextPrompt += `\nInstructions:
-- Be conversational, supportive, and personalized
-- Ask thoughtful follow-up questions when appropriate
-- Provide specific, actionable insights based on the user's patterns
-- Keep responses concise but meaningful (2-3 sentences max)
-- Adapt your tone to the session type and user's apparent mood
-- Reference previous conversations when relevant
-- Offer practical suggestions based on the current context
+  contextPrompt += `\nInstructions:
+- You are FocusMate AI Coach. Give thorough, actionable guidance.
+- Start with a one-line acknowledgement, then provide concrete next steps.
+- Include a short plan with 3–6 bullet points, examples, and 1–2 alternatives.
+- Briefly explain the “why” behind the advice to build confidence.
+- Aim for 150–300 words by default unless the user asks for shorter.
+- If chatting during an ongoing session, reference today’s goals and prior messages.
+
+Detail level: comprehensive
 
 Respond as the AI Focus Coach:`;
 
@@ -143,22 +143,21 @@ Respond as the AI Focus Coach:`;
 
   private async callAIService(contextPrompt: string): Promise<AIResponse> {
     try {
-      // Call Firebase Cloud Function
+      // Call Firebase Cloud Function - use analyzeTask as fallback
       const { getFunctions, httpsCallable } = await import('firebase/functions');
       const functions = getFunctions();
-      const aiChat = httpsCallable(functions, 'aiChat');
+      const analyzeTask = httpsCallable(functions, 'analyzeTask');
       
-      const result = await aiChat({
-        message: contextPrompt,
-        context: 'focus_coaching',
+      const result = await analyzeTask({
+        task: contextPrompt,
         model: 'deepseek-chat',
         temperature: 0.7
       });
 
-      const data = result.data as { response: string };
+      const data = result.data as { analysis: string };
       
       // Parse the AI response to extract different components
-      const aiMessage = data.response || 'Let me help you stay focused!';
+      const aiMessage = data.analysis || 'Let me help you stay focused!';
       
       return this.parseAIResponse(aiMessage);
     } catch (error) {
@@ -172,7 +171,8 @@ Respond as the AI Focus Coach:`;
    */
   async *generateStreamResponse(
     context: ConversationContext,
-    userInput?: string
+    userInput?: string,
+    detailLevel: 'concise' | 'balanced' | 'comprehensive' = 'comprehensive'
   ): AsyncGenerator<{ chunk: string; isComplete: boolean; fullResponse?: AIResponse }> {
     const contextPrompt = this.buildConversationContext(context, userInput);
     
@@ -185,8 +185,11 @@ Respond as the AI Focus Coach:`;
         body: JSON.stringify({
           message: contextPrompt,
           context: 'focus_coaching',
-          model: 'deepseek-chat',
-          temperature: 0.7
+          model: 'deepseek-reasoner',
+          temperature: 0.8,
+          top_p: 0.95,
+          max_tokens: 1200,
+          detailLevel
         })
       });
 
@@ -236,8 +239,20 @@ Respond as the AI Focus Coach:`;
                   continue;
                 }
 
-                if (parsed.choices?.[0]?.delta?.content) {
-                  const chunk = parsed.choices[0].delta.content;
+                // Handle DeepSeek response format through Firebase Functions
+                let chunk = '';
+                if (parsed.content) {
+                  // Direct content from DeepSeek
+                  chunk = parsed.content;
+                } else if (parsed.response) {
+                  // Firebase function response format
+                  chunk = parsed.response;
+                } else if (typeof parsed === 'string') {
+                  // Direct string response
+                  chunk = parsed;
+                }
+
+                if (chunk) {
                   fullContent += chunk;
                   
                   yield {

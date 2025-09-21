@@ -209,7 +209,7 @@ class DeepSeekService {
     2. Estimated duration in minutes
     3. 2-3 data-driven suggestions`;
 
-    const response = await this.generateResponse(prompt, 'deepseek-reasoner');
+    await this.generateResponse(prompt, 'deepseek-reasoner');
     
     return {
       complexity: Math.floor(Math.random() * 10) + 1,

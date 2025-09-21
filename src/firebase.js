@@ -22,9 +22,21 @@ const firebaseConfig = {
   databaseURL: process.env.REACT_APP_FIREBASE_DATABASE_URL
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
+// Initialize Firestore with proper settings
 const db = getFirestore(app);
+
+// Initialize Auth
 const auth = getAuth(app);
+
+// Initialize Storage
 const storage = getStorage(app);
 
-export { db, auth, storage };
+// Verify Firebase is properly configured
+if (!app.options.projectId) {
+  console.error('Firebase project ID not configured');
+}
+
+export { db, auth, storage, app };

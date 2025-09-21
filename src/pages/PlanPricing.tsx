@@ -170,7 +170,7 @@ const PlanPricing: React.FC = () => {
           className="text-center mt-8 sm:mt-12"
         >
           <p className="text-gray-600 dark:text-gray-300 mb-4 text-sm sm:text-base">
-            All plans include 14-day free trial • No credit card required • Cancel anytime
+            All plans include 3-month free trial • No credit card required • Cancel anytime
           </p>
           <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 sm:p-6 max-w-2xl mx-auto">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">

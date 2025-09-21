@@ -1123,9 +1123,9 @@ const EnhancedTodoListDesktop: React.FC<{ user: any }> = ({ user }) => {
                   value={scheduledTime}
                   onChange={(e) => setScheduledTime(e.target.value)}
                   min={new Date().toISOString().slice(0, 16)}
-                  className={`w-full p-2 text-sm border rounded-lg ${darkMode
-                    ? 'border-gray-600 bg-gray-700 text-white'
-                    : 'border-gray-300 bg-white text-gray-900'
+                  className={`w-full p-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ${darkMode
+                    ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400 [color-scheme:dark]'
+                    : 'border-gray-300 bg-white text-gray-900 placeholder-gray-500 [color-scheme:light]'
                     }`}
                 />
               </div>

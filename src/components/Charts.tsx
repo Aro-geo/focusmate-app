@@ -38,15 +38,44 @@ export const FocusTimeBarChart: React.FC<{
   
   const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   
-  // Create SVG path for a week's data
+  // Create smooth SVG path for a week's data using basis interpolation
   const createPath = (weekData: typeof currentWeekData) => {
     if (weekData.length === 0) return '';
+    
     const points = weekData.map((day, index) => {
       const x = (index / 6) * 100; // 7 days = 0 to 100%
       const y = 100 - (day.focusMinutes / maxFocusMinutes) * 100;
-      return `${x},${y}`;
-    }).join(' ');
-    return `M ${points}`;
+      return { x, y };
+    });
+    
+    if (points.length < 2) {
+      return `M ${points[0].x},${points[0].y}`;
+    }
+    
+    // Create smooth curve using quadratic bezier curves
+    let path = `M ${points[0].x},${points[0].y}`;
+    
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      
+      if (i === 1) {
+        // First curve - use current point as control
+        const cpx = prev.x + (curr.x - prev.x) * 0.5;
+        const cpy = prev.y + (curr.y - prev.y) * 0.5;
+        path += ` Q ${cpx},${cpy} ${curr.x},${curr.y}`;
+      } else {
+        // Subsequent curves - create smooth transitions
+        const next = points[i + 1] || curr;
+        const cpx1 = prev.x + (curr.x - prev.x) * 0.6;
+        const cpy1 = prev.y;
+        const cpx2 = curr.x - (next.x - prev.x) * 0.2;
+        const cpy2 = curr.y;
+        path += ` C ${cpx1},${cpy1} ${cpx2},${cpy2} ${curr.x},${curr.y}`;
+      }
+    }
+    
+    return path;
   };
   
   return (
@@ -98,6 +127,8 @@ export const FocusTimeBarChart: React.FC<{
                 stroke="rgb(147, 51, 234)"
                 strokeWidth="0.5"
                 strokeDasharray="2,2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
                 vectorEffect="non-scaling-stroke"
               />
               {lastWeekData.map((day, index) => {
@@ -127,6 +158,8 @@ export const FocusTimeBarChart: React.FC<{
                 fill="none"
                 stroke="rgb(99, 102, 241)"
                 strokeWidth="0.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
                 vectorEffect="non-scaling-stroke"
               />
               {currentWeekData.map((day, index) => {

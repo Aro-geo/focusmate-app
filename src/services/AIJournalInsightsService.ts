@@ -1,25 +1,12 @@
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { SecureJournalEntry } from './SecureFirestoreService';
 
-interface JournalEntry {
-  id: string;
-  title: string;
-  content: string;
-  mood?: string;
-  tags?: string[];
-  createdAt: Date;
-  updatedAt: Date;
-}
+// Helper function to safely extract IDs from entries
+const getEntryIds = (entries: SecureJournalEntry[]): string[] => {
+  return entries.map(e => e.id).filter((id): id is string => id !== undefined);
+};
 
-interface AIInsight {
-  id: string;
-  type: 'emotion' | 'pattern' | 'suggestion' | 'growth' | 'concern';
-  title: string;
-  description: string;
-  confidence: number; // 0-1
-  relatedEntries: string[];
-  actionable?: string;
-  timestamp: Date;
-}
+// (Removed local AIInsight; using exported version below)
 
 interface EmotionalAnalysis {
   dominantEmotion: string;
@@ -40,52 +27,107 @@ interface ThoughtPattern {
   trend: 'increasing' | 'decreasing' | 'stable';
 }
 
+export interface AIInsight {
+  id: string;
+  type: 'emotion' | 'pattern' | 'suggestion' | 'growth' | 'concern';
+  title: string;
+  description: string;
+  confidence: number; // 0-1
+  relatedEntries: string[];
+  actionable?: string | null;
+  timestamp: Date;
+}
+
+function compactEntries(entries: SecureJournalEntry[]) {
+  return entries.map(e => ({
+    id: e.id || '',
+    date: (e as any).date || (e as any).sessionDate || e.createdAt?.toDate?.().toISOString?.() || '',
+    mood: e.mood || '',
+    content: String(e.content || '').slice(0, 400)
+  }));
+}
+
+async function sha1(input: string): Promise<string> {
+  const enc = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest('SHA-1', enc);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function loadCache(key: string) {
+  try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; }
+}
+function getIfFresh(key: string) {
+  const item = loadCache(key);
+  if (item && item.exp > Date.now()) return item.value;
+  return null;
+}
+function saveCache(key: string, value: any, ttlMs = 1000 * 60 * 15) {
+  const payload = { value, exp: Date.now() + ttlMs };
+  localStorage.setItem(key, JSON.stringify(payload));
+}
+
 class AIJournalInsightsService {
-  private functions = getFunctions();
+  private functions = getFunctions(undefined, 'us-central1');
 
   /**
    * Generate comprehensive AI insights from journal entries
    * Limited to 5 high-quality insights to avoid overwhelming users
    */
-  async generateInsights(entries: JournalEntry[]): Promise<AIInsight[]> {
+  async generateInsights(entries: SecureJournalEntry[]): Promise<AIInsight[]> {
     if (entries.length === 0) return [];
 
+    // Fast path: use optimized callable + client cache + timeout fallback
+    const slim = compactEntries(entries.slice(0, 60));
+    const key = 'jrnl_insights_' + (await sha1(JSON.stringify(slim)));
+    const cached = getIfFresh(key);
+    if (cached) return cached;
+
+    const fn = httpsCallable(this.functions, 'generateJournalInsightsOptimized');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+
     try {
-      const allInsights: AIInsight[] = [];
+      const res: any = await fn({ entries: slim, cacheKey: key });
+      clearTimeout(timer);
 
-      // Analyze emotions (limit to 2 insights)
-      const emotionalInsights = await this.analyzeEmotions(entries);
-      allInsights.push(...emotionalInsights.slice(0, 2));
+      const normalized: AIInsight[] = (res.data?.insights || []).map((i: any, idx: number) => ({
+        id: `insight_${Date.now()}_${idx}`,
+        type: i.type || 'pattern',
+        title: i.title || 'Insight',
+        description: i.description || '',
+        confidence: typeof i.confidence === 'number' ? i.confidence : 0.7,
+        actionable: i.actionable ?? null,
+        relatedEntries: Array.isArray(i.relatedEntries) ? i.relatedEntries : [],
+        timestamp: new Date()
+      }));
 
-      // Analyze thought patterns (limit to 1 insight)
-      const patternInsights = await this.analyzeThoughtPatterns(entries);
-      allInsights.push(...patternInsights.slice(0, 1));
-
-      // Generate growth insights (limit to 1 insight)
-      const growthInsights = await this.analyzePersonalGrowth(entries);
-      allInsights.push(...growthInsights.slice(0, 1));
-
-      // Generate suggestions (limit to 1 insight)
-      const suggestionInsights = await this.generateSuggestions(entries);
-      allInsights.push(...suggestionInsights.slice(0, 1));
-
-      // Sort by confidence and return top 5
-      return allInsights
-        .sort((a, b) => b.confidence - a.confidence)
-        .slice(0, 5);
-    } catch (error) {
-      console.error('Error generating AI insights:', error);
-      return this.getFallbackInsights(entries);
+      saveCache(key, normalized);
+      return normalized;
+    } catch (e) {
+      clearTimeout(timer);
+      // fallback: quick local summary on recent 10
+      const recent = slim.slice(-10);
+      const quick: AIInsight[] = [{
+        id: `fallback_${Date.now()}`,
+        type: 'pattern',
+        title: 'Recent Themes',
+        description: `Generated a quick local summary across your ${recent.length} most recent entries. Try again for deeper AI insights.`,
+        confidence: 0.5,
+        actionable: 'Add more entries or retry when the network is stable.',
+        relatedEntries: recent.map(r => r.id).filter(Boolean).slice(0, 3),
+        timestamp: new Date()
+      }];
+      return quick;
     }
   }
 
   /**
    * Analyze emotional patterns in journal entries
    */
-  private async analyzeEmotions(entries: JournalEntry[]): Promise<AIInsight[]> {
+  private async analyzeEmotions(entries: SecureJournalEntry[]): Promise<AIInsight[]> {
     const recentEntries = entries.slice(0, 10); // Analyze last 10 entries
     const entriesText = recentEntries.map(entry => 
-      `Entry from ${entry.createdAt.toDateString()}: ${entry.content}`
+      `Entry from ${entry.createdAt.toDate().toDateString()}: ${entry.content}`
     ).join('\n\n');
 
     const prompt = `Analyze the emotional patterns in these journal entries and provide insights:
@@ -112,9 +154,9 @@ Respond with specific, actionable insights about the person's emotional well-bei
   /**
    * Analyze recurring thought patterns
    */
-  private async analyzeThoughtPatterns(entries: JournalEntry[]): Promise<AIInsight[]> {
+  private async analyzeThoughtPatterns(entries: SecureJournalEntry[]): Promise<AIInsight[]> {
     const entriesText = entries.slice(0, 15).map(entry => 
-      `${entry.createdAt.toDateString()}: ${entry.content}`
+      `${entry.createdAt.toDate().toDateString()}: ${entry.content}`
     ).join('\n\n');
 
     const prompt = `Analyze the thought patterns and recurring themes in these journal entries:
@@ -142,7 +184,7 @@ Provide insights about thinking patterns and mental habits.`;
   /**
    * Analyze personal growth and development
    */
-  private async analyzePersonalGrowth(entries: JournalEntry[]): Promise<AIInsight[]> {
+  private async analyzePersonalGrowth(entries: SecureJournalEntry[]): Promise<AIInsight[]> {
     if (entries.length < 5) return [];
 
     const oldEntries = entries.slice(-10, -5); // Older entries
@@ -180,10 +222,10 @@ Provide insights about personal growth and development patterns.`;
   /**
    * Generate actionable suggestions based on journal content
    */
-  private async generateSuggestions(entries: JournalEntry[]): Promise<AIInsight[]> {
+  private async generateSuggestions(entries: SecureJournalEntry[]): Promise<AIInsight[]> {
     const recentEntries = entries.slice(0, 8);
     const entriesText = recentEntries.map(entry => 
-      `${entry.createdAt.toDateString()}: ${entry.content}`
+      `${entry.createdAt.toDate().toDateString()}: ${entry.content}`
     ).join('\n\n');
 
     const prompt = `Based on these journal entries, provide personalized suggestions for improvement:
@@ -232,7 +274,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
   /**
    * Parse emotional insights from AI response - limit to most significant insights
    */
-  private parseEmotionalInsights(response: string, entries: JournalEntry[]): AIInsight[] {
+  private parseEmotionalInsights(response: string, entries: SecureJournalEntry[]): AIInsight[] {
     const insights: AIInsight[] = [];
     const lines = response.split('\n').filter(line => line.trim() && line.length > 20);
 
@@ -249,7 +291,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
           title: 'Emotional Pattern',
           description: line.trim(),
           confidence: 0.8,
-          relatedEntries: entries.slice(0, 3).map(e => e.id),
+          relatedEntries: getEntryIds(entries.slice(0, 3)),
           timestamp: new Date()
         });
         insightCount++;
@@ -262,7 +304,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
   /**
    * Parse thought pattern insights from AI response - focus on most significant pattern
    */
-  private parsePatternInsights(response: string, entries: JournalEntry[]): AIInsight[] {
+  private parsePatternInsights(response: string, entries: SecureJournalEntry[]): AIInsight[] {
     const insights: AIInsight[] = [];
     const lines = response.split('\n').filter(line => line.trim() && line.length > 30);
 
@@ -276,7 +318,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
           title: 'Key Thought Pattern',
           description: line.trim(),
           confidence: 0.75,
-          relatedEntries: entries.slice(0, 5).map(e => e.id),
+          relatedEntries: getEntryIds(entries.slice(0, 5)),
           timestamp: new Date()
         });
         break; // Only take the first (most significant) pattern
@@ -289,7 +331,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
   /**
    * Parse growth insights from AI response - focus on most significant growth
    */
-  private parseGrowthInsights(response: string, entries: JournalEntry[]): AIInsight[] {
+  private parseGrowthInsights(response: string, entries: SecureJournalEntry[]): AIInsight[] {
     const insights: AIInsight[] = [];
     const lines = response.split('\n').filter(line => line.trim() && line.length > 25);
 
@@ -303,7 +345,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
           title: 'Personal Growth',
           description: line.trim(),
           confidence: 0.85,
-          relatedEntries: entries.slice(0, 3).map(e => e.id),
+          relatedEntries: getEntryIds(entries.slice(0, 3)),
           timestamp: new Date()
         });
         break; // Only take the most significant growth insight
@@ -316,7 +358,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
   /**
    * Parse suggestion insights from AI response - focus on most actionable suggestion
    */
-  private parseSuggestionInsights(response: string, entries: JournalEntry[]): AIInsight[] {
+  private parseSuggestionInsights(response: string, entries: SecureJournalEntry[]): AIInsight[] {
     const insights: AIInsight[] = [];
     const lines = response.split('\n').filter(line => line.trim() && line.length > 20);
 
@@ -330,7 +372,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
           title: 'Actionable Suggestion',
           description: line.trim(),
           confidence: 0.7,
-          relatedEntries: entries.slice(0, 3).map(e => e.id),
+          relatedEntries: getEntryIds(entries.slice(0, 3)),
           actionable: line.trim(),
           timestamp: new Date()
         });
@@ -344,7 +386,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
   /**
    * Provide 5 precise, high-quality insights when AI service fails
    */
-  private getFallbackInsights(entries: JournalEntry[]): AIInsight[] {
+  private getFallbackInsights(entries: SecureJournalEntry[]): AIInsight[] {
     const insights: AIInsight[] = [];
 
     if (entries.length === 0) return insights;
@@ -353,7 +395,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
     const allText = entries.map(e => e.content.toLowerCase()).join(' ');
     const wordCount = allText.split(/\s+/).filter(word => word.length > 3).length;
     const avgWordsPerEntry = Math.round(wordCount / entries.length);
-    const dates = entries.map(e => new Date(e.createdAt).toDateString());
+    const dates = entries.map(e => e.createdAt.toDate().toDateString());
     const uniqueDates = new Set(dates);
     const consistency = uniqueDates.size / entries.length;
 
@@ -363,7 +405,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
       title: 'Journaling Overview',
       description: `You've written ${entries.length} entries (avg ${avgWordsPerEntry} words each) across ${uniqueDates.size} days. ${consistency > 0.7 ? 'Your consistent daily practice shows strong commitment to self-reflection.' : consistency > 0.4 ? 'You have moderate consistency - try spreading entries across more days for better habit formation.' : 'You tend to write multiple entries on the same days. Consider daily journaling for deeper insights.'}`,
       confidence: 0.95,
-      relatedEntries: entries.slice(0, 3).map(e => e.id),
+      relatedEntries: getEntryIds(entries.slice(0, 3)),
       timestamp: new Date()
     });
 
@@ -375,8 +417,8 @@ Make suggestions practical and tailored to this person's specific situation.`;
         return acc;
       }, {} as Record<string, number>);
 
-      const dominantMood = Object.entries(moodCounts).sort(([,a], [,b]) => b - a)[0];
-      const moodPercentage = Math.round((dominantMood[1] / moodEntries.length) * 100);
+      const dominantMood = Object.entries(moodCounts).sort(([,a], [,b]) => (b as number) - (a as number))[0];
+      const moodPercentage = Math.round(((dominantMood[1] as number) / moodEntries.length) * 100);
       
       // Analyze mood trend if enough data
       let trendInsight = '';
@@ -393,7 +435,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
         title: 'Emotional Insights',
         description: `Your most frequent mood is "${dominantMood[0]}" (${moodPercentage}% of entries).${trendInsight} ${dominantMood[0] === 'happy' || dominantMood[0] === 'excited' ? 'This positive pattern suggests good emotional well-being.' : dominantMood[0] === 'neutral' ? 'Consider exploring what brings you more joy and energy.' : 'Focus on activities that help improve your mood and well-being.'}`,
         confidence: 0.85,
-        relatedEntries: moodEntries.slice(0, 3).map(e => e.id),
+        relatedEntries: getEntryIds(moodEntries.slice(0, 3)),
         timestamp: new Date()
       });
     }
@@ -410,7 +452,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
           acc[tag] = (acc[tag] || 0) + 1;
           return acc;
         }, {} as Record<string, number>);
-        const topTags = Object.entries(tagCounts).sort(([,a], [,b]) => b - a).slice(0, 2);
+        const topTags = Object.entries(tagCounts).sort(([,a], [,b]) => (b as number) - (a as number)).slice(0, 2);
         themeDescription = `Your main topics are: ${topTags.map(([tag, count]) => `"${tag}" (${count}x)`).join(', ')}. `;
       }
       
@@ -426,7 +468,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
           title: 'Core Themes',
           description: themeDescription + ' These recurring elements reveal what matters most to you right now.',
           confidence: 0.8,
-          relatedEntries: entries.slice(0, 3).map(e => e.id),
+          relatedEntries: getEntryIds(entries.slice(0, 3)),
           timestamp: new Date()
         });
       }
@@ -458,7 +500,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
         title: 'Personal Growth',
         description: growthDescription,
         confidence: 0.75,
-        relatedEntries: [...recentEntries.slice(0, 2), ...olderEntries.slice(0, 1)].map(e => e.id),
+        relatedEntries: getEntryIds([...recentEntries.slice(0, 2), ...olderEntries.slice(0, 1)]),
         timestamp: new Date()
       });
     }
@@ -483,7 +525,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
       title: 'Next Step',
       description: suggestionText,
       confidence: 0.9,
-      relatedEntries: entries.slice(0, 2).map(e => e.id),
+      relatedEntries: getEntryIds(entries.slice(0, 2)),
       timestamp: new Date()
     });
 
@@ -510,9 +552,9 @@ Make suggestions practical and tailored to this person's specific situation.`;
       .slice(0, 5);
   }
 
-  private analyzeTimePatterns(entries: JournalEntry[]): AIInsight | null {
+  private analyzeTimePatterns(entries: SecureJournalEntry[]): AIInsight | null {
     const timeData = entries.map(entry => ({
-      hour: new Date(entry.createdAt).getHours(),
+      hour: entry.createdAt.toDate().getHours(),
       date: entry.createdAt
     }));
 
@@ -546,7 +588,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
         title: 'Writing Time Preference',
         description: `You tend to write most often in the ${timeDescription} (${percentage}% of entries around ${hour}:00). This suggests when you're most reflective or have time for introspection.`,
         confidence: 0.6,
-        relatedEntries: entries.slice(0, 3).map(e => e.id),
+        relatedEntries: getEntryIds(entries.slice(0, 3)),
         timestamp: new Date()
       };
     }
@@ -554,7 +596,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
     return null;
   }
 
-  private analyzeMoodTrend(moodEntries: JournalEntry[]): AIInsight | null {
+  private analyzeMoodTrend(moodEntries: SecureJournalEntry[]): AIInsight | null {
     if (moodEntries.length < 4) return null;
 
     const moodValues: Record<string, number> = {
@@ -587,7 +629,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
           ? `Your recent entries show an upward emotional trend. You seem to be feeling more positive lately compared to earlier entries.`
           : `Your recent entries show a more reflective or challenging emotional period compared to earlier entries. This is normal and shows you're processing life's ups and downs.`,
         confidence: 0.7,
-        relatedEntries: [...recentMoods.slice(0, 2), ...olderMoods.slice(0, 1)].map(e => e.id),
+        relatedEntries: getEntryIds([...recentMoods.slice(0, 2), ...olderMoods.slice(0, 1)]),
         timestamp: new Date()
       };
     }
@@ -598,7 +640,7 @@ Make suggestions practical and tailored to this person's specific situation.`;
   /**
    * Get emotional analysis summary
    */
-  async getEmotionalAnalysis(entries: JournalEntry[]): Promise<EmotionalAnalysis> {
+  async getEmotionalAnalysis(entries: SecureJournalEntry[]): Promise<EmotionalAnalysis> {
     const moodEntries = entries.filter(e => e.mood);
     
     if (moodEntries.length === 0) {
@@ -616,10 +658,10 @@ Make suggestions practical and tailored to this person's specific situation.`;
       return acc;
     }, {} as Record<string, number>);
 
-    const dominantMood = Object.entries(moodCounts).sort(([,a], [,b]) => b - a)[0];
+    const dominantMood = Object.entries(moodCounts).sort(([,a], [,b]) => (b as number) - (a as number))[0];
     
     const emotionTrends = moodEntries.slice(0, 10).map(entry => ({
-      date: entry.createdAt.toISOString().split('T')[0],
+      date: entry.createdAt.toDate().toISOString().split('T')[0],
       emotion: entry.mood!,
       score: this.getMoodScore(entry.mood!)
     }));
@@ -658,5 +700,5 @@ Make suggestions practical and tailored to this person's specific situation.`;
 }
 
 export const aiJournalInsightsService = new AIJournalInsightsService();
-export type { AIInsight, EmotionalAnalysis, ThoughtPattern };
+export type { EmotionalAnalysis, ThoughtPattern };
 export default aiJournalInsightsService;

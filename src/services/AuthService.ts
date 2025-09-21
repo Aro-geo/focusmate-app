@@ -91,16 +91,28 @@ class AuthService {
       await setDoc(doc(db, 'users', user.uid), userProfile, { merge: true });
       return user;
     } catch (error: any) {
-      // If popup is blocked or COOP error, fallback to redirect
-      if (error.code === 'auth/popup-blocked' || 
-          error.code === 'auth/popup-closed-by-user' ||
-          error.message?.includes('Cross-Origin-Opener-Policy') ||
-          error.message?.includes('window.closed') ||
-          error.toString().includes('popup')) {
-        console.log('Popup blocked or COOP error, falling back to redirect authentication');
-        await signInWithRedirect(auth, provider);
-        throw new Error('REDIRECT_INITIATED');
+      // Enhanced error detection for COOP and popup issues
+      const isPopupError = 
+        error.code === 'auth/popup-blocked' || 
+        error.code === 'auth/popup-closed-by-user' ||
+        error.code === 'auth/cancelled-popup-request' ||
+        error.message?.includes('Cross-Origin-Opener-Policy') ||
+        error.message?.includes('window.closed') ||
+        error.message?.includes('popup') ||
+        error.toString().includes('popup') ||
+        error.toString().includes('COOP');
+        
+      if (isPopupError) {
+        console.log('Popup authentication failed, using redirect method');
+        try {
+          await signInWithRedirect(auth, provider);
+          throw new Error('REDIRECT_INITIATED');
+        } catch (redirectError) {
+          console.error('Redirect authentication also failed:', redirectError);
+          throw new Error('Authentication failed. Please try again or check your browser settings.');
+        }
       }
+      
       console.error('Google sign-in error:', error);
       throw error;
     }

@@ -1,6 +1,29 @@
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
+import { 
+  collection, 
+  addDoc, 
+  getDocs, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  getDoc, 
+  setDoc,
+  query,
+  where,
+  orderBy,
+  connectFirestoreEmulator
+} from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { SecurityUtils } from '../utils/security';
+
+// Ensure Firestore is properly initialized
+if (process.env.NODE_ENV === 'development') {
+  // Basic initialization check
+  try {
+    if (!db) console.warn('Firestore not properly initialized');
+  } catch (e) {
+    console.warn('Firestore initialization check failed');
+  }
+}
 
 export class FirebaseService {
   async addTask(title: string, priority: 'low' | 'medium' | 'high' = 'medium', dueDate?: string) {
@@ -53,10 +76,26 @@ export class FirebaseService {
       const querySnapshot = await getDocs(userTasksCollection);
       const tasks: any[] = [];
       querySnapshot.forEach((doc) => {
-        tasks.push({ id: doc.id, ...doc.data() });
+        const data = doc.data();
+        tasks.push({ 
+          id: doc.id, 
+          ...data,
+          // Ensure consistent field names
+          title: data.title,
+          completed: data.completed || false,
+          priority: data.priority || 'medium',
+          createdAt: data.created_at || data.createdAt,
+          dueDate: data.due_date || data.dueDate,
+          completedAt: data.completed_at || data.completedAt
+        });
       });
       return tasks;
-    } catch (e) {
+    } catch (e: any) {
+      // Handle CORS and network errors
+      if (e.code === 'unavailable' || e.message?.includes('CORS') || e.message?.includes('fetch')) {
+        console.warn('Network error, returning cached data or empty array');
+        return [];
+      }
       console.error("Error getting tasks: ", SecurityUtils.sanitizeForLog(String(e)));
       throw e;
     }
@@ -101,7 +140,10 @@ export class FirebaseService {
   
   async getPomodoroSessions(date?: string) {
     const user = auth.currentUser;
-    if (!user) throw new Error('User not authenticated');
+    if (!user) {
+      console.warn('User not authenticated for Pomodoro sessions');
+      return [];
+    }
     
     try {
       const userSessionsCollection = collection(db, 'users', user.uid, 'pomodoroSessions');
@@ -110,12 +152,12 @@ export class FirebaseService {
       
       for (const doc of querySnapshot.docs) {
         const data = doc.data();
-        const sessionDate = data.date || data.createdAt?.toDate()?.toISOString().split('T')[0];
+        const sessionDate = data.date || data.createdAt?.toDate()?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0];
         
         if (!date || sessionDate === date) {
           sessions.push({
             id: doc.id,
-            userId: data.userId,
+            userId: data.userId || user.uid,
             duration: data.duration || data.durationMinutes || 25,
             completed: data.completed || false,
             date: sessionDate,
@@ -127,7 +169,12 @@ export class FirebaseService {
       }
       
       return sessions;
-    } catch (e) {
+    } catch (e: any) {
+      // Handle CORS and network errors gracefully
+      if (e.code === 'unavailable' || e.message?.includes('CORS') || e.message?.includes('fetch')) {
+        console.warn('Network error getting Pomodoro sessions, returning empty array');
+        return [];
+      }
       console.error("Error getting pomodoro sessions: ", SecurityUtils.sanitizeForLog(String(e)));
       return [];
     }
@@ -148,21 +195,7 @@ export class FirebaseService {
     }
   }
 
-  async saveTip(tip: string) {
-    const user = auth.currentUser;
-    if (!user) throw new Error('User not authenticated');
-    
-    try {
-      const userTipsCollection = collection(db, 'users', user.uid, 'savedTips');
-      await addDoc(userTipsCollection, {
-        tip,
-        createdAt: new Date(),
-        source: 'ai_coach'
-      });
-    } catch (e) {
-      console.error("Error saving tip: ", SecurityUtils.sanitizeForLog(String(e)));
-    }
-  }
+
 
   // Example user management functions
   async addUser(name: string, email: string) {

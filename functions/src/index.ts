@@ -4,6 +4,7 @@ import {onDocumentCreated} from "firebase-functions/v2/firestore";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 import {getConfig} from "./config";
+import * as crypto from "crypto";
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -28,13 +29,14 @@ try {
 
 setGlobalOptions({maxInstances: 10});
 
-// Force deployment with correct model names
+// Force deployment with correct CORS settings - updated
 
 export const analyzeTask = onCall({
   cors: [
     config.app.corsOrigin,
     "https://focusmate-ai-8cad6.web.app",
     "https://focusmate-ai-8cad6.firebaseapp.com",
+    "http://localhost:3000",
   ],
 }, async (request) => {
   const {
@@ -69,8 +71,14 @@ export const analyzeTask = onCall({
           {
             role: "user",
             content: `Analyze this task comprehensively: "${task}". ` +
-              "Provide complexity assessment, time estimation, priority " +
-              "level, and actionable suggestions.",
+              "Return a JSON response with the following structure: " +
+              "{\"category\": \"Work/Personal/Health/etc\", " +
+              "\"priority\": \"low/medium/high\", " +
+              "\"estimatedTime\": number_in_minutes, " +
+              "\"complexity\": \"low/medium/high\", " +
+              "\"suggestions\": [\"suggestion1\", \"suggestion2\"], " +
+              "\"insights\": \"detailed analysis text\"}. " +
+              "Provide realistic time estimates and actionable suggestions.",
           }],
           max_tokens: modelConfig.maxTokens,
           temperature: finalTemperature,
@@ -81,12 +89,46 @@ export const analyzeTask = onCall({
     const data = await response.json();
     const aiResponse = data.choices[0]?.message?.content || "";
 
+    // Try to parse JSON response from AI
+    let parsedAnalysis;
+    try {
+      // Remove markdown code blocks if present
+      let cleanedResponse = aiResponse;
+      if (aiResponse.includes("```json")) {
+        cleanedResponse = aiResponse
+          .replace(/```json\s*/g, "")
+          .replace(/```\s*/g, "")
+          .trim();
+      }
+
+      parsedAnalysis = JSON.parse(cleanedResponse);
+    } catch (parseError) {
+      console.error("Failed to parse AI response:", parseError);
+      console.error("Raw AI response:", aiResponse);
+
+      // Fallback if AI doesn't return valid JSON
+      parsedAnalysis = {
+        category: "General",
+        priority: "medium",
+        estimatedTime: 30,
+        complexity: "medium",
+        suggestions: [
+          "Break task into smaller steps",
+          "Set a timer",
+          "Focus on one thing at a time",
+        ],
+        insights: aiResponse,
+      };
+    }
+
     return {
-      analysis: aiResponse,
-      complexity: "medium",
-      estimatedTime: 30,
-      priority: "high",
-      suggestions: ["Break into smaller tasks", "Set a timer"],
+      analysis: parsedAnalysis.insights || aiResponse,
+      category: parsedAnalysis.category || "General",
+      complexity: parsedAnalysis.complexity || "medium",
+      estimatedTime: parsedAnalysis.estimatedTime || 30,
+      priority: parsedAnalysis.priority || "medium",
+      suggestions: parsedAnalysis.suggestions ||
+        ["Break into smaller tasks", "Set a timer"],
       model: modelConfig.model,
       temperature: finalTemperature,
     };
@@ -174,6 +216,7 @@ export const aiChat = onCall({
     config.app.corsOrigin,
     "https://focusmate-ai-8cad6.web.app",
     "https://focusmate-ai-8cad6.firebaseapp.com",
+    "http://localhost:3000",
   ],
 }, async (request) => {
   const {
@@ -192,11 +235,15 @@ export const aiChat = onCall({
     const finalTemperature = temperature !== undefined ?
       temperature : modelConfig.temperature;
 
+    console.log("Request data:", {message, context, model, temperature});
+
     const messages = [
       {role: "system", content: modelConfig.systemMessage},
       ...(context ? [{role: "user", content: context}] : []),
       {role: "user", content: message},
     ];
+
+    console.log("Constructed messages:", JSON.stringify(messages, null, 2));
 
     const response = await fetch(
       "https://api.deepseek.com/v1/chat/completions",
@@ -233,11 +280,132 @@ export const aiChat = onCall({
   }
 });
 
+// Optimized Journal Insights generator (fast, structured, cached-friendly)
+export const generateJournalInsightsOptimized = onCall({
+  cors: [
+    config.app.corsOrigin,
+    "https://focusmate-ai-8cad6.web.app",
+    "https://focusmate-ai-8cad6.firebaseapp.com",
+    "http://localhost:3000",
+  ],
+  timeoutSeconds: 120,
+  memory: "512MiB",
+}, async (request) => {
+  const auth = request.auth;
+  if (!auth) {
+    throw new Error("Auth required");
+  }
+
+  if (!config.deepseek.apiKey) {
+    throw new Error("DeepSeek API key not configured");
+  }
+
+  const {entries = [], cacheKey: _cacheKey} = request.data as {entries: Array<any>; cacheKey?: string};
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return {insights: [], usedCache: false, cacheKey: null};
+  }
+
+  // Compact and cap entries server-side
+  const sanitized = entries.slice(0, 60).map((e) => ({
+    id: e.id || "",
+    date: e.date || e.sessionDate || "",
+    mood: e.mood || "",
+    content: String(e.content || e.text || "").slice(0, 400),
+  }));
+
+  const prompt = `You are FocusMate Journal Insight Engine.\nAnalyze the entries and return JSON only (no markdown). Focus on patterns, emotions, growth, and actionable suggestions.\n\nReturn this JSON shape:\n{\n  "insights": [\n    {\n      "type": "emotion|pattern|suggestion|growth|concern",\n      "title": "string",\n      "description": "string",\n      "confidence": 0.0,\n      "actionable": "string or null",\n      "relatedEntries": ["id1","id2"]\n    }\n  ]\n}\n\nEntries:\n${JSON.stringify(sanitized, null, 2)}\n`;
+
+  const body = {
+    model: "deepseek-chat",
+    messages: [
+      {role: "system", content: "You return strict JSON only. No code fences. Keep 3-5 insights."},
+      {role: "user", content: prompt},
+    ],
+    temperature: 0.6,
+    top_p: 0.9,
+    max_tokens: 700,
+    stream: false,
+  };
+
+  try {
+    const resp = await fetch("https://api.deepseek.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.deepseek.apiKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(25000),
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      throw new Error(`DeepSeek error ${resp.status}: ${text}`);
+    }
+
+    const json = await resp.json();
+    const raw = json?.choices?.[0]?.message?.content || "";
+    const cleaned = raw.replace(/```json|```/g, "").trim();
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (e) {
+      parsed = {insights: []};
+    }
+
+    const normalized = Array.isArray(parsed.insights)
+      ? parsed.insights.slice(0, 5).map((i: any) => ({
+        type: i.type || "pattern",
+        title: i.title || "Insight",
+        description: i.description || "",
+        confidence: typeof i.confidence === "number" ? i.confidence : 0.7,
+        actionable: i.actionable || null,
+        relatedEntries: Array.isArray(i.relatedEntries) ? i.relatedEntries.slice(0, 3) : [],
+      }))
+      : [];
+
+    const serverHash = crypto
+      .createHash("sha1")
+      .update(JSON.stringify(sanitized))
+      .digest("hex");
+
+    return {insights: normalized, usedCache: false, cacheKey: serverHash};
+  } catch (e) {
+    logger.error("generateJournalInsightsOptimized error", e);
+    // Graceful server-side fallback instead of 500
+    try {
+      const serverHash = crypto
+        .createHash("sha1")
+        .update(JSON.stringify(sanitized))
+        .digest("hex");
+
+      const quick = [
+        {
+          type: "pattern",
+          title: "Recent Themes",
+          description: `Quick summary across ${sanitized.length} recent entries. AI service temporarily unavailable.`,
+          confidence: 0.5,
+          actionable: "Try again shortly or continue journaling.",
+          relatedEntries: sanitized.slice(0, 3).map((x) => x.id).filter(Boolean),
+        },
+      ];
+
+      return {insights: quick, usedCache: false, cacheKey: serverHash};
+    } catch (fallbackError) {
+      logger.error("generateJournalInsightsOptimized fallback error", fallbackError);
+      // Final minimal response
+      return {insights: [], usedCache: false, cacheKey: null};
+    }
+  }
+});
+
 export const aiChatStream = onRequest({
   cors: [
     config.app.corsOrigin,
     "https://focusmate-ai-8cad6.web.app",
     "https://focusmate-ai-8cad6.firebaseapp.com",
+    "http://localhost:3000",
   ],
 }, async (req, res) => {
   res.set("Access-Control-Allow-Origin", "*");
@@ -370,7 +538,7 @@ export const aiChatStream = onRequest({
 });
 
 export const healthCheck = onRequest({
-  cors: [config.app.corsOrigin, "https://focusmate-ai-8cad6.web.app", "https://focusmate-ai-8cad6.firebaseapp.com"],
+  cors: [config.app.corsOrigin, "https://focusmate-ai-8cad6.web.app", "https://focusmate-ai-8cad6.firebaseapp.com", "http://localhost:3000"],
 }, async (req, res) => {
   res.set("Access-Control-Allow-Origin", "https://focusmate-ai-8cad6.web.app");
   res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");

@@ -58,8 +58,18 @@ service cloud.firestore {
         allow read, write: if isOwner(userId);
       }
 
+      // AI insights subcollection
+      match /insights/{insightId} {
+        allow read, write: if isOwner(userId);
+      }
+
       // User settings subcollection
       match /settings/{settingId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Calendar events subcollection
+      match /events/{eventId} {
         allow read, write: if isOwner(userId);
       }
     }
@@ -82,6 +92,12 @@ service cloud.firestore {
     match /stats/{statId} {
       allow read: if true;
       allow write: if isAuthenticated() && request.auth.token.admin == true;
+    }
+
+    // User subscriptions (top-level collection)
+    match /subscriptions/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      allow read, write: if isAuthenticated() && request.auth.token.admin == true;
     }
 
     // Default deny for everything else

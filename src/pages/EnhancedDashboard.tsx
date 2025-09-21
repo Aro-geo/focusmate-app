@@ -40,7 +40,7 @@ import ProductivityInsights from '../components/ProductivityInsights';
 import MobileDashboard from '../components/MobileDashboard';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { firebaseService } from '../services/FirebaseService';
+import { offlineFirebaseService } from '../services/OfflineFirebaseService';
 import useResponsive from '../hooks/useResponsive';
 
 const EnhancedDashboard: React.FC = () => {
@@ -85,6 +85,8 @@ const EnhancedDashboardDesktop: React.FC = () => {
   const [completionRate, setCompletionRate] = React.useState(0);
   const [userActivity, setUserActivity] = React.useState<any[]>([]);
   const [aiInsights, setAiInsights] = React.useState<any[]>([]);
+  // Keep a reference to the last fetched raw tasks for insight regeneration
+  const lastUserTasksRef = React.useRef<any[]>([]);
   
   const [aiMessage, setAiMessage] = React.useState("Welcome! I'm here to help you stay focused and productive.");
   const [isAiLoading, setIsAiLoading] = React.useState(false);
@@ -105,14 +107,43 @@ const EnhancedDashboardDesktop: React.FC = () => {
       
       try {
         setIsLoading(true);
-        const userTasks = await firebaseService.getTasks();
-        setTasks(userTasks.map(task => ({
+        // Load cached AI insights immediately to avoid empty state on refresh
+        try {
+          const cached = localStorage.getItem(`dashboard-ai-insights-${user.id}`);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed.insights)) {
+              setAiInsights(parsed.insights);
+            } else if (Array.isArray(parsed)) {
+              // Backward compatibility if array was stored directly
+              setAiInsights(parsed);
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to load cached dashboard insights:', e);
+        }
+
+  const userTasks = await offlineFirebaseService.getTasks();
+        console.log('Raw tasks from Firebase:', userTasks);
+  // Store for future re-computation of insights when focus stats update
+  lastUserTasksRef.current = userTasks;
+        
+        setTasks(userTasks.map((task: any) => ({
           id: task.id,
           title: task.title,
           status: task.completed ? 'completed' : 'pending',
           priority: task.priority || 'medium',
           createdAt: task.createdAt || new Date().toISOString(),
-          completedAt: task.completedAt || null
+          completedAt: task.completedAt || null,
+          due_date: task.due_date || task.dueDate
+        })));
+        
+        console.log('Processed tasks:', userTasks.map((task: any) => ({
+          id: task.id,
+          title: task.title,
+          status: task.completed ? 'completed' : 'pending',
+          priority: task.priority || 'medium',
+          due_date: task.due_date || task.dueDate
         })));
         
         // Load real activity data
@@ -120,13 +151,13 @@ const EnhancedDashboardDesktop: React.FC = () => {
         
         // Calculate completion rate
         const totalCreated = userTasks.length;
-        const totalCompleted = userTasks.filter(task => task.completed).length;
+        const totalCompleted = userTasks.filter((task: any) => task.completed).length;
         setCompletionRate(totalCreated > 0 ? Math.round((totalCompleted / totalCreated) * 100) : 0);
         
         // Generate realistic AI insights based on user activity
-        generateRealisticInsights(userTasks);
+  generateRealisticInsights(userTasks);
         
-        const incompleteTasks = userTasks.filter(task => !task.completed);
+        const incompleteTasks = userTasks.filter((task: any) => !task.completed);
         const greeting = getGreeting();
         if (incompleteTasks.length > 0) {
           setAiMessage(`${greeting}! You have ${incompleteTasks.length} pending tasks. Let's tackle them one by one!`);
@@ -144,6 +175,14 @@ const EnhancedDashboardDesktop: React.FC = () => {
     loadTasks();
   }, [user]);
 
+  // Re-generate insights when focus-related stats or mood change
+  React.useEffect(() => {
+    if (user && lastUserTasksRef.current && lastUserTasksRef.current.length > 0) {
+      generateRealisticInsights(lastUserTasksRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusTime, focusStreak, selectedMood]);
+
   // Load real user activity data
   const loadUserActivity = async () => {
     if (!user) return;
@@ -151,11 +190,11 @@ const EnhancedDashboardDesktop: React.FC = () => {
     try {
       // Get today's sessions
       const today = new Date().toISOString().split('T')[0];
-      const sessions = await firebaseService.getPomodoroSessions(today);
-      const completedSessions = sessions.filter(s => s.completed);
+      const sessions = await offlineFirebaseService.getPomodoroSessions(today);
+      const completedSessions = sessions.filter((s: any) => s.completed);
       
       // Calculate real focus time and streak
-      const todayFocusTime = completedSessions.reduce((total, session) => total + (session.duration || 25), 0);
+      const todayFocusTime = completedSessions.reduce((total: number, session: any) => total + (session.duration || 25), 0);
       setFocusTime(todayFocusTime);
       
       // Get streak from last 7 days
@@ -164,11 +203,11 @@ const EnhancedDashboardDesktop: React.FC = () => {
         const date = new Date();
         date.setDate(date.getDate() - i);
         const dayStr = date.toISOString().split('T')[0];
-        const daySessions = await firebaseService.getPomodoroSessions(dayStr);
+        const daySessions = await offlineFirebaseService.getPomodoroSessions(dayStr);
         last7Days.push({
           date: dayStr,
-          sessions: daySessions.filter(s => s.completed).length,
-          focusTime: daySessions.filter(s => s.completed).reduce((total, s) => total + (s.duration || 25), 0)
+          sessions: daySessions.filter((s: any) => s.completed).length,
+          focusTime: daySessions.filter((s: any) => s.completed).reduce((total: number, s: any) => total + (s.duration || 25), 0)
         });
       }
       
@@ -191,12 +230,12 @@ const EnhancedDashboardDesktop: React.FC = () => {
     const insights = [];
     
     // Calculate productivity metrics
-    const completedTasks = userTasks.filter(task => task.completed);
-    const pendingTasks = userTasks.filter(task => !task.completed);
-    const highPriorityPending = pendingTasks.filter(task => task.priority === 'high');
+    const completedTasks = userTasks.filter((task: any) => task.completed);
+    const pendingTasks = userTasks.filter((task: any) => !task.completed);
+    const highPriorityPending = pendingTasks.filter((task: any) => task.priority === 'high');
     
     // Morning productivity insight (based on completion times)
-    const morningCompleted = completedTasks.filter(task => {
+    const morningCompleted = completedTasks.filter((task: any) => {
       if (!task.completedAt) return false;
       const hour = new Date(task.completedAt).getHours();
       return hour >= 8 && hour < 12;
@@ -236,7 +275,7 @@ const EnhancedDashboardDesktop: React.FC = () => {
     }
     
     // Task breakdown suggestion
-    if (pendingTasks.some(task => task.title.length > 40)) {
+    if (pendingTasks.some((task: any) => task.title.length > 40)) {
       insights.push({
         id: 'task_breakdown',
         title: 'Break down large tasks',
@@ -311,13 +350,27 @@ const EnhancedDashboardDesktop: React.FC = () => {
       });
     }
     
-    setAiInsights(insights);
+    // Only overwrite if we have something meaningful to show
+    if (insights.length > 0) {
+      setAiInsights(insights);
+      // Persist insights so they survive page refreshes
+      try {
+        if (user) {
+          localStorage.setItem(
+            `dashboard-ai-insights-${user.id}`,
+            JSON.stringify({ insights, lastUpdated: new Date().toISOString() })
+          );
+        }
+      } catch (e) {
+        console.warn('Failed to cache dashboard insights:', e);
+      }
+    }
   };
 
   const addTask = async () => {
     if (newTask.trim() && user) {
       try {
-        const taskId = await firebaseService.addTask(newTask.trim());
+        const taskId = await offlineFirebaseService.addTask(newTask.trim());
         const newTaskObj = {
           id: taskId,
           title: newTask.trim(),
@@ -345,7 +398,7 @@ const EnhancedDashboardDesktop: React.FC = () => {
 
   const handleSmartTaskCreated = async (taskData: any) => {
     try {
-      const taskId = await firebaseService.addTask(taskData.title, taskData.priority);
+      const taskId = await offlineFirebaseService.addTask(taskData.title, taskData.priority);
       const newTaskObj = {
         id: taskId,
         title: taskData.title,
@@ -378,7 +431,7 @@ const EnhancedDashboardDesktop: React.FC = () => {
       if (!task) return;
       
       const newCompleted = task.status !== 'completed';
-      await firebaseService.toggleTask(taskId);
+      await offlineFirebaseService.toggleTask(taskId);
       
       setTasks(prev => prev.map(t => 
         t.id === taskId ? { 
@@ -471,7 +524,7 @@ const EnhancedDashboardDesktop: React.FC = () => {
           
           // Save completed session to Firebase
           if (user) {
-            firebaseService.savePomodoroSession({
+            offlineFirebaseService.savePomodoroSession({
               userId: user.id,
               duration: 25,
               completed: true,
@@ -552,14 +605,14 @@ const EnhancedDashboardDesktop: React.FC = () => {
       setAiMessage(tipMessage);
       
       // Auto-save the tip
-      await firebaseService.saveTip(tipMessage);
+      // Auto-save the tip - removed for now
     } catch (error) {
       console.error('AI tip error:', error);
       const fallbackTip = "Here's a quick tip: Break your next task into smaller 15-minute chunks for better focus!";
       setAiMessage(fallbackTip);
       // Save fallback tip too
       try {
-        await firebaseService.saveTip(fallbackTip);
+        // Save fallback tip - removed for now
       } catch (saveError) {
         console.error('Error saving fallback tip:', saveError);
       }
@@ -619,6 +672,77 @@ const EnhancedDashboardDesktop: React.FC = () => {
   const pendingTasks = tasks.filter(task => task.status === 'pending');
   const completedTasks = tasks.filter(task => task.status === 'completed').length;
   const totalTasks = tasks.length;
+
+  // Get upcoming deadlines from real task data
+  const getUpcomingDeadlines = () => {
+    console.log('All tasks:', tasks);
+    // Use start-of-day and also a string comparator for YYYY-MM-DD to avoid timezone pitfalls
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const tasksWithDeadlines = tasks
+      .filter(task => {
+        console.log(`Task ${task.title}: due_date = ${task.due_date}, status = ${task.status}`);
+        // Only include tasks with a deadline in the future and not completed
+        if (!task.due_date || task.status === 'completed') return false;
+        const raw = task.due_date as string;
+        const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw);
+        if (dateOnly) {
+          // Lexicographical compare works for YYYY-MM-DD
+          return raw >= todayStr;
+        }
+        const dueDate = new Date(raw);
+        // Normalize to local start-of-day for comparison
+        const dueStart = new Date(dueDate);
+        dueStart.setHours(0, 0, 0, 0);
+        return dueStart.getTime() >= todayStart.getTime();
+      })
+      .map(task => {
+        const dueDate = new Date(task.due_date);
+        const timeDiff = dueDate.getTime() - todayStart.getTime();
+        const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        
+        return {
+          id: task.id,
+          title: task.title,
+          deadline: formatDeadline(dueDate),
+          priority: task.priority,
+          daysLeft: daysLeft,
+          dueDate: dueDate
+        };
+      })
+      .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
+      .slice(0, 5); // Show only next 5 deadlines
+    
+    console.log('Tasks with deadlines:', tasksWithDeadlines);
+    return tasksWithDeadlines;
+  };
+  
+  const formatDeadline = (date: Date) => {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const isToday = date.toDateString() === today.toDateString();
+    const isTomorrow = date.toDateString() === tomorrow.toDateString();
+    
+    if (isToday) {
+      return `Today at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } else if (isTomorrow) {
+      return `Tomorrow at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } else {
+      const options: Intl.DateTimeFormatOptions = { 
+        weekday: 'long', 
+        month: 'short', 
+        day: 'numeric',
+        hour: '2-digit', 
+        minute: '2-digit' 
+      };
+      return date.toLocaleDateString([], options);
+    }
+  };
+
+  const upcomingDeadlines = getUpcomingDeadlines();
 
   return (
     <AnimatedPage>
@@ -1126,74 +1250,81 @@ const EnhancedDashboardDesktop: React.FC = () => {
                 </StaggeredList>
               </FloatingCard>
               
-              {/* Daily Activity Overview */}
+              {/* Upcoming Deadlines */}
               <FloatingCard 
                 className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700"
                 delay={0.5}
               >
                 <div className="flex items-center space-x-3 mb-6">
-                  <TrendingUp className="w-5 h-5 text-green-500" />
-                  <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Daily Activity Overview</h3>
+                  <Calendar className="w-5 h-5 text-red-500" />
+                  <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Upcoming Deadlines</h3>
                 </div>
                 
                 <div className="space-y-3">
-                  {userActivity.length > 0 ? userActivity.map((day, index) => {
-                    const dayDate = new Date(day.date);
-                    const isToday = day.date === new Date().toISOString().split('T')[0];
-                    const dayName = dayDate.toLocaleDateString('en-US', { weekday: 'short' });
-                    const dateStr = dayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                    
-                    const dayData = {
-                      date: `${dayName}, ${dateStr}`,
-                      focusMinutes: day.focusTime,
-                      sessions: day.sessions,
-                      completedTasks: isToday ? completedTasks : 0,
-                      isToday
+                  {upcomingDeadlines.length > 0 ? upcomingDeadlines.map((task, index) => {
+                    const getPriorityInfo = (priority: string) => {
+                      switch (priority) {
+                        case 'high':
+                          return { 
+                            color: 'border-red-500 bg-red-50 dark:bg-red-900/20', 
+                            icon: '🔴', 
+                            badge: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+                            textColor: 'text-red-600 dark:text-red-400'
+                          };
+                        case 'medium':
+                          return { 
+                            color: 'border-orange-500 bg-orange-50 dark:bg-orange-900/20', 
+                            icon: '🟡', 
+                            badge: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+                            textColor: 'text-orange-600 dark:text-orange-400'
+                          };
+                        default:
+                          return { 
+                            color: 'border-green-500 bg-green-50 dark:bg-green-900/20', 
+                            icon: '🟢', 
+                            badge: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+                            textColor: 'text-green-600 dark:text-green-400'
+                          };
+                      }
                     };
                     
-                    const getStatusInfo = (focusMinutes: number, sessions: number) => {
-                      if (focusMinutes >= 60) return { status: 'Active', color: 'border-green-500', icon: '💪', label: 'Productive' };
-                      if (focusMinutes >= 25) return { status: 'Active', color: 'border-orange-500', icon: '☕', label: 'Getting Started' };
-                      if (sessions > 0) return { status: 'Active', color: 'border-blue-500', icon: '🎯', label: 'Active' };
-                      return { status: 'Rest', color: 'border-gray-600', icon: '😴', label: 'Inactive' };
-                    };
-                    
-                    const statusInfo = getStatusInfo(dayData.focusMinutes, dayData.sessions);
+                    const priorityInfo = getPriorityInfo(task.priority);
+                    const isUrgent = task.daysLeft <= 1;
                     
                     return (
                       <div
-                        key={index}
+                        key={task.id}
                         className={`flex items-center justify-between p-3 rounded-lg border transition-all hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
-                          dayData.isToday ? 'border-orange-200 bg-orange-50 dark:border-orange-700 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800'
+                          isUrgent ? priorityInfo.color : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800'
                         }`}
                       >
                         <div className="flex items-center space-x-3">
-                          <span className="text-lg">{statusInfo.icon}</span>
+                          <span className="text-lg">{priorityInfo.icon}</span>
                           <div>
-                            <p className="font-medium text-gray-800 dark:text-white">{dayData.date}</p>
-                            <p className={`text-sm ${
-                              statusInfo.status === 'Active' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'
-                            }`}>{statusInfo.label}</p>
+                            <p className="font-medium text-gray-800 dark:text-white">{task.title}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">{task.deadline}</p>
                           </div>
                         </div>
                         
-                        <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-300">
-                          <div className="text-center">
-                            <p className="font-medium">{dayData.focusMinutes > 0 ? `${Math.floor(dayData.focusMinutes / 60)}h ${dayData.focusMinutes % 60}m` : '0m'}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Focus</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="font-medium">{dayData.sessions}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Sessions</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="font-medium">{dayData.completedTasks}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Tasks</p>
-                          </div>
+                        <div className="flex items-center space-x-3">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${priorityInfo.badge}`}>
+                            {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)} Priority
+                          </span>
+                          {isUrgent && (
+                            <AlertTriangle className={`w-4 h-4 ${priorityInfo.textColor}`} />
+                          )}
                         </div>
                       </div>
                     );
-                  }) : <div className="text-center text-gray-500 dark:text-gray-400 py-4">Loading activity data...</div>}
+                  }) : (
+                    <div className="text-center py-8">
+                      <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                      <p className="text-gray-500 dark:text-gray-400">No upcoming deadlines</p>
+                      <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+                        Tasks with due dates will appear here
+                      </p>
+                    </div>
+                  )}
                 </div>
               </FloatingCard>
             </div>

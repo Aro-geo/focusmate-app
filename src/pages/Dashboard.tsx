@@ -21,7 +21,8 @@ import {
   Loader,
   RefreshCw,
   Activity,
-  Calendar
+  Calendar,
+  AlertTriangle
 } from 'lucide-react';
 import AnimatedPage from '../components/AnimatedPage';
 import FloatingCard from '../components/FloatingCard';
@@ -29,7 +30,7 @@ import StaggeredList from '../components/StaggeredList';
 import FloatingAssistant from '../components/FloatingAssistant';
 import SubscriptionStatus from '../components/SubscriptionStatus';
 import UpgradePrompt from '../components/UpgradePrompt';
-import AIAnalytics from '../components/AIAnalytics';
+import ProductivityInsights from '../components/ProductivityInsights';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import firestoreService from '../services/FirestoreService';
@@ -38,138 +39,137 @@ import subscriptionService from '../services/SubscriptionService';
 import { analyticsService } from '../services/AnalyticsService';
 import { taskAnalysisService } from '../services/TaskAnalysisService';
 
-// Daily Activity Overview Component
-const DailyActivityOverview: React.FC = () => {
-  const { user } = useAuth();
-  const [weeklyData, setWeeklyData] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    const loadWeeklyData = async () => {
-      if (!user) return;
-      try {
-        const data = await analyticsService.getAnalyticsData('week');
+// Upcoming Deadlines Component
+const UpcomingDeadlines: React.FC<{ tasks: any[] }> = ({ tasks }) => {
+  // Get upcoming deadlines from real task data
+  const getUpcomingDeadlines = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset to start of day
+    const tasksWithDeadlines = tasks
+      .filter(task => {
+        if (!task.dueDate || task.status === 'completed') return false;
+        const dueDate = new Date(task.dueDate);
+        dueDate.setHours(0, 0, 0, 0); // Reset to start of day
+        return dueDate.getTime() >= today.getTime(); // Only future or today's deadlines
+      })
+      .map(task => {
+        const dueDate = new Date(task.dueDate);
+        const timeDiff = dueDate.getTime() - today.getTime();
+        const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
         
-        // Generate all 7 days of current week with real data
-        const today = new Date();
-        const dayOfWeek = today.getDay();
-        const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-        
-        const weekStart = new Date(today);
-        weekStart.setDate(today.getDate() - daysFromMonday);
-        weekStart.setHours(0, 0, 0, 0);
-        
-        const weekData = [];
-        const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        
-        for (let i = 0; i < 7; i++) {
-          const currentDay = new Date(weekStart);
-          currentDay.setDate(weekStart.getDate() + i);
-          
-          const dayData = data.dailyStats?.find(stat => {
-            const statDate = new Date();
-            statDate.setDate(today.getDate() - daysFromMonday + i);
-            return stat.date === dayNames[i];
-          });
-          
-          weekData.push({
-            date: dayNames[i] + ', ' + currentDay.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-            focusMinutes: dayData?.focusMinutes || 0,
-            sessions: dayData?.sessions || 0,
-            completedTasks: dayData?.completedTasks || 0,
-            mood: dayData?.mood || 'Inactive',
-            isToday: i === daysFromMonday
-          });
-        }
-        
-        setWeeklyData(weekData);
-      } catch (error) {
-        console.error('Failed to load weekly data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadWeeklyData();
-  }, [user]);
-
-  const getStatusInfo = (focusMinutes: number, sessions: number) => {
-    if (focusMinutes >= 60) return { status: 'Active', color: 'border-green-500', icon: '💪', label: 'Productive' };
-    if (focusMinutes >= 25) return { status: 'Active', color: 'border-orange-500', icon: '☕', label: 'Getting Started' };
-    if (sessions > 0) return { status: 'Active', color: 'border-blue-500', icon: '🎯', label: 'Active' };
-    return { status: 'Rest', color: 'border-gray-600', icon: '😴', label: 'Inactive' };
+        return {
+          id: task.id,
+          title: task.title,
+          deadline: formatDeadline(dueDate),
+          priority: task.priority,
+          daysLeft: daysLeft,
+          dueDate: dueDate
+        };
+      })
+      .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
+      .slice(0, 5); // Show only next 5 deadlines
+    
+    return tasksWithDeadlines;
+  };
+  
+  const formatDeadline = (date: Date) => {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const isToday = date.toDateString() === today.toDateString();
+    const isTomorrow = date.toDateString() === tomorrow.toDateString();
+    
+    if (isToday) {
+      return `Today at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } else if (isTomorrow) {
+      return `Tomorrow at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } else {
+      const options: Intl.DateTimeFormatOptions = { 
+        weekday: 'long', 
+        month: 'short', 
+        day: 'numeric',
+        hour: '2-digit', 
+        minute: '2-digit' 
+      };
+      return date.toLocaleDateString([], options);
+    }
   };
 
-  if (loading) {
-    return (
-      <FloatingCard className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700" delay={0.8}>
-        <div className="flex items-center justify-center h-32">
-          <Loader className="w-6 h-6 animate-spin text-indigo-600" />
-        </div>
-      </FloatingCard>
-    );
-  }
+  const upcomingTasks = getUpcomingDeadlines();
+
+  const getPriorityInfo = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return { 
+          color: 'border-red-500 bg-red-50 dark:bg-red-900/20', 
+          icon: '🔴', 
+          badge: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+          textColor: 'text-red-600 dark:text-red-400'
+        };
+      case 'medium':
+        return { 
+          color: 'border-orange-500 bg-orange-50 dark:bg-orange-900/20', 
+          icon: '🟡', 
+          badge: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+          textColor: 'text-orange-600 dark:text-orange-400'
+        };
+      default:
+        return { 
+          color: 'border-green-500 bg-green-50 dark:bg-green-900/20', 
+          icon: '�', 
+          badge: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+          textColor: 'text-green-600 dark:text-green-400'
+        };
+    }
+  };
 
   return (
     <FloatingCard className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700" delay={0.8}>
       <div className="flex items-center space-x-3 mb-6">
-        <TrendingUp className="w-5 h-5 text-green-500" />
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Daily Activity Overview</h3>
+        <Calendar className="w-5 h-5 text-red-500" />
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Upcoming Deadlines</h3>
       </div>
       
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
-        {weeklyData.map((day, index) => {
-          const statusInfo = getStatusInfo(day.focusMinutes, day.sessions);
+      <div className="space-y-3">
+        {upcomingTasks.length > 0 ? upcomingTasks.map((task, index) => {
+          const priorityInfo = getPriorityInfo(task.priority);
+          const isUrgent = task.daysLeft <= 1;
+          
           return (
             <div
-              key={index}
-              className={`p-4 rounded-lg border-2 bg-gray-50 dark:bg-gray-700/50 ${
-                day.isToday ? 'border-orange-500' : statusInfo.color
-              } transition-all hover:shadow-md`}
+              key={task.id}
+              className={`flex items-center justify-between p-3 rounded-lg border transition-all hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
+                isUrgent ? priorityInfo.color : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800'
+              }`}
             >
-              <div className="flex justify-between items-start mb-3">
-                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
-                  {day.date}
+              <div className="flex items-center space-x-3">
+                <span className="text-lg">{priorityInfo.icon}</span>
+                <div>
+                  <p className="font-medium text-gray-800 dark:text-white">{task.title}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{task.deadline}</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-3">
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${priorityInfo.badge}`}>
+                  {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)} Priority
                 </span>
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                  statusInfo.status === 'Active' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-600 dark:text-gray-300'
-                }`}>
-                  {statusInfo.status}
-                </span>
-              </div>
-              
-              <div className="flex items-center justify-center mb-4">
-                <div className={`w-16 h-16 rounded-full border-4 flex items-center justify-center ${
-                  statusInfo.status === 'Active' ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' : 'border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-600'
-                }`}>
-                  <span className="text-2xl">{statusInfo.icon}</span>
-                </div>
-              </div>
-              
-              <div className="text-center mb-3">
-                <p className="text-sm font-semibold text-gray-800 dark:text-white">
-                  {statusInfo.label}
-                </p>
-              </div>
-              
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-gray-500 dark:text-gray-400">Focus</span>
-                  <span className="font-medium text-gray-700 dark:text-gray-200">
-                    {day.focusMinutes > 0 ? `${Math.floor(day.focusMinutes / 60)}h ${day.focusMinutes % 60}m` : '0m'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500 dark:text-gray-400">Sessions</span>
-                  <span className="font-medium text-gray-700 dark:text-gray-200">{day.sessions}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500 dark:text-gray-400">Tasks</span>
-                  <span className="font-medium text-gray-700 dark:text-gray-200">{day.completedTasks}</span>
-                </div>
+                {isUrgent && (
+                  <AlertTriangle className={`w-4 h-4 ${priorityInfo.textColor}`} />
+                )}
               </div>
             </div>
           );
-        })}
+        }) : (
+          <div className="text-center py-8">
+            <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-500 dark:text-gray-400">No upcoming deadlines</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+              Tasks with due dates will appear here
+            </p>
+          </div>
+        )}
       </div>
     </FloatingCard>
   );
@@ -204,9 +204,9 @@ const Dashboard: React.FC = () => {
     { id: 'tired', icon: Frown, label: 'Tired', color: 'text-red-500' },
   ];
 
-  // Load tasks and initial AI message
+  // Load tasks, sessions, and journal entries
   React.useEffect(() => {
-    const loadTasks = async () => {
+    const loadData = async () => {
       if (!user) {
         setIsLoading(false);
         return;
@@ -214,13 +214,37 @@ const Dashboard: React.FC = () => {
       
       try {
         setIsLoading(true);
+        
+        // Load tasks
         const userTasks = await firestoreService.getTasks();
         setTasks(userTasks.map(task => ({
           id: task.id,
           title: task.title,
           status: task.completed ? 'completed' : 'pending',
-          priority: task.priority || 'medium'
+          priority: task.priority || 'medium',
+          dueDate: task.dueDate,
+          completed: task.completed
         })));
+        
+        // Load Pomodoro sessions
+        try {
+          const { default: DatabasePomodoroService } = await import('../services/DatabasePomodoroService');
+          const sessions = await DatabasePomodoroService.getSessions();
+          setPomodoroSessions(sessions || []);
+        } catch (sessionError) {
+          console.error('Error loading Pomodoro sessions:', sessionError);
+          setPomodoroSessions([]);
+        }
+        
+        // Load journal entries
+        try {
+          const { default: DatabaseJournalService } = await import('../services/DatabaseJournalService');
+          const entries = await DatabaseJournalService.getEntries();
+          setJournalEntries(entries || []);
+        } catch (journalError) {
+          console.error('Error loading journal entries:', journalError);
+          setJournalEntries([]);
+        }
         
         const incompleteTasks = userTasks.filter(task => !task.completed);
         const greeting = getGreeting();
@@ -230,14 +254,14 @@ const Dashboard: React.FC = () => {
           setAiMessage(`${greeting}! Great job on completing your tasks. Ready for something new?`);
         }
       } catch (err) {
-        console.error('Error loading tasks:', err);
-        setError('Failed to load tasks');
+        console.error('Error loading data:', err);
+        setError('Failed to load dashboard data');
       } finally {
         setIsLoading(false);
       }
     };
     
-    loadTasks();
+    loadData();
   }, [user]);
 
   const addTask = async () => {
@@ -802,15 +826,14 @@ const Dashboard: React.FC = () => {
                 </StaggeredList>
               </FloatingCard>
 
-              {/* AI Analytics */}
-              <AIAnalytics 
+              {/* Productivity Insights */}
+              <ProductivityInsights 
                 tasks={tasks}
-                pomodoroSessions={pomodoroSessions}
-                journalEntries={journalEntries}
+                sessions={pomodoroSessions}
               />
 
-              {/* Daily Activity Overview */}
-              <DailyActivityOverview />
+              {/* Upcoming Deadlines */}
+              <UpcomingDeadlines tasks={tasks} />
             </div>
           </div>
         </div>

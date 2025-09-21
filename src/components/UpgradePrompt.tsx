@@ -40,7 +40,7 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
       case 'trial_expired':
         return {
           title: 'Trial Expired',
-          message: 'Your 14-day trial has ended. Continue with Pro to keep all features!',
+          message: 'Your 3-month trial has ended. Continue with Pro to keep all features!',
           icon: Clock
         };
       default:

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Settings, Moon, Sun, LogOut, CreditCard } from 'lucide-react';
+import { User, Settings, Moon, Sun, LogOut, CreditCard, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface UserProfileDropdownProps {
@@ -10,6 +10,7 @@ interface UserProfileDropdownProps {
   onLogout: () => void;
   onThemeToggle: () => void;
   isDarkMode: boolean;
+  isAdmin?: boolean;
 }
 
 const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
@@ -18,7 +19,8 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
   avatarUrl,
   onLogout,
   onThemeToggle,
-  isDarkMode
+  isDarkMode,
+  isAdmin = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
@@ -57,6 +59,11 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
 
   const handlePricingClick = () => {
     navigate('/app/pricing');
+    setIsOpen(false);
+  };
+
+  const handleAdminClick = () => {
+    navigate('/app/admin');
     setIsOpen(false);
   };
 
@@ -138,6 +145,18 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
                   <span>Plan & Pricing</span>
                 </motion.button>
               </li>
+              {isAdmin && (
+                <li>
+                  <motion.button
+                    className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    whileHover={{ x: 2 }}
+                    onClick={handleAdminClick}
+                  >
+                    <Shield size={16} className="mr-2" />
+                    <span>Admin Panel</span>
+                  </motion.button>
+                </li>
+              )}
               <li className="border-t border-gray-100 dark:border-gray-700">
                 <motion.button
                   className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"

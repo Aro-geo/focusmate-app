@@ -30,7 +30,8 @@ import { useTheme } from '../context/ThemeContext';
 import FloatingAssistant from '../components/FloatingAssistant';
 import FormattedMessage from '../components/FormattedMessage';
 import MobilePomodoro from '../components/MobilePomodoro';
-import SavedTipsModal from '../components/SavedTipsModal';
+import '../styles/pomodoro-fixes.css';
+
 import aiService from '../services/AIService';
 import { enhancedAIFocusCoachService } from '../services/EnhancedAIFocusCoachService';
 import useResponsive from '../hooks/useResponsive';
@@ -83,6 +84,8 @@ const Pomodoro: React.FC = () => {
 
 // Desktop Pomodoro component
 const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
+  const { user, isAuthenticated } = useAuth();
+  
   // Pomodoro Settings
   const [settings, setSettings] = useState({
     workDuration: 25,
@@ -125,7 +128,7 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
   const [showDistractionModal, setShowDistractionModal] = useState<boolean>(false);
   const [showNotesModal, setShowNotesModal] = useState<boolean>(false);
   const [selectedSessionNotes, setSelectedSessionNotes] = useState<{notes: string | null, task: string | null} | null>(null);
-  const [showSavedTips, setShowSavedTips] = useState<boolean>(false);
+
   
   // Distractions & Notes
   const [distractions, setDistractions] = useState<Distraction[]>([]);
@@ -149,6 +152,12 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
   const [aiMessage, setAiMessage] = useState<string>("Ready to focus? Select a task and let's get started with a productive Pomodoro session!");
   const [isAiLoading, setIsAiLoading] = useState<boolean>(false);
   const [aiChatInput, setAiChatInput] = useState<string>('');
+  const [conversationHistory, setConversationHistory] = useState<Array<{
+    timestamp: Date;
+    userInput: string;
+    aiResponse: string;
+    context: string;
+  }>>([]);
   
   // Refs
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -264,6 +273,10 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
         id: `session-${Date.now()}`
       };
       setCurrentSession(newSession);
+      
+      // Reset conversation history for new session
+      setConversationHistory([]);
+      setAiMessage(''); // Clear any previous AI message
     }
     setIsActive(!isActive);
   };
@@ -431,9 +444,33 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
 
   // Helper functions for new features
   const updateSettings = (key: string, value: any) => {
+    // Validate numeric values to prevent NaN
+    let validatedValue = value;
+    if (typeof value === 'number' && (isNaN(value) || value < 1)) {
+      switch (key) {
+        case 'workDuration':
+          validatedValue = 25;
+          break;
+        case 'shortBreakDuration':
+          validatedValue = 5;
+          break;
+        case 'longBreakDuration':
+          validatedValue = 15;
+          break;
+        case 'longBreakInterval':
+          validatedValue = 4;
+          break;
+        case 'dailyGoal':
+          validatedValue = 8;
+          break;
+        default:
+          validatedValue = 1;
+      }
+    }
+    
     setSettings(prev => ({
       ...prev,
-      [key]: value
+      [key]: validatedValue
     }));
   };
 
@@ -470,7 +507,7 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
     setAiMessage("Distraction logged. Good job recognizing it! Let's get back to focus.");
   };
 
-  const saveSessionNotes = () => {
+  const saveSessionNotes = async () => {
     // Update current session with notes if there is an active session
     if (currentSession) {
       const updatedSession = {
@@ -492,8 +529,8 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
         
         // Also save to database if we have a session service
         try {
-          if (DatabasePomodoroService.updateSession) {
-            DatabasePomodoroService.updateSession(currentSession.id, { notes: sessionNotes });
+          if (DatabasePomodoroService.updateSession && currentSession.id) {
+            await DatabasePomodoroService.updateSession(currentSession.id, { notes: sessionNotes });
           }
         } catch (error) {
           console.error('Error saving session notes:', error);
@@ -543,44 +580,127 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
   const sendAIMessage = async () => {
     if (!aiChatInput.trim()) return;
     
+    // Check if user is authenticated
+    if (!isAuthenticated || !user) {
+      setAiMessage("## Authentication Required\n\nPlease sign in to use the AI Focus Coach feature.");
+      return;
+    }
+    
     try {
       setIsAiLoading(true);
+      console.log('Sending AI request with authentication check:', { isAuthenticated, userExists: !!user });
       
-      // Use the enhanced AI service with streaming
-      const context = {
-        sessionType: 'reflection' as const,
-        currentTask: selectedTask || undefined,
-        timeElapsed: (settings.workDuration * 60) - timeRemaining,
-        totalDuration: settings.workDuration * 60,
-        distractionCount: distractions.length,
-        streakCount: completedSessions,
-        timeOfDay: new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening',
-        recentPerformance: {
-          completionRate: completedSessions > 0 ? 0.8 : 0,
-          averageDistractions: distractions.length,
-          preferredTimes: [new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening']
-        }
-      };
+      // Build conversation context with history
+      let contextPrompt = `You are an AI Focus Coach having an ongoing conversation with a user during their Pomodoro session.
 
-      // Clear previous message and show loading
-      setAiMessage('');
-      
-      // Stream the response
-      let fullContent = '';
-      const streamGenerator = enhancedAIFocusCoachService.generateStreamResponse(context, aiChatInput);
+Current Session Context:
+- Task: ${selectedTask || 'Not specified'}
+- Time Elapsed: ${Math.round(((settings.workDuration * 60) - timeRemaining) / 60)} minutes
+- Distractions: ${distractions.length}
+- Session Status: ${isActive ? 'Active' : mode !== 'work' ? 'Break' : 'Paused'}
 
-      for await (const chunk of streamGenerator) {
-        if (chunk.isComplete) {
-          if (chunk.fullResponse) {
-            setAiMessage(chunk.fullResponse.message);
-            fullContent = chunk.fullResponse.message;
-          }
-          break;
-        } else {
-          fullContent += chunk.chunk;
-          setAiMessage(fullContent);
-        }
+`;
+
+      // Add conversation history for context (last 10)
+      if (conversationHistory.length > 0) {
+        contextPrompt += `Recent Conversation:\n`;
+        conversationHistory.slice(-10).forEach((entry, index) => {
+          contextPrompt += `User: "${entry.userInput}"\nAI: "${entry.aiResponse}"\n\n`;
+        });
       }
+
+      contextPrompt += `Current User Message: "${aiChatInput}"
+
+Instructions:
+- You are FocusMate AI Coach. Give thorough, actionable guidance.
+- Start with a one-line acknowledgement, then provide concrete next steps.
+- Include a short plan with 3–6 bullet points, with examples and 1–2 alternatives.
+- Briefly explain the “why” behind the advice to build confidence.
+- Aim for 150–300 words by default unless I ask for short.
+- Reference prior messages and today’s goals when relevant.
+
+Detail level: comprehensive
+
+Respond as the AI Focus Coach:`;
+
+      // Use aiChatStream for real-time conversation
+      console.log('Making fetch request to AI stream...');
+      const response = await fetch(`https://us-central1-focusmate-ai-8cad6.cloudfunctions.net/aiChatStream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: contextPrompt,
+          context: 'focus_coaching',
+          model: 'deepseek-reasoner',
+          temperature: 0.8,
+          top_p: 0.95,
+          max_tokens: 1200,
+          detailLevel: 'comprehensive'
+        })
+      });
+
+      console.log('Response status:', response.status, 'Response ok:', response.ok);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response stream available');
+      }
+
+      console.log('Starting to read stream...');
+      let fullContent = '';
+      const decoder = new TextDecoder();
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          console.log('Received chunk:', chunk);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') {
+                break;
+              }
+              
+              try {
+                const parsed = JSON.parse(data);
+                // Handle our custom format: {"content":"text","done":false}
+                if (parsed.content && !parsed.done) {
+                  const content = parsed.content;
+                  fullContent += content;
+                  setAiMessage(fullContent);
+                } else if (parsed.done) {
+                  // Stream is complete
+                  break;
+                }
+              } catch (e) {
+                // Ignore parsing errors for individual chunks
+                console.log('Parse error for chunk:', data, e);
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      // Add to conversation history
+      setConversationHistory(prev => [...prev, {
+        timestamp: new Date(),
+        userInput: aiChatInput,
+        aiResponse: fullContent,
+        context: selectedTask || 'General'
+      }]);
       
       setAiChatInput('');
       
@@ -597,6 +717,12 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
       }
     } catch (error) {
       console.error('Failed to send AI message:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        isAuthenticated,
+        userExists: !!user
+      });
       setAiMessage("## Focus Assistant\n\nI'm having trouble connecting right now, but I'm here to help you stay focused!\n\nTry again in a moment or use the 'Get Tip' button for quick advice.");
     } finally {
       setIsAiLoading(false);
@@ -608,6 +734,12 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
   };
 
   const handleGetTip = async () => {
+    // Check if user is authenticated
+    if (!isAuthenticated || !user) {
+      setAiMessage("## Authentication Required\n\nPlease sign in to use the AI Focus Coach feature.");
+      return;
+    }
+    
     try {
       setIsAiLoading(true);
       
@@ -1048,21 +1180,7 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
                 </motion.button>
               </div>
               
-              <div className="mt-4">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setShowSavedTips(true)}
-                  className={`w-full flex items-center justify-center px-4 py-3 rounded-xl ${
-                    darkMode
-                      ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                      : 'bg-purple-500 hover:bg-purple-600 text-white'
-                  } shadow-lg transition-colors`}
-                >
-                  <BookOpen size={18} className="mr-2" />
-                  Saved Tips
-                </motion.button>
-              </div>
+
             </motion.div>
 
             {/* Session Stats */}
@@ -1094,7 +1212,8 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
                 </div>
                 <div className={`w-full h-2 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
                   <div 
-                    className={`h-2 rounded-full bg-blue-500 transition-all duration-300 progress-bar-width-${Math.min(Math.round((completedSessions / settings.dailyGoal) * 100), 100)}`}
+                    className="h-2 rounded-full bg-blue-500 transition-all duration-300"
+                    style={{ width: `${Math.min(Math.round((completedSessions / settings.dailyGoal) * 100), 100)}%` }}
                   >
                   </div>
                 </div>
@@ -1266,8 +1385,8 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
                         type="number"
                         min="1"
                         max="60"
-                        value={settings.workDuration}
-                        onChange={(e) => updateSettings('workDuration', parseInt(e.target.value))}
+                        value={settings.workDuration || ''}
+                        onChange={(e) => updateSettings('workDuration', parseInt(e.target.value) || 25)}
                         className={`w-full p-2 rounded-lg border ${
                           darkMode
                             ? 'bg-gray-700 border-gray-600 text-white'
@@ -1286,8 +1405,8 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
                         type="number"
                         min="1"
                         max="30"
-                        value={settings.shortBreakDuration}
-                        onChange={(e) => updateSettings('shortBreakDuration', parseInt(e.target.value))}
+                        value={settings.shortBreakDuration || ''}
+                        onChange={(e) => updateSettings('shortBreakDuration', parseInt(e.target.value) || 5)}
                         className={`w-full p-2 rounded-lg border ${
                           darkMode
                             ? 'bg-gray-700 border-gray-600 text-white'
@@ -1306,8 +1425,8 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
                         type="number"
                         min="5"
                         max="60"
-                        value={settings.longBreakDuration}
-                        onChange={(e) => updateSettings('longBreakDuration', parseInt(e.target.value))}
+                        value={settings.longBreakDuration || ''}
+                        onChange={(e) => updateSettings('longBreakDuration', parseInt(e.target.value) || 15)}
                         className={`w-full p-2 rounded-lg border ${
                           darkMode
                             ? 'bg-gray-700 border-gray-600 text-white'
@@ -1351,8 +1470,8 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
                         type="number"
                         min="2"
                         max="10"
-                        value={settings.longBreakInterval}
-                        onChange={(e) => updateSettings('longBreakInterval', parseInt(e.target.value))}
+                        value={settings.longBreakInterval || ''}
+                        onChange={(e) => updateSettings('longBreakInterval', parseInt(e.target.value) || 4)}
                         className={`w-16 p-2 rounded-lg border ${
                           darkMode
                             ? 'bg-gray-700 border-gray-600 text-white'
@@ -1374,8 +1493,8 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
                       type="number"
                       min="1"
                       max="16"
-                      value={settings.dailyGoal}
-                      onChange={(e) => updateSettings('dailyGoal', parseInt(e.target.value))}
+                      value={settings.dailyGoal || ''}
+                      onChange={(e) => updateSettings('dailyGoal', parseInt(e.target.value) || 8)}
                       className={`w-16 p-2 rounded-lg border ${
                         darkMode
                           ? 'bg-gray-700 border-gray-600 text-white'
@@ -1618,7 +1737,8 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
                                       ? darkMode ? 'bg-green-500' : 'bg-green-600' 
                                       : darkMode ? 'bg-blue-500' : 'bg-blue-600'
                                     : darkMode ? 'bg-gray-600' : 'bg-gray-300'
-                                } chart-bar-height-${maxHeightPercentage === 0 ? 5 : Math.round(maxHeightPercentage)}`}
+                                }`}
+                                style={{ height: `${maxHeightPercentage === 0 ? 5 : Math.round(maxHeightPercentage)}%` }}
                               ></div>
                             </div>
                             <div className="text-xs text-gray-500">
@@ -1874,11 +1994,7 @@ const PomodoroDesktop: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
         )}
       </AnimatePresence>
 
-      {/* Saved Tips Modal */}
-      <SavedTipsModal
-        isOpen={showSavedTips}
-        onClose={() => setShowSavedTips(false)}
-      />
+
 
       {/* Floating AI Assistant */}
       <FloatingAssistant

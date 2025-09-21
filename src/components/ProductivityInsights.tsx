@@ -15,6 +15,24 @@ const ProductivityInsights: React.FC<ProductivityInsightsProps> = ({ tasks, sess
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  // Load cached insights on mount
+  useEffect(() => {
+    const cached = localStorage.getItem(`productivity-insights-${user?.id}`);
+    if (cached) {
+      try {
+        const { recommendations: cachedRecs, lastUpdated: cachedTime } = JSON.parse(cached);
+        const cacheAge = Date.now() - new Date(cachedTime).getTime();
+        // Use cache if less than 1 hour old
+        if (cacheAge < 60 * 60 * 1000) {
+          setRecommendations(cachedRecs);
+          setLastUpdated(new Date(cachedTime));
+        }
+      } catch (error) {
+        console.error('Error loading cached insights:', error);
+      }
+    }
+  }, [user?.id]);
+
   const generateInsights = async () => {
     if (!user) return;
 
@@ -22,8 +40,15 @@ const ProductivityInsights: React.FC<ProductivityInsightsProps> = ({ tasks, sess
     try {
       const habits = await PersonalizedAIService.analyzeUserHabits(user.id, tasks, sessions);
       const insights = await PersonalizedAIService.generateProductivityRecommendations(habits);
+      const now = new Date();
       setRecommendations(insights);
-      setLastUpdated(new Date());
+      setLastUpdated(now);
+      
+      // Cache the results
+      localStorage.setItem(`productivity-insights-${user.id}`, JSON.stringify({
+        recommendations: insights,
+        lastUpdated: now.toISOString()
+      }));
     } catch (error) {
       console.error('Failed to generate insights:', error);
     } finally {
@@ -32,10 +57,11 @@ const ProductivityInsights: React.FC<ProductivityInsightsProps> = ({ tasks, sess
   };
 
   useEffect(() => {
-    if (tasks.length > 0 || sessions.length > 0) {
+    // Only generate if no cached data and we have data
+    if ((tasks.length > 0 || sessions.length > 0) && recommendations.length === 0) {
       generateInsights();
     }
-  }, [tasks.length, sessions.length, user]);
+  }, [tasks.length, sessions.length, user, recommendations.length]);
 
   const getRecommendationIcon = (type: string) => {
     switch (type) {

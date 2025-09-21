@@ -61,6 +61,7 @@ const EnhancedAICoach: React.FC<EnhancedAICoachProps> = ({
   darkMode = false
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isLarge, setIsLarge] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -155,7 +156,11 @@ const EnhancedAICoach: React.FC<EnhancedAICoachProps> = ({
 
       // Stream the response
       let fullContent = '';
-      const streamGenerator = enhancedAIFocusCoachService.generateStreamResponse(context, userMessage);
+      const streamGenerator = enhancedAIFocusCoachService.generateStreamResponse(
+        context,
+        userMessage,
+        'comprehensive'
+      );
 
       for await (const chunk of streamGenerator) {
         if (chunk.isComplete) {
@@ -285,7 +290,7 @@ const EnhancedAICoach: React.FC<EnhancedAICoachProps> = ({
 
   return (
     <motion.div
-      className={`fixed bottom-6 right-6 w-96 h-[500px] z-50 ${
+      className={`fixed bottom-6 right-6 w-96 md:w-[28rem] ${isLarge ? 'h-[700px]' : 'h-[500px]'} z-50 ${
         darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'
       } rounded-lg shadow-2xl border ${darkMode ? 'border-gray-700' : 'border-gray-200'} ${className}`}
       initial={{ scale: 0, opacity: 0 }}
@@ -308,6 +313,14 @@ const EnhancedAICoach: React.FC<EnhancedAICoachProps> = ({
             aria-label="Toggle insights"
           >
             <TrendingUp className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setIsLarge(!isLarge)}
+            className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+            aria-label={isLarge ? 'Switch to compact mode' : 'Expand chat height'}
+            title={isLarge ? 'Compact size' : 'Larger panel'}
+          >
+            <Maximize2 className="h-4 w-4" />
           </button>
           <button
             onClick={() => setIsExpanded(false)}
@@ -371,7 +384,7 @@ const EnhancedAICoach: React.FC<EnhancedAICoachProps> = ({
                     ? 'bg-gray-700 text-gray-100' 
                     : 'bg-gray-100 text-gray-800'
               }`}>
-                <p className="text-sm">
+                <p className="text-sm whitespace-pre-wrap">
                   {message.content}
                   {isStreaming && message.type === 'ai' && message.id === chatMessages[chatMessages.length - 1]?.id && (
                     <motion.span

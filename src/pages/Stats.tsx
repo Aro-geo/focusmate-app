@@ -299,37 +299,39 @@ const Stats: React.FC = () => {
         currentTime: new Date().toISOString()
       };
 
-      // Generate streaming insights
-      const currentInsights: string[] = [];
-      let streamedContent = '';
+      // Use analyzeTask for structured productivity insights
+      const { getFunctions, httpsCallable } = await import('firebase/functions');
+      const functions = getFunctions();
+      const analyzeTask = httpsCallable(functions, 'analyzeTask');
       
-      const streamGenerator = aiFocusCoachService.generateStreamingInsight(analyticsContext);
+      const analyticsPrompt = `Analyze my productivity data and provide 5 key insights:
+      
+Total Sessions: ${totalSessions}
+Total Completed Tasks: ${totalCompletedTasks}
+Total Focus Time: ${totalFocusMinutes} minutes
+Average Daily Focus: ${avgFocusMinutesPerDay} minutes
+Recent 7 days: ${JSON.stringify(dailyStats.slice(-7))}
+Top Task Categories: ${JSON.stringify(taskCategories.slice(0, 3))}
 
-      for await (const chunk of streamGenerator) {
-        if (chunk.isComplete && chunk.fullResponse) {
-          // Parse the final response into individual insights
-          const finalMessage = chunk.fullResponse;
-          const insights = finalMessage.split('\n')
-            .filter(line => line.trim().length > 0)
-            .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
-            .filter(insight => insight.length > 20); // Filter out very short insights
-          
-          setAiInsights(insights.slice(0, 5)); // Limit to 5 insights
-          break;
-        } else if (chunk.chunk) {
-          // Update with streaming content
-          streamedContent += chunk.chunk;
-          
-          // Try to extract partial insights from the stream
-          const partialInsights = streamedContent.split('\n')
-            .filter(line => line.trim().length > 0)
-            .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
-            .filter(insight => insight.length > 15);
-          
-          if (partialInsights.length > 0) {
-            setAiInsights([...partialInsights, '...analyzing more patterns']);
-          }
-        }
+Please provide actionable productivity insights, patterns, and recommendations.`;
+
+      const result = await analyzeTask({
+        task: analyticsPrompt,
+        model: 'deepseek-chat',
+        temperature: 0.7
+      });
+
+      const data = result.data as { analysis: string };
+      if (data.analysis) {
+        // Parse the analysis into individual insights
+        const insights = data.analysis.split('\n')
+          .filter(line => line.trim().length > 0)
+          .map(line => line.replace(/^[•\-\*\d\.]\s*/, '').trim())
+          .filter(insight => insight.length > 20); // Filter out very short insights
+        
+        setAiInsights(insights.slice(0, 5)); // Limit to 5 insights
+      } else {
+        throw new Error('No analysis received');
       }
 
     } catch (error) {

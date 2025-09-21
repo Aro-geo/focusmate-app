@@ -30,7 +30,7 @@ export interface SubscriptionLimits {
 }
 
 class SubscriptionService {
-  private readonly TRIAL_DURATION_DAYS = 14;
+  private readonly TRIAL_DURATION_DAYS = 90;
   private readonly BASIC_AI_REQUESTS_PER_DAY = 10;
   private readonly PRO_AI_REQUESTS_PER_DAY = 100;
 

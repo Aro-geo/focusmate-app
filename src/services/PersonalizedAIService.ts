@@ -97,38 +97,45 @@ class PersonalizedAIService {
   }
 
   async analyzeTaskFromNaturalLanguage(input: string): Promise<TaskAnalysis> {
+    console.log('🔍 PersonalizedAIService: Analyzing task:', input);
+    
     try {
-      const prompt = `Analyze this task description and extract structured information:
-      "${input}"
+      console.log('🚀 PersonalizedAIService: Calling Firebase analyzeTask function...');
       
-      Return JSON with: category, priority (low/medium/high), estimatedDuration (minutes), deadline (if mentioned), subtasks (array), tags (array)`;
-
-      const analyzeTask = httpsCallable(this.functions, 'aiChat');
-      const result = await analyzeTask({
-        data: {
-          message: prompt,
-          model: 'deepseek-reasoner',
-          temperature: 1.0
-        }
+      const analyzeTaskFunction = httpsCallable(this.functions, 'analyzeTask');
+      const result = await analyzeTaskFunction({
+        task: input,
+        model: 'deepseek-reasoner',
+        temperature: 0.7
       });
 
+      console.log('✅ PersonalizedAIService: Firebase function response:', result);
+
       const response = result.data as any;
-      if (!response || !response.result || !response.result.response) {
-        throw new Error('Invalid response structure from DeepSeek API');
+      console.log('🔎 PersonalizedAIService: Response data keys:', Object.keys(response || {}));
+      console.log('🔎 PersonalizedAIService: Full response data:', response);
+      
+      if (!response) {
+        console.error('❌ PersonalizedAIService: No response data received');
+        throw new Error('No response data from analyzeTask function');
       }
 
-      const analysis = JSON.parse(response.result.response);
+      console.log('📝 PersonalizedAIService: Raw AI analysis:', response.analysis);
+      
+      // The analyzeTask function now returns structured data
+      console.log('✨ PersonalizedAIService: Structured response:', response);
 
       return {
-        category: analysis.category || 'General',
-        priority: analysis.priority || 'medium',
-        estimatedDuration: analysis.estimatedDuration || 30,
-        deadline: analysis.deadline ? new Date(analysis.deadline) : undefined,
-        subtasks: analysis.subtasks || [],
-        tags: analysis.tags || []
+        category: response.category || 'General',
+        priority: response.priority || 'medium',
+        estimatedDuration: response.estimatedTime || 30,
+        deadline: undefined, // analyzeTask doesn't handle deadlines yet
+        subtasks: response.suggestions || [],
+        tags: ['ai-analyzed']
       };
     } catch (error) {
-      console.error('Task analysis error:', SecurityUtils.sanitizeForLog(String(error)));
+      console.error('❌ PersonalizedAIService: Task analysis error:', SecurityUtils.sanitizeForLog(String(error)));
+      console.log('🔄 PersonalizedAIService: Falling back to rule-based analysis');
       return this.fallbackTaskAnalysis(input);
     }
   }
@@ -140,7 +147,7 @@ class PersonalizedAIService {
     notes?: string;
   }): Promise<string> {
     try {
-      const prompt = `Generate a brief, encouraging summary for this focus session:
+      const taskDescription = `Generate a brief, encouraging summary for this focus session:
       Duration: ${sessionData.duration} minutes
       Tasks completed: ${sessionData.tasksCompleted.join(', ')}
       Mood: ${sessionData.mood}
@@ -148,21 +155,19 @@ class PersonalizedAIService {
       
       Provide insights and encouragement in 2-3 sentences.`;
 
-      const generateSummary = httpsCallable(this.functions, 'aiChat');
-      const result = await generateSummary({
-        data: {
-          message: prompt,
-          model: 'deepseek-chat',
-          temperature: 1.3
-        }
+      const analyzeTaskFunction = httpsCallable(this.functions, 'analyzeTask');
+      const result = await analyzeTaskFunction({
+        task: taskDescription,
+        model: 'deepseek-chat',
+        temperature: 1.3
       });
 
       const response = result.data as any;
-      if (!response || !response.result || !response.result.response) {
-        throw new Error('Invalid response from DeepSeek API');
+      if (!response || !response.analysis) {
+        throw new Error('Invalid response from analyzeTask function');
       }
 
-      return response.result.response;
+      return response.analysis;
     } catch (error) {
       console.error('Summary generation error:', SecurityUtils.sanitizeForLog(String(error)));
       return this.fallbackSessionSummary(sessionData);
@@ -171,26 +176,24 @@ class PersonalizedAIService {
 
   async generateJournalInsights(entry: string): Promise<string> {
     try {
-      const prompt = `Analyze this journal entry and provide helpful insights:
+      const taskDescription = `Analyze this journal entry and provide helpful insights:
       "${entry}"
       
       Highlight key achievements, patterns, and suggest areas for improvement. Be supportive and constructive.`;
 
-      const generateInsights = httpsCallable(this.functions, 'aiChat');
-      const result = await generateInsights({
-        data: {
-          message: prompt,
-          model: 'deepseek-chat',
-          temperature: 1.3
-        }
+      const analyzeTaskFunction = httpsCallable(this.functions, 'analyzeTask');
+      const result = await analyzeTaskFunction({
+        task: taskDescription,
+        model: 'deepseek-chat',
+        temperature: 1.3
       });
 
       const response = result.data as any;
-      if (!response || !response.result || !response.result.response) {
-        throw new Error('Invalid response from DeepSeek API');
+      if (!response || !response.analysis) {
+        throw new Error('Invalid response from analyzeTask function');
       }
 
-      return response.result.response;
+      return response.analysis;
     } catch (error) {
       console.error('Journal insights error:', SecurityUtils.sanitizeForLog(String(error)));
       return "Great reflection! Keep journaling to track your progress and maintain self-awareness.";
@@ -214,6 +217,8 @@ class PersonalizedAIService {
   }
 
   private fallbackTaskAnalysis(input: string): TaskAnalysis {
+    console.log('⚠️ PersonalizedAIService: Using fallback rule-based analysis (AI failed)');
+    
     const hasDeadline = /by|due|before|until/i.test(input);
     const isUrgent = /urgent|asap|immediately|today/i.test(input);
     const isProject = /project|report|presentation/i.test(input);
@@ -223,8 +228,8 @@ class PersonalizedAIService {
       priority: isUrgent ? 'high' : hasDeadline ? 'medium' : 'low',
       estimatedDuration: isProject ? 120 : 30,
       deadline: hasDeadline ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) : undefined,
-      subtasks: isProject ? ['Research', 'Draft', 'Review', 'Finalize'] : [],
-      tags: [isUrgent ? 'urgent' : 'normal']
+      subtasks: isProject ? ['Research', 'Draft', 'Review', 'Finalize'] : ['Complete task'],
+      tags: ['fallback-analysis', isUrgent ? 'urgent' : 'normal']
     };
   }
 

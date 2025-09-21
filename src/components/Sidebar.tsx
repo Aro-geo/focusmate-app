@@ -7,6 +7,7 @@ import {
   BookOpen, 
   BarChart3, 
   CheckSquare,
+  CalendarDays,
   Shield
 } from 'lucide-react';
 import StaggeredList from './StaggeredList';
@@ -28,9 +29,7 @@ const Sidebar: React.FC = () => {
     { to: '/app/journal', icon: BookOpen, label: 'Journal' },
     { to: '/app/stats', icon: BarChart3, label: 'Stats' },
     { to: '/app/todos', icon: CheckSquare, label: 'Todos' },
-    ...(user?.email && adminService.isAdmin(user.email) ? [
-      { to: '/app/admin', icon: Shield, label: 'Admin Panel' }
-    ] : [])
+    { to: '/app/calendar', icon: CalendarDays, label: 'Calendar' }
   ];
 
   const handleLogout = async () => {
@@ -124,6 +123,7 @@ const Sidebar: React.FC = () => {
           onLogout={handleLogout}
           onThemeToggle={toggleTheme}
           isDarkMode={theme === 'dark'}
+          isAdmin={user?.email ? adminService.isAdmin(user.email) : false}
         />
       </motion.div>
     </motion.div>

@@ -82,7 +82,7 @@ const IntegrationDemo: React.FC = () => {
                   <span className="text-2xl">🧠</span>
                   <div>
                     <h3 className="font-medium text-blue-900">AI Integration</h3>
-                    <p className="text-sm text-blue-700">OpenAI proxy with rate limiting</p>
+                    <p className="text-sm text-blue-700">DeepSeek AI with Firebase Functions</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3 p-3 bg-purple-50 rounded-lg">
@@ -104,7 +104,7 @@ const IntegrationDemo: React.FC = () => {
                   <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Live</span>
                 </div>
                 <p className="text-gray-600 text-sm">
-                  Real-time AI chat powered by OpenAI API through our secure backend proxy. 
+                  Real-time AI chat powered by DeepSeek AI through secure Firebase Functions. 
                   Features focus suggestions, journal analysis, and general assistance.
                 </p>
                 <AIIntegrationDemo className="h-96" />
@@ -140,7 +140,7 @@ const IntegrationDemo: React.FC = () => {
                 <div className="space-y-2">
                   <h3 className="font-medium text-gray-900">🧠 AI Integration</h3>
                   <ul className="text-sm text-gray-600 space-y-1">
-                    <li>• OpenAI API proxy with rate limiting</li>
+                    <li>• DeepSeek AI through Firebase Functions</li>
                     <li>• Focus suggestions generation</li>
                     <li>• Journal analysis & insights</li>
                     <li>• Session summaries</li>
@@ -211,7 +211,7 @@ const IntegrationDemo: React.FC = () => {
                   <div className="space-y-1 text-sm">
                     <div className="flex items-center space-x-2">
                       <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">POST</span>
-                      <code className="text-gray-700">/openai-proxy</code>
+                      <code className="text-gray-700">/aiChat</code>
                     </div>
                     <div className="flex items-center space-x-2">
                       <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">POST</span>

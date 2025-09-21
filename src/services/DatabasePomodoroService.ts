@@ -112,15 +112,23 @@ class DatabasePomodoroService {
     const user = auth.currentUser;
     if (!user) throw new Error('User not authenticated');
     
-    const sessionRef = doc(db, 'users', user.uid, 'pomodoroSessions', sessionId);
-    
-    // Convert Date objects to Firestore Timestamps
-    const firestoreUpdates: any = { ...updates };
-    if (updates.startTime) firestoreUpdates.startTime = Timestamp.fromDate(updates.startTime);
-    if (updates.endTime) firestoreUpdates.endTime = Timestamp.fromDate(updates.endTime);
-    if (updates.createdAt) firestoreUpdates.createdAt = Timestamp.fromDate(updates.createdAt);
-    
-    await updateDoc(sessionRef, firestoreUpdates);
+    try {
+      const sessionRef = doc(db, 'users', user.uid, 'pomodoroSessions', sessionId);
+      
+      // Convert Date objects to Firestore Timestamps
+      const firestoreUpdates: any = { ...updates };
+      if (updates.startTime) firestoreUpdates.startTime = Timestamp.fromDate(updates.startTime);
+      if (updates.endTime) firestoreUpdates.endTime = Timestamp.fromDate(updates.endTime);
+      if (updates.createdAt) firestoreUpdates.createdAt = Timestamp.fromDate(updates.createdAt);
+      
+      await updateDoc(sessionRef, firestoreUpdates);
+    } catch (error: any) {
+      if (error.code === 'not-found') {
+        console.warn(`Session ${sessionId} not found, skipping update`);
+        return;
+      }
+      throw error;
+    }
   }
 }
 

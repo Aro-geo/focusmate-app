@@ -374,7 +374,7 @@ class AIFocusCoachService {
     const { messageType, sessionData, userPerformance, currentTime } = context;
     
     // Build context for AI insight generation
-    let prompt = `As a focus coach, provide personalized advice for the following situation:
+  let prompt = `You are FocusMate AI Coach. Provide personalized, thorough guidance for the following situation:
     
 Context: ${messageType}
 User's analytics: ${JSON.stringify(this.analytics)}
@@ -389,7 +389,12 @@ Time: ${currentTime || new Date().toLocaleTimeString()}`;
       prompt += `\nPerformance data: ${JSON.stringify(userPerformance)}`;
     }
 
-    prompt += `\n\nProvide a brief, encouraging, and actionable insight (2-3 sentences max). Be specific and personal based on the data provided.`;
+  prompt += `\n\nInstructions:
+- Start with a short acknowledgement, then give concrete next steps.
+- Include a 3–6 bullet plan with examples and one alternative path.
+- Briefly explain the “why” behind your advice.
+- Aim for ~150–300 words unless asked to be brief.
+- Adapt to the context and reference prior patterns when helpful.`;
 
     try {
       const response = await fetch(`https://us-central1-focusmate-ai-8cad6.cloudfunctions.net/aiChatStream`, {
@@ -400,8 +405,11 @@ Time: ${currentTime || new Date().toLocaleTimeString()}`;
         body: JSON.stringify({
           message: prompt,
           context: 'focus_insights',
-          model: 'deepseek-chat',
-          temperature: 0.8
+          model: 'deepseek-reasoner',
+          temperature: 0.8,
+          top_p: 0.95,
+          max_tokens: 1200,
+          detailLevel: 'comprehensive'
         })
       });
 
@@ -450,8 +458,20 @@ Time: ${currentTime || new Date().toLocaleTimeString()}`;
                   continue;
                 }
 
-                if (parsed.choices?.[0]?.delta?.content) {
-                  const chunk = parsed.choices[0].delta.content;
+                // Handle DeepSeek response format through Firebase Functions
+                let chunk = '';
+                if (parsed.content) {
+                  // Direct content from DeepSeek
+                  chunk = parsed.content;
+                } else if (parsed.response) {
+                  // Firebase function response format
+                  chunk = parsed.response;
+                } else if (typeof parsed === 'string') {
+                  // Direct string response
+                  chunk = parsed;
+                }
+
+                if (chunk) {
                   fullContent += chunk;
                   
                   yield {
@@ -484,18 +504,6 @@ Time: ${currentTime || new Date().toLocaleTimeString()}`;
    * Stream personalized coaching advice
    */
   async *streamCoachingAdvice(userQuery: string): AsyncGenerator<{ chunk: string; isComplete: boolean; fullResponse?: string }> {
-    const prompt = `As an AI focus coach, respond to this user query with personalized advice:
-
-User Query: "${userQuery}"
-
-User's Focus Analytics:
-- Average session length: ${this.analytics.averageSessionLength} minutes
-- Completion rate: ${Math.round(this.analytics.completionRate * 100)}%
-- Current streak: ${this.analytics.streak} days
-- Common distractions: ${Object.keys(this.distractions).join(', ') || 'None tracked yet'}
-
-Provide encouraging, actionable advice in 2-3 sentences. Be specific and reference their data when relevant.`;
-
     yield* this.generateStreamingInsight({
       messageType: 'coaching_advice',
       userPerformance: { query: userQuery }

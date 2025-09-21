@@ -9,10 +9,7 @@ import {
   Search,
   Download,
   Lightbulb,
-  Tag,
   X,
-  Upload,
-  Image,
   BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,12 +19,10 @@ import JournalInsightsModal from '../components/JournalInsightsModal';
 import SecureFirestoreService, { SecureJournalEntry } from '../services/SecureFirestoreService';
 import JournalAIService from '../services/JournalAIService';
 import JournalAttachmentService from '../services/JournalAttachmentService';
-import { exportService } from '../services/ExportService';
-import { aiJournalInsightsService, AIInsight as AIJournalInsight } from '../services/AIJournalInsightsService';
 import { journalInsightsService } from '../services/JournalInsightsService';
+import { AIInsight, aiJournalInsightsService } from '../services/AIJournalInsightsService';
 
 import { useAuth } from '../context/AuthContext';
-import { Timestamp } from 'firebase/firestore';
 
 // Define interfaces for the app
 interface JournalStreak {
@@ -45,16 +40,12 @@ interface JournalStats {
   entriesByDate: Record<string, number>;
 }
 
-interface AIInsight {
-  type: string;
-  content: string;
-  confidence?: number;
-}
-
 const Journal: React.FC = () => {
   const { darkMode } = useTheme();
   const { user, firebaseUser, isAuthenticated } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Track last recent-entries signature to avoid redundant AI calls
+  const lastRecentKeyRef = useRef<string | null>(null);
 
   // Log authentication state to help debug
   useEffect(() => {
@@ -83,7 +74,7 @@ const Journal: React.FC = () => {
   };
 
   // Auto-suggestions
-  const [autoSuggestions, setAutoSuggestions] = useState<string[]>([
+  const [autoSuggestions] = useState<string[]>([
     "What went well today?",
     "What could I improve tomorrow?",
     "What am I grateful for?",
@@ -123,9 +114,7 @@ const Journal: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<JournalStats | null>(null);
 
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [currentEntry, setCurrentEntry] = useState<string>('');
   const [currentTitle, setCurrentTitle] = useState<string>('');
   const [currentMood, setCurrentMood] = useState<string>('neutral');
@@ -135,12 +124,10 @@ const Journal: React.FC = () => {
   const [selectedTagFilter, setSelectedTagFilter] = useState<string>('all');
   const [showCalendarFilter, setShowCalendarFilter] = useState<boolean>(false);
   const [aiInsight, setAiInsight] = useState<string>('');
-  const [isGeneratingInsight, setIsGeneratingInsight] = useState<boolean>(false);
   const [currentAttachments, setCurrentAttachments] = useState<string[]>([]);
   const [isPrivateEntry, setIsPrivateEntry] = useState<boolean>(false);
   const [showEntryTemplates, setShowEntryTemplates] = useState<boolean>(false);
   const [uploadingFile, setUploadingFile] = useState<boolean>(false);
-  const [fileError, setFileError] = useState<string | null>(null);
 
   // Streak tracking
   const [streak, setStreak] = useState<JournalStreak>({
@@ -153,7 +140,7 @@ const Journal: React.FC = () => {
   const [aiMessage, setAiMessage] = useState<string>("Ready to help you reflect on your thoughts and experiences! Ask me about journaling techniques or insights.");
   const [isAiLoading, setIsAiLoading] = useState<boolean>(false);
   const [aiChatInput, setAiChatInput] = useState<string>('');
-  const [aiInsights, setAiInsights] = useState<AIJournalInsight[]>([]);
+  const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
   const [isGeneratingAIInsights, setIsGeneratingAIInsights] = useState<boolean>(false);
   const [showAIInsights, setShowAIInsights] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
@@ -189,7 +176,6 @@ const Journal: React.FC = () => {
 
         // Get journal stats
         const journalStats = await SecureFirestoreService.getJournalStats(firebaseUser.uid);
-        setStats(journalStats);
         setStreak(journalStats.streak);
 
         // AI insights will be generated on demand
@@ -254,7 +240,6 @@ const Journal: React.FC = () => {
 
       // Update stats
       const journalStats = await SecureFirestoreService.getJournalStats(firebaseUser.uid);
-      setStats(journalStats);
       setStreak(journalStats.streak);
 
       // Reset form
@@ -382,7 +367,6 @@ const Journal: React.FC = () => {
 
       // Update stats
       const journalStats = await SecureFirestoreService.getJournalStats(firebaseUser.uid);
-      setStats(journalStats);
       setStreak(journalStats.streak);
 
     } catch (err) {
@@ -393,7 +377,7 @@ const Journal: React.FC = () => {
     }
   };
 
-  // Generate insights using DeepSeek
+  // Generate insights using AIJournalInsightsService
   const handleGenerateInsight = async () => {
     if (!firebaseUser || !isAuthenticated || entries.length === 0) {
       setError('You need to be logged in and have journal entries to generate insights.');
@@ -405,102 +389,47 @@ const Journal: React.FC = () => {
       setError(null);
       setAiInsight('');
 
+      console.log('🔍 Journal: Generating insights using AIJournalInsightsService...');
+      
       // Use only recent entries to speed up processing
       const recentEntries = entries.slice(-5);
-      const moodCounts = recentEntries.reduce((acc, entry) => {
-        acc[entry.mood] = (acc[entry.mood] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      // Compute a compact signature of recent entries (id, date, first 200 chars)
+      const recentKey = JSON.stringify(
+        recentEntries.map(e => ({
+          i: e.id || '',
+          d: (e as any).createdAt?.toDate ? (e as any).createdAt.toDate().toISOString() : (e as any).createdAt || (e as any).date || '',
+          c: (e.content || '').slice(0, 200)
+        }))
+      );
+      if (lastRecentKeyRef.current === recentKey && aiInsights.length > 0) {
+        console.log('ℹ️ Journal: Skipping AI insights call - recent entries unchanged; using cached insights in state.');
+        setShowAIInsights(true);
+        const first = aiInsights[0];
+        if (first) setAiInsight(`${first.title}: ${first.description}`);
+        setIsGeneratingAIInsights(false);
+        return;
+      }
       
-      const commonTags = recentEntries.flatMap(e => e.tags || []).slice(0, 5);
+      // Generate insights using the service
+      const insights = await aiJournalInsightsService.generateInsights(recentEntries);
       
-      const prompt = `Analyze these journal patterns and provide a brief insight (2-3 sentences, no markdown formatting):
-
-Recent entries: ${recentEntries.length}
-Mood distribution: ${Object.entries(moodCounts).map(([mood, count]) => `${mood}: ${count}`).join(', ')}
-Common themes: ${commonTags.join(', ')}
-Average entry length: ${Math.round(recentEntries.reduce((sum, e) => sum + e.content.length, 0) / recentEntries.length)} characters
-
-Provide actionable insights about patterns, growth opportunities, or emotional trends.`;
-
-      // Use DeepSeek for faster, more focused insights
-      let fullInsight = '';
-      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.REACT_APP_DEEPSEEK_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'deepseek-reasoner',
-          messages: [{
-            role: 'system',
-            content: 'You are an analytical journal insights expert. Provide clear, actionable insights without markdown formatting.'
-          }, {
-            role: 'user',
-            content: prompt
-          }],
-          max_tokens: 200,
-          temperature: 1.0,
-          stream: true
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate insights');
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('No response stream');
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') break;
-
-            try {
-              const parsed = JSON.parse(data);
-              const content = parsed.choices[0]?.delta?.content || '';
-              if (content) {
-                fullInsight += content;
-                setAiInsight(fullInsight);
-              }
-            } catch (e) {
-              // Skip invalid JSON
-            }
-          }
-        }
-      }
-
-      // Create simple insight object
-      if (fullInsight) {
-        const insights = [{
-          id: `insight-${Date.now()}`,
-          type: 'pattern' as const,
-          title: 'Journal Analysis',
-          description: fullInsight,
-          confidence: 0.85,
-          relatedEntries: recentEntries.slice(-3).map(e => e.id || ''),
-          timestamp: new Date()
-        }];
+      if (insights && insights.length > 0) {
         setAiInsights(insights);
         setShowAIInsights(true);
+        // Remember signature to dedupe subsequent clicks
+        lastRecentKeyRef.current = recentKey;
+        
+        // Set the first insight as the main insight text for display
+        const firstInsight = insights[0];
+        const insightText = `${firstInsight.title}: ${firstInsight.description}`;
+        setAiInsight(insightText);
+        
+        console.log('✅ Journal: Generated', insights.length, 'insights');
+      } else {
+        setAiInsight('Unable to generate insights at this time. Your recent entries show consistent journaling habits - keep it up!');
       }
     } catch (err) {
-      console.error('Error generating insights:', err);
+      console.error('❌ Journal: Error generating insights:', err);
       setAiInsight('Unable to generate insights at this time. Your recent entries show consistent journaling habits - keep it up!');
     } finally {
       setIsGeneratingAIInsights(false);
@@ -593,11 +522,11 @@ Provide actionable insights about patterns, growth opportunities, or emotional t
 
     try {
       setUploadingFile(true);
-      setFileError(null);
+      setError(null);
 
       // Check file size (limit to 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        setFileError('File is too large. Maximum size is 5MB.');
+        setError('File is too large. Maximum size is 5MB.');
         return;
       }
 
@@ -612,7 +541,7 @@ Provide actionable insights about patterns, growth opportunities, or emotional t
 
     } catch (err) {
       console.error('Error uploading attachment:', err);
-      setFileError(`Failed to upload attachment: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setError(`Failed to upload attachment: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setUploadingFile(false);
       // Reset the file input
@@ -1138,13 +1067,6 @@ Provide actionable insights about patterns, growth opportunities, or emotional t
                         : "Click 'Generate Insight' to get AI analysis of your journal entries."}
                     </p>
                   </div>
-                </div>
-              )}
-
-              {/* Debug info */}
-              {process.env.NODE_ENV === 'development' && (
-                <div className="mb-2 p-2 bg-yellow-100 dark:bg-yellow-900 rounded text-xs">
-                  Debug: showAIInsights={showAIInsights.toString()}, aiInsights.length={aiInsights.length}
                 </div>
               )}
 

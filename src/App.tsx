@@ -6,6 +6,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import Pomodoro from './pages/Pomodoro';
 import Journal from './pages/Journal';
 import Stats from './pages/Stats';
+import CalendarPage from './pages/calendar/CalendarPage';
 import Profile from './pages/Profile';
 import SettingsPage from './pages/SettingsPage';
 import EnhancedTodoList from './pages/EnhancedTodoList';
@@ -57,6 +58,7 @@ function App() {
                       <Route path="pomodoro" element={<Pomodoro />} />
                       <Route path="journal" element={<Journal />} />
                       <Route path="stats" element={<Stats />} />
+                      <Route path="calendar" element={<CalendarPage />} />
                       <Route path="todos" element={<EnhancedTodoList />} />
                       <Route path="profile" element={<Profile />} />
                       <Route path="settings" element={<SettingsPage />} />

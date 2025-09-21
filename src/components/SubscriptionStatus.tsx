@@ -111,11 +111,13 @@ const SubscriptionStatus: React.FC<SubscriptionStatusProps> = ({ onUpgrade, comp
             </button>
           )}
         </div>
-        <div className={`text-xs mt-1 ${
-          aiRequestsRemaining <= 2 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'
-        }`}>
-          {aiRequestsRemaining} AI requests left today
-        </div>
+        {subscription.plan === 'basic' && trialDaysRemaining === 0 && (
+          <div className={`text-xs mt-1 ${
+            aiRequestsRemaining <= 2 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'
+          }`}>
+            {aiRequestsRemaining} AI requests left today
+          </div>
+        )}
       </div>
     );
   }
@@ -147,7 +149,7 @@ const SubscriptionStatus: React.FC<SubscriptionStatusProps> = ({ onUpgrade, comp
 
           <div className="mb-6">
             <p className={`mb-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-              Your 14-day trial has ended. Upgrade to Pro to continue enjoying:
+              Your 3-month trial has ended. Upgrade to Pro to continue enjoying:
             </p>
             <ul className="space-y-2">
               <li className="flex items-center space-x-2">

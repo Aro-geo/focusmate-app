@@ -27,7 +27,7 @@ export class JournalAIService {
   async analyzeSentiment(text: string): Promise<SentimentAnalysis> {
     try {
       // This is a simple implementation - in a real app, you would call an AI API
-      // like OpenAI, Google Cloud Natural Language API, or Azure Text Analytics
+      // like DeepSeek, Google Cloud Natural Language API, or Azure Text Analytics
       
       // Sample implementation using simple keyword analysis
       const positiveWords = ['happy', 'good', 'great', 'excellent', 'joy', 'wonderful', 'amazing', 'love'];
